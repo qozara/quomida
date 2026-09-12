@@ -1,0 +1,25 @@
+{
+  "name": "quomida",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "dev": "npm run dev --workspace=@quomida/webapp",
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:web:e2e": "npm run test:e2e --workspace=@quomida/webapp",
+    "test:all:non-interactive": "vitest run && npm run test:web:e2e",
+    "cli": "npm run start --workspace=@quomida/cli",
+    "etl": "npm run build --workspace=@quomida/etl-pipeline && npm run start --workspace=@quomida/etl-pipeline"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

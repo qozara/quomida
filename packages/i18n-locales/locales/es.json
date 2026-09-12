@@ -1,0 +1,57 @@
+{
+  "app": {
+    "title": "Quomida",
+    "tagline": "Contador de Calorías y Macronutrientes Local y Privado"
+  },
+  "nav": {
+    "dashboard": "Diario",
+    "catalog": "Mis Alimentos",
+    "settings": "Ajustes"
+  },
+  "dashboard": {
+    "title": "Resumen Diario",
+    "calories": "Calorías",
+    "protein": "Proteínas",
+    "carbs": "Carbohidratos",
+    "fats": "Grasas",
+    "remaining": "restantes",
+    "overGoal": "sobre la meta",
+    "meals": {
+      "breakfast": "Desayuno",
+      "lunch": "Almuerzo",
+      "dinner": "Cena",
+      "snack": "Snacks / Colaciones"
+    },
+    "noEntries": "Aún no registraste alimentos en esta comida.",
+    "addFood": "Registrar Alimento"
+  },
+  "search": {
+    "placeholder": "Buscar alimento o corte (ej. Peceto, Palta, Milanesa)...",
+    "aiPlaceholder": "Describe lo que comiste (ej. 2 empanadas de carne y ensalada mixta)...",
+    "tabSearch": "Búsqueda en Catálogo",
+    "tabAi": "Registro IA",
+    "parseButton": "Analizar Comida",
+    "noResults": "No se encontraron alimentos en el catálogo."
+  },
+  "portionModal": {
+    "title": "Porción y Cantidad",
+    "unitLabel": "Unidad de Porción",
+    "quantityLabel": "Cantidad",
+    "logAction": "Registrar en Diario",
+    "calculatedMacros": "Nutrición Calculada",
+    "customGrams": "Gramos (g)"
+  },
+  "settings": {
+    "title": "Perfil y Configuración",
+    "language": "Idioma",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema",
+    "dailyTarget": "Objetivo Calórico Diario (kcal)",
+    "syncTitle": "Persistencia de Datos y Sincronización BYOS",
+    "syncStatusConnected": "Estado de Sync: Conectado",
+    "syncStatusOffline": "Estado de Sync: Modo Local sin Conexión (Mock)",
+    "syncLastSynced": "Última sync: {{time}}"
+  }
+}

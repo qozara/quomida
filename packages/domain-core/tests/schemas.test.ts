@@ -1,0 +1,42 @@
+import { describe, it, expect } from 'vitest';
+import {
+  baseIngredientsSchema,
+  recipesSchema,
+  portionsSchema,
+  dailyLogsSchema,
+  userSettingsSchema
+} from '../src/index.js';
+
+describe('RxDB Schema Specs', () => {
+  it('defines base_ingredients schema with primary key id', () => {
+    expect(baseIngredientsSchema.title).toBe('base_ingredients');
+    expect(baseIngredientsSchema.primaryKey).toBe('id');
+    expect(baseIngredientsSchema.required).toContain('name');
+    expect(baseIngredientsSchema.required).toContain('calories_100g');
+  });
+
+  it('defines recipes schema with embedded ingredients array', () => {
+    expect(recipesSchema.title).toBe('recipes');
+    expect(recipesSchema.primaryKey).toBe('id');
+    expect(recipesSchema.properties.ingredients.type).toBe('array');
+  });
+
+  it('defines portions schema referencing base food', () => {
+    expect(portionsSchema.title).toBe('portions');
+    expect(portionsSchema.primaryKey).toBe('id');
+    expect(portionsSchema.required).toContain('base_food_id');
+    expect(portionsSchema.required).toContain('equivalent_weight_g');
+  });
+
+  it('defines daily_logs schema with hardcoded macros snapshot', () => {
+    expect(dailyLogsSchema.title).toBe('daily_logs');
+    expect(dailyLogsSchema.primaryKey).toBe('id');
+    expect(dailyLogsSchema.required).toContain('date');
+    expect(dailyLogsSchema.required).toContain('macros');
+  });
+
+  it('defines user_settings schema with global_settings key', () => {
+    expect(userSettingsSchema.title).toBe('user_settings');
+    expect(userSettingsSchema.primaryKey).toBe('id');
+  });
+});

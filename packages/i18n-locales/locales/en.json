@@ -1,0 +1,57 @@
+{
+  "app": {
+    "title": "Quomida",
+    "tagline": "Privacy-First Local Calorie & Macro Tracker"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "catalog": "My Foods",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Daily Summary",
+    "calories": "Calories",
+    "protein": "Protein",
+    "carbs": "Carbs",
+    "fats": "Fats",
+    "remaining": "remaining",
+    "overGoal": "over goal",
+    "meals": {
+      "breakfast": "Breakfast",
+      "lunch": "Lunch",
+      "dinner": "Dinner",
+      "snack": "Snacks"
+    },
+    "noEntries": "No foods logged yet for this meal.",
+    "addFood": "Log Food"
+  },
+  "search": {
+    "placeholder": "Search food or cuts (e.g. Peceto, Aguacate, Milanesa)...",
+    "aiPlaceholder": "Describe what you ate (e.g. 2 beef empanadas and mixed salad)...",
+    "tabSearch": "Catalog Search",
+    "tabAi": "AI Natural Log",
+    "parseButton": "Parse Meal",
+    "noResults": "No ingredients found matching your search."
+  },
+  "portionModal": {
+    "title": "Portion & Quantity",
+    "unitLabel": "Portion Unit",
+    "quantityLabel": "Quantity",
+    "logAction": "Log to Diary",
+    "calculatedMacros": "Calculated Nutrition",
+    "customGrams": "Grams (g)"
+  },
+  "settings": {
+    "title": "Profile & Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "dailyTarget": "Daily Calorie Target (kcal)",
+    "syncTitle": "Data Persistence & BYOS Sync",
+    "syncStatusConnected": "Sync Status: Connected",
+    "syncStatusOffline": "Sync Status: Local Offline Mode (Mock)",
+    "syncLastSynced": "Last synced: {{time}}"
+  }
+}
