@@ -6,7 +6,7 @@ Welcome! Whether you are a human developer or an AI coding agent, this guide out
 
 ## 1. Development Prerequisites
 
-- **Node.js**: `v20.0.0` or higher
+- **Node.js**: `v24.0.0` (LTS) or higher (minimum `v20.0.0`)
 - **npm**: `v10.0.0` or higher
 
 ---
