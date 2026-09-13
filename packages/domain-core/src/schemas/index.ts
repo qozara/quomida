@@ -21,7 +21,8 @@ export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
     calories_100g: { type: 'number', minimum: 0 },
     protein_100g: { type: 'number', minimum: 0 },
     carbs_100g: { type: 'number', minimum: 0 },
-    fats_100g: { type: 'number', minimum: 0 }
+    fats_100g: { type: 'number', minimum: 0 },
+    updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'name', 'source', 'lang', 'calories_100g', 'protein_100g', 'carbs_100g', 'fats_100g']
 };
@@ -46,7 +47,8 @@ export const recipesSchema: RxJsonSchema<Recipe> = {
         required: ['ingredient_id', 'raw_weight_g']
       }
     },
-    yield_factor: { type: 'number', minimum: 0.1, default: 1.0 }
+    yield_factor: { type: 'number', minimum: 0.1, default: 1.0 },
+    updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'name', 'ingredients', 'yield_factor']
 };
@@ -61,7 +63,8 @@ export const portionsSchema: RxJsonSchema<Portion> = {
     id: { type: 'string', maxLength: 100 },
     base_food_id: { type: 'string' },
     name: { type: 'string' },
-    equivalent_weight_g: { type: 'number', minimum: 0.1 }
+    equivalent_weight_g: { type: 'number', minimum: 0.1 },
+    updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'base_food_id', 'name', 'equivalent_weight_g']
 };
@@ -92,7 +95,8 @@ export const dailyLogsSchema: RxJsonSchema<DailyLog> = {
         fats: { type: 'number' }
       },
       required: ['calories', 'protein', 'carbs', 'fats']
-    }
+    },
+    updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'timestamp', 'date', 'meal_type', 'food_reference_id', 'quantity', 'portion_name', 'macros']
 };
@@ -116,7 +120,8 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
         fats: { type: 'number' }
       },
       required: ['protein', 'carbs', 'fats']
-    }
+    },
+    updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']
 };
