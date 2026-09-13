@@ -1,0 +1,13 @@
+# Architectural Decision Records (ADRs)
+
+This directory contains formal Architectural Decision Records (ADRs) for the Quomida project, following the [MADR (Markdown Architecture Decision Records)](https://adr.github.io/madr/) standard.
+
+## Index of Decision Records
+
+* [ADR 0000: Use Markdown Architectural Decision Records](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0000-use-markdown-architectural-decision-records.md)
+* [ADR 0001: RxDB + IndexedDB Local-First Client Engine](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0001-rxdb-indexeddb-local-first-engine.md)
+* [ADR 0002: Bring Your Own Storage (BYOS) & Decoupled Sync Adapter](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0002-byos-decoupled-sync-adapter-pattern.md)
+* [ADR 0003: Immutability of Historical Macro Snapshots in Daily Logs](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0003-historical-macro-immutability.md)
+* [ADR 0004: Compound Recipe Yield & Retention Factors (FAO/INFOODS Standard)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0004-compound-recipe-fao-infoods-yield-factors.md)
+* [ADR 0005: Decoupled Build-Time ETL Ingestion Pipeline](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0005-build-time-etl-regional-food-ingestion.md)
+* [ADR 0006: LLM Natural Language Meal Parser with Graceful Fallback](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0006-natural-language-llm-fallback-degradation.md)
