@@ -68,8 +68,16 @@ When adding a new field to an RxDB collection in `packages/domain-core`:
 
 ---
 
-## 6. Submitting Pull Requests (PRs)
+## 6. GitFlow & Pull Request Workflow
 
-- Ensure all Vitest unit tests pass (`npm run test`).
-- Ensure code builds cleanly (`npm run build`).
-- Include descriptive commit messages following Conventional Commits (`feat: ...`, `fix: ...`, `docs: ...`).
+- **`main` Branch Protection**: The `main` branch represents production releases and is protected. Direct pushes to `main` are disabled.
+- **Branch Naming Conventions**:
+  - Features: `feature/short-description`
+  - Bug Fixes: `fix/short-description`
+  - Refactoring/Docs: `refactor/short-description` or `docs/short-description`
+- **Submitting Pull Requests**:
+  1. Create a feature branch off `main` (`git checkout -b feature/my-feature`).
+  2. Implement changes following TDD and verify all tests pass (`npm run test`).
+  3. Push the feature branch to GitHub (`git push -u origin feature/my-feature`).
+  4. Open a Pull Request on GitHub against `main`.
+  5. The repository owner will review, inspect CI build results, and merge the PR on the GitHub website.
