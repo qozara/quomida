@@ -27,6 +27,11 @@ This document contains operational guidelines, architectural constraints, and st
    - All interactive touch buttons MUST maintain minimum touch target dimensions of 44x44 CSS pixels.
    - Root `<html lang="...">` attribute MUST update dynamically on language toggle.
 
+6. **GitFlow Branching & PR Protection Policy**:
+   - `main` is a PROTECTED production branch. Direct commits or direct pushes to `main` are STRICTLY FORBIDDEN.
+   - All changes, features, and bug fixes MUST be implemented on dedicated branches (e.g. `feature/<name>`, `fix/<name>`).
+   - Push feature branches to GitHub and allow the maintainer to review and merge PRs on the GitHub website.
+
 ---
 
 ## 🛠️ Verification Command Registry
