@@ -88,3 +88,26 @@ export function createMacroSnapshot(macros: MacroSnapshot): MacroSnapshot {
     fats: Math.round(macros.fats * 10) / 10
   };
 }
+
+/**
+ * Validates macro and calorie alignment for 100g base ingredients.
+ */
+export function validateMacroAlignment(
+  calories: number,
+  protein: number,
+  carbs: number,
+  fats: number
+): { valid: boolean; reason?: string } {
+  if (calories < 0 || protein < 0 || carbs < 0 || fats < 0) {
+    return { valid: false, reason: 'Nutritional values cannot be negative' };
+  }
+  const totalMacroWeight = protein + carbs + fats;
+  if (totalMacroWeight > 100) {
+    return { valid: false, reason: 'Total macro weight (protein + carbs + fats) cannot exceed 100g per 100g base' };
+  }
+  const expectedCalories = protein * 4 + carbs * 4 + fats * 9;
+  if (calories > 0 && expectedCalories > 0 && Math.abs(calories - expectedCalories) > expectedCalories * 1.5 + 100) {
+    return { valid: false, reason: 'Declared calories differ significantly from macro calculation' };
+  }
+  return { valid: true };
+}

@@ -4,9 +4,10 @@ import {
   calculateRecipeMacros,
   convertPortionToGrams,
   createMacroSnapshot,
-  BaseIngredient,
-  Recipe
-} from '../src/index.js';
+  validateMacroAlignment,
+  type BaseIngredient,
+  type Recipe
+} from '@quomida/domain-core';
 
 describe('Domain Calculations & Macro Utilities', () => {
   const sampleIngredient: BaseIngredient = {
@@ -92,5 +93,19 @@ describe('Domain Calculations & Macro Utilities', () => {
       carbs: 0,
       fats: 7.9
     });
+  });
+
+  it('validates macro alignment for custom ingredients', () => {
+    // Valid macro alignment
+    expect(validateMacroAlignment(250, 20, 10, 15).valid).toBe(true);
+
+    // Negative values invalid
+    expect(validateMacroAlignment(-100, 20, 10, 15).valid).toBe(false);
+
+    // Total macro weight > 100g per 100g base invalid
+    expect(validateMacroAlignment(500, 60, 50, 20).valid).toBe(false);
+
+    // Wildly impossible calorie vs macro calculation invalid
+    expect(validateMacroAlignment(1500, 5, 5, 2).valid).toBe(false);
   });
 });

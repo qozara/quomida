@@ -211,7 +211,7 @@ As a local-first application, the "API" defines the internal TypeScript contract
 
 **Frontend / UI Wiring**
 
-* **Task [APP-105]: Wire SettingsModal to DB Service**
+* **Task [APP-105] [COMPLETED]: Wire SettingsModal to DB Service**
 * **Description:** Connect `apps/webapp/src/components/SettingsModal.tsx` to the settings repository. Remove mock state.
 
 
@@ -219,7 +219,7 @@ As a local-first application, the "API" defines the internal TypeScript contract
 * **Dependencies:** Blocked by [APP-104].
 
 
-* **Task [APP-106]: Wire CatalogManager for Custom Foods**
+* **Task [APP-106] [COMPLETED]: Wire CatalogManager for Custom Foods**
 * **Description:** Connect `apps/webapp/src/components/CatalogManager.tsx` to persist custom foods to IndexedDB.
 
 
@@ -227,7 +227,7 @@ As a local-first application, the "API" defines the internal TypeScript contract
 * **Dependencies:** Blocked by [APP-104].
 
 
-* **Task [APP-107]: Wire FoodLogger and MacroRings Reactivity**
+* **Task [APP-107] [COMPLETED]: Wire FoodLogger and MacroRings Reactivity**
 * **Description:** Update `apps/webapp/src/components/FoodLogger.tsx` and `apps/webapp/src/components/MacroRings.tsx` to subscribe to the `observeLogsByDate` stream.
 
 
