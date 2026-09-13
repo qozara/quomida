@@ -39,6 +39,45 @@ This document contains operational guidelines, architectural constraints, and st
 
 ---
 
+## 📐 Mandatory Coding Principles & Feature Lifecycle Guidelines
+
+AI coding agents MUST strictly adhere to the following 10 mandatory principles during any feature development, refactoring, or bug fix:
+
+1. **Requirement Comparison & Scope Verification**:
+   - Always compare requested feature specifications against implemented features to ensure 100% requirement coverage without missed specs.
+
+2. **Strict TDD & Isolation of Domain vs Webapp Tests**:
+   - Follow Test-Driven Development (TDD). Strictly isolate domain model unit tests (`packages/domain-core/tests/`) from presentation/webapp tests (`apps/webapp/`).
+
+3. **Test-First Development & Pre-Code Security/NFR Analysis**:
+   - Write failing unit/integration tests BEFORE writing implementation code.
+   - Design and analyze security constraints, privacy requirements, and non-functional requirements (NFRs) before writing code to pass the tests.
+
+4. **Full Regression Verification Before Completion**:
+   - Before declaring any feature or refactoring complete, execute the full regression test suite (`npm run test`) and monorepo build (`npm run build`) to guarantee zero regressions.
+
+5. **Clean Code & Best Design Practices**:
+   - Prefer clean code, SOLID principles, clear domain abstractions, and robust software engineering practices over quick hacks or cutting corners.
+
+6. **KISS & No Over-Engineering**:
+   - Avoid over-engineering; favor the simplest, most elegant solution that satisfies all functional and non-functional requirements while maintaining high design standards.
+
+7. **Pillars: Security-First, Local-First, Privacy-First**:
+   - **Security-First**: Zero vulnerabilities (`npm audit`), input sanitization, zero hardcoded secrets.
+   - **Local-First**: Primary data persistence and business logic run locally in IndexedDB via RxDB.
+   - **Privacy-First**: No unexpected data collection or remote sync without user configuration; user data stays local by default.
+
+8. **ADR Documentation**:
+   - Document all major architectural, design, or feature decisions in Architectural Decision Records under `docs/adr/` following standard Markdown ADR formats.
+
+9. **Pre-Feature ADR Review & Conflict Resolution**:
+   - Before starting any new feature or refactoring, review ALL existing ADRs in `docs/adr/` to identify potential architectural conflicts or required refactorings. Ask the maintainer for confirmation before proceeding if conflicts exist.
+
+10. **Dual-Language i18n Sync (English & Spanish)**:
+    - Always implement and maintain complete internationalization in `@quomida/i18n-locales`. English (`en`) and Spanish (`es`) dictionary keys MUST be kept in 100% sync at all times.
+
+---
+
 ## 🛠️ Verification Command Registry
 
 ```bash
