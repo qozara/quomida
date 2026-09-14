@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { X, Plus, Utensils, Tag } from 'lucide-react';
+import { validateMacroAlignment } from '@quomida/domain-core';
+import { X, Plus, Utensils, Tag, AlertCircle } from 'lucide-react';
 
 export const CatalogManager: React.FC = () => {
   const { ingredients, portions, addCustomIngredient, isCatalogOpen, setIsCatalogOpen } = useApp();
   const [activeTab, setActiveTab] = useState<'ingredients' | 'portions'>('ingredients');
   const [isAdding, setIsAdding] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // New Ingredient Form State
   const [name, setName] = useState('');
@@ -18,15 +20,27 @@ export const CatalogManager: React.FC = () => {
 
   const handleCreateIngredient = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     if (!name || !calories) return;
+
+    const calNum = parseFloat(calories) || 0;
+    const pNum = parseFloat(protein) || 0;
+    const cNum = parseFloat(carbs) || 0;
+    const fNum = parseFloat(fats) || 0;
+
+    const validation = validateMacroAlignment(calNum, pNum, cNum, fNum);
+    if (!validation.valid) {
+      setErrorMsg(validation.reason || 'Invalid macro values');
+      return;
+    }
 
     await addCustomIngredient({
       name,
       lang: 'es',
-      calories_100g: parseFloat(calories) || 0,
-      protein_100g: parseFloat(protein) || 0,
-      carbs_100g: parseFloat(carbs) || 0,
-      fats_100g: parseFloat(fats) || 0
+      calories_100g: calNum,
+      protein_100g: pNum,
+      carbs_100g: cNum,
+      fats_100g: fNum
     });
 
     setName('');
@@ -90,6 +104,13 @@ export const CatalogManager: React.FC = () => {
         {isAdding && (
           <form onSubmit={handleCreateIngredient} className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
             <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">New Custom Ingredient (100g base)</h3>
+            
+            {errorMsg && (
+              <div className="p-2.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
             
             <div>
               <label className="text-[11px] text-slate-400 block mb-1">Food Name</label>

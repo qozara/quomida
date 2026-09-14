@@ -184,6 +184,13 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 4: App Version */}
+        <div className="pt-2 border-t border-slate-800/80 text-center">
+          <span className="text-xs text-slate-500 font-mono">
+            Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
+          </span>
+        </div>
+
       </div>
     </div>
   );

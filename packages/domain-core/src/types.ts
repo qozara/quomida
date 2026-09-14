@@ -11,6 +11,7 @@ export interface BaseIngredient {
   protein_100g: number;
   carbs_100g: number;
   fats_100g: number;
+  updatedAt?: number;
 }
 
 export interface RecipeIngredientItem {
@@ -23,6 +24,7 @@ export interface Recipe {
   name: string;
   ingredients: RecipeIngredientItem[];
   yield_factor: number;
+  updatedAt?: number;
 }
 
 export interface Portion {
@@ -30,6 +32,7 @@ export interface Portion {
   base_food_id: string;
   name: string;
   equivalent_weight_g: number;
+  updatedAt?: number;
 }
 
 export interface MacroSnapshot {
@@ -48,6 +51,7 @@ export interface DailyLog {
   quantity: number;
   portion_name: string;
   macros: MacroSnapshot;
+  updatedAt?: number;
 }
 
 export interface UserSettings {
@@ -60,4 +64,5 @@ export interface UserSettings {
     carbs: number;
     fats: number;
   };
+  updatedAt?: number;
 }
