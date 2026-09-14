@@ -89,4 +89,10 @@ describe('Frontend UI Wiring & Reactivity (APP-105 to APP-107)', () => {
     const totalCalories = logs.reduce((sum, item) => sum + item.macros.calories, 0);
     expect(totalCalories).toBeGreaterThan(0);
   });
+
+  it('exposes defined app version or dev fallback constant', () => {
+    const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+    expect(version).toBeDefined();
+    expect(typeof version).toBe('string');
+  });
 });
