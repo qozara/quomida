@@ -37,6 +37,11 @@ This document contains operational guidelines, architectural constraints, and st
    - All changes, features, and bug fixes MUST be implemented on dedicated branches (e.g. `feature/<name>`, `fix/<name>`).
    - Push feature branches to GitHub and allow the maintainer to review and merge PRs on the GitHub website.
 
+8. **Ephemeral Implementation Plans (`implementation_plan.md`)**:
+   - `implementation_plan.md` is a local, ephemeral file used strictly for tracking progress and guiding AI agents during feature development.
+   - It is NOT intended to be persisted or committed to the repository.
+   - Its content may change completely as features evolve. Official documentation should go in `docs/`, ADRs in `docs/adr/`, and tasks in GitHub issues.
+
 ---
 
 ## 📐 Mandatory Coding Principles & Feature Lifecycle Guidelines
