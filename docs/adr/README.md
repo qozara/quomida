@@ -12,3 +12,4 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0005: Decoupled Build-Time ETL Ingestion Pipeline](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0005-build-time-etl-regional-food-ingestion.md)
 * [ADR 0006: LLM Natural Language Meal Parser with Graceful Fallback](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0006-natural-language-llm-fallback-degradation.md)
 * [ADR 0007: LocalDBService Repository Pattern and Unified BYOS Sync Boundary](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0007-local-repository-service-and-sync-boundary.md)
+* [ADR 0008: Service Worker PWA Application Shell & Heartbeat Connectivity Monitoring](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0008-service-worker-pwa-app-shell-and-heartbeat-connectivity.md)

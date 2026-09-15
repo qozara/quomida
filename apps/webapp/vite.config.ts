@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import { execSync } from 'child_process';
 
@@ -18,7 +19,44 @@ function getGitCommitHash(): string {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      manifest: {
+        name: 'Quomida',
+        short_name: 'Quomida',
+        description: 'Privacy-First Local Calorie & Macro Tracker',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone'
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: 'index.html',
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'navigation-cache'
+            }
+          },
+          {
+            urlPattern: ({ request }) =>
+              request.destination === 'style' ||
+              request.destination === 'script' ||
+              request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-assets-cache'
+            }
+          }
+        ]
+      }
+    })
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(getGitCommitHash())
   },

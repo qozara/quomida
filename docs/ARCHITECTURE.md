@@ -1,18 +1,19 @@
 # 🏗️ Quomida System Architecture Blueprint
 
-**Version:** 1.4  
+**Version:** 1.5  
 **Architectural Style:** Monorepo, Local-First, Bring Your Own Storage (BYOS), Isomorphic TypeScript
 
 ---
 
 ## 1. System Overview
 
-Quomida is a privacy-first, local-first web application designed for zero-latency calorie and macronutrient tracking. It eliminates client-side server dependency by storing all user state locally in **RxDB (IndexedDB)** and replicating changes asynchronously to the user's personal storage (Google Drive / Sheets).
+Quomida is a privacy-first, local-first web application designed for zero-latency calorie and macronutrient tracking. It eliminates client-side server dependency by storing all user state locally in **RxDB (IndexedDB)** and replicating changes asynchronously to the user's personal storage (Google Drive / Sheets). Service Worker PWA support ensures full cold-start offline shell availability.
 
 ```mermaid
 graph TD
     subgraph Client Application (Browser / PWA)
-        UI[React 19 WebApp] -->|Queries & Mutates| Repo[Domain Core Repository]
+        SW[Service Worker / Cache Storage] -->|Serves App Shell Offline| UI[React 19 WebApp]
+        UI -->|Queries & Mutates| Repo[Domain Core Repository]
         Repo -->|RxDB API| DB[(Local RxDB Engine / IndexedDB)]
         DB -->|Native Observables| UI
     end
@@ -144,3 +145,12 @@ sequenceDiagram
 - **Repository Pattern**: Wraps RxDB collections into typed domain methods.
 - **Observer Pattern**: Native RxDB observables push live updates to React component state.
 - **Isomorphic Domain Core**: Math calculations execute identically in Node.js (CLI/ETL) and Browser environments.
+
+---
+
+## 6. Offline PWA Shell & Heartbeat Architecture
+
+- **PWA Service Worker**: Managed via `vite-plugin-pwa` (`generateSW`). Automatically precaches `index.html`, core JavaScript, CSS, and SVG icons. Serves navigation requests offline (`NetworkFirst` with cache fallback) and hashed assets (`CacheFirst`).
+- **Heartbeat & Network Detection**: `AppContext` listens to browser `online`/`offline` window events and executes a periodic 30-second `HEAD /` ping to verify real server reachability. Updates status reactively to `'disconnected'` on connection drop or failed ping.
+- **WCAG 2.2 Accessibility**: Header status badge uses an `sr-only` element inside an `aria-live="polite"` region to announce connectivity state changes to screen readers in English and Spanish.
+
