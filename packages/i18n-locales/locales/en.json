@@ -53,5 +53,9 @@
     "syncStatusConnected": "Sync Status: Connected",
     "syncStatusOffline": "Sync Status: Local Offline Mode (Mock)",
     "syncLastSynced": "Last synced: {{time}}"
+  },
+  "appStatus": {
+    "offline": "Application status: Offline. Changes are saved locally.",
+    "connected": "Application status: Connected."
   }
 }

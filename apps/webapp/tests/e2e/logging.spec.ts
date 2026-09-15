@@ -23,7 +23,7 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
     await searchResult.click();
 
     // Verify portion bottom sheet modal opens
-    await expect(page.getByText('Portión y Cantidad')).toBeVisible();
+    await expect(page.getByText('Porción y Cantidad')).toBeVisible();
     await expect(page.getByText('Nutrición Calculada')).toBeVisible();
 
     // Click Log Item button
@@ -31,7 +31,7 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
     await logButton.click();
 
     // Bottom sheet closes and food logs into Lunch section
-    await expect(page.getByText('Portión y Cantidad')).not.toBeVisible();
+    await expect(page.getByText('Porción y Cantidad')).not.toBeVisible();
     await expect(page.getByText('Vacío vacuno (crudo)')).toBeVisible();
   });
 
@@ -39,7 +39,12 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
     await page.locator('#btn-open-settings').click();
     await expect(page.getByText('Perfil y Configuración')).toBeVisible();
 
-    await page.getByRole('button', { name: 'English (US)' }).click().catch(() => {});
-    await page.keyboard.press('Escape').catch(() => {});
+    const langSelect = page.locator('select').first();
+    await langSelect.selectOption('en');
+
+    // Click close button
+    const closeBtn = page.locator('button:has(svg.lucide-x)').first();
+    await closeBtn.click();
+    await expect(page.getByText('Perfil y Configuración')).not.toBeVisible();
   });
 });

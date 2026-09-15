@@ -78,8 +78,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
       const adapter = dbService.getSyncAdapter();
-      if (adapter) {
+      if (adapter && navigator.onLine) {
         setSyncStatus(adapter.getStatus());
+      } else if (!navigator.onLine) {
+        setSyncStatus('disconnected');
       }
 
       // Load settings from repository
@@ -108,6 +110,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subIngs?.unsubscribe();
     };
   }, [selectedDate, dbService]);
+
+  // Online/Offline & Heartbeat connectivity monitoring
+  useEffect(() => {
+    const updateConnectivity = async () => {
+      if (!navigator.onLine) {
+        setSyncStatus('disconnected');
+        return;
+      }
+
+      try {
+        const response = await fetch('/', { method: 'HEAD', cache: 'no-store' });
+        if (response.ok) {
+          const adapterStatus = dbService.getSyncAdapter()?.getStatus() || 'synced';
+          setSyncStatus(adapterStatus);
+        } else {
+          setSyncStatus('disconnected');
+        }
+      } catch {
+        setSyncStatus('disconnected');
+      }
+    };
+
+    const handleOnline = () => updateConnectivity();
+    const handleOffline = () => setSyncStatus('disconnected');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    updateConnectivity();
+
+    const interval = setInterval(updateConnectivity, 30000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, [dbService]);
 
   // Update HTML tag lang & dark mode
   useEffect(() => {

@@ -82,6 +82,7 @@ export const Header: React.FC = () => {
         {/* Right Sync Status Badge (WCAG aria-live polite) */}
         <div
           aria-live="polite"
+          id="sync-status-badge"
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 shadow-sm"
           title={`Status: ${syncStatus} (Last: ${lastSyncedTime || 'Now'})`}
         >
@@ -93,6 +94,11 @@ export const Header: React.FC = () => {
             <CloudOff className="w-3.5 h-3.5 text-amber-400" />
           )}
           <span className="hidden xs:inline">{syncStatus === 'synced' ? 'Local' : syncStatus}</span>
+          <span className="sr-only">
+            {syncStatus === 'disconnected'
+              ? (t as any).appStatus?.offline || 'Application status: Offline. Changes are saved locally.'
+              : (t as any).appStatus?.connected || 'Application status: Connected.'}
+          </span>
         </div>
 
       </div>
