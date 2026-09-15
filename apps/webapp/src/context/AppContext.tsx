@@ -78,8 +78,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
       const adapter = dbService.getSyncAdapter();
-      if (adapter) {
+      if (adapter && navigator.onLine) {
         setSyncStatus(adapter.getStatus());
+      } else if (!navigator.onLine) {
+        setSyncStatus('disconnected');
       }
 
       // Load settings from repository

@@ -6,6 +6,13 @@ test.describe('Quomida Service Worker & Offline Shell Support', () => {
     await page.goto('/');
     await expect(page.locator('header')).toBeVisible();
 
+    // Wait for Service Worker registration and active state
+    await page.waitForFunction(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      const reg = await navigator.serviceWorker.ready;
+      return !!reg && !!reg.active;
+    });
+
     // 2. Set browser context offline
     await context.setOffline(true);
 

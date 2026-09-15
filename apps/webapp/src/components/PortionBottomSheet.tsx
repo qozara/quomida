@@ -61,6 +61,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
+            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block">{t.portionModal.title}</span>
             <h2 className="text-xl font-bold text-white">{ingredient.name}</h2>
             <p className="text-xs text-slate-400 mt-0.5">
               100g base: {ingredient.calories_100g} kcal | P: {ingredient.protein_100g}g | C: {ingredient.carbs_100g}g | F: {ingredient.fats_100g}g
