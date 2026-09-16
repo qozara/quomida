@@ -21,11 +21,33 @@ const AVAILABLE_PROVIDERS: ProviderInfo[] = [
   }
 ];
 
+import { useGoogleLogin } from '@react-oauth/google';
+
 export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnectRequest }) => {
   const { activeAdapter, connectAdapter, reconnectAdapter, t } = useApp();
 
+  const googleLogin = useGoogleLogin({
+    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
+    onSuccess: async (tokenResponse) => {
+      await connectAdapter('google-drive-sheets', tokenResponse.access_token);
+    },
+    onError: (error) => console.error('Google Login Failed:', error)
+  });
+
   const handleConnect = async (providerId: string) => {
-    await connectAdapter(providerId);
+    if (providerId === 'google-drive-sheets') {
+      googleLogin();
+    } else {
+      await connectAdapter(providerId);
+    }
+  };
+
+  const handleReconnect = async (providerId: string) => {
+    if (providerId === 'google-drive-sheets') {
+      googleLogin();
+    } else {
+      await reconnectAdapter();
+    }
   };
 
   return (
@@ -55,7 +77,7 @@ export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnect
               isActive={isActive}
               onConnect={handleConnect}
               onDisconnectClick={onDisconnectRequest}
-              onReconnect={reconnectAdapter}
+              onReconnect={() => handleReconnect(provider.id)}
             />
           );
         })}

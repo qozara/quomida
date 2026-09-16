@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProvider, useApp } from './context/AppContext.js';
 import { Header } from './components/Header.js';
 import { MacroRings } from './components/MacroRings.js';
@@ -96,12 +97,15 @@ const DashboardContent: React.FC = () => {
   );
 };
 
-
 export const App: React.FC = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy_client_id';
+
   return (
-    <AppProvider>
-      <DashboardContent />
-    </AppProvider>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <AppProvider>
+        <DashboardContent />
+      </AppProvider>
+    </GoogleOAuthProvider>
   );
 };
 

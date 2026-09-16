@@ -13,6 +13,7 @@
     "@quomida/i18n-locales": "*",
     "@quomida/llm-engine": "*",
     "@quomida/sync-adapters": "*",
+    "@react-oauth/google": "^0.13.5",
     "lucide-react": "^0.454.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

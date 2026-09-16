@@ -44,7 +44,7 @@ interface AppContextType {
   forceSync: () => Promise<void>;
   reconnectAdapter: () => Promise<void>;
   disconnectAdapter: () => Promise<void>;
-  connectAdapter: (adapterId: string) => Promise<void>;
+  connectAdapter: (adapterId: string, token?: string) => Promise<void>;
   logFoodItem: (
     ingredient: BaseIngredient,
     mealType: MealType,
@@ -175,6 +175,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.locale?.startsWith('en')) setLocaleState('en');
       if (settings.theme) setThemeState(settings.theme as any);
 
+      // Check if we need to auto-connect to Google
+      if (!adapter && settings.cloud_providers?.google?.accessToken) {
+        const expiresAt = settings.cloud_providers.google.expiresAt;
+        if (Date.now() < expiresAt) {
+          const newAdapter = new GoogleDriveSheetsSyncAdapter();
+          await newAdapter.initialize(settings.cloud_providers.google.accessToken);
+          dbService.setSyncAdapter(newAdapter);
+          setActiveAdapter(newAdapter);
+          if (navigator.onLine) {
+            setSyncStatus(newAdapter.getStatus());
+          }
+        }
+      }
+
       // Load Portions
       const pDocs = await rxdb.portions.find().exec();
       setPortions(pDocs.map((d: any) => d.toJSON()));
@@ -265,13 +279,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dbService.setSyncAdapter(undefined);
     setActiveAdapter(null);
     setSyncStatus('disconnected');
+    
+    // Clear cloud tokens
+    if (userSettings) {
+      await updateUserSettings({
+        cloud_providers: undefined
+      });
+    }
   };
 
-  const connectAdapter = async (adapterId: string) => {
+  const connectAdapter = async (adapterId: string, token?: string) => {
     let newAdapter: SyncAdapter;
     if (adapterId === 'google-drive-sheets') {
       newAdapter = new GoogleDriveSheetsSyncAdapter();
-      await newAdapter.initialize('mock-google-token-456');
+      // Store token if provided
+      if (token) {
+        await updateUserSettings({
+          cloud_providers: {
+            ...userSettings?.cloud_providers,
+            google: { accessToken: token, expiresAt: Date.now() + 3500000 }
+          }
+        });
+      }
+      const activeToken = token || userSettings?.cloud_providers?.google?.accessToken || '';
+      await newAdapter.initialize(activeToken);
     } else {
       newAdapter = new MockSyncAdapter();
       await newAdapter.initialize();

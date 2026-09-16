@@ -1,6 +1,9 @@
-import { createRxDatabase, type RxDatabase, type RxStorage } from 'rxdb';
+import { createRxDatabase, addRxPlugin, type RxDatabase, type RxStorage } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
+import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
+
+addRxPlugin(RxDBMigrationSchemaPlugin);
 import {
   baseIngredientsSchema,
   recipesSchema,
@@ -74,7 +77,14 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     recipes: { schema: recipesSchema },
     portions: { schema: portionsSchema },
     daily_logs: { schema: dailyLogsSchema },
-    user_settings: { schema: userSettingsSchema }
+    user_settings: { 
+      schema: userSettingsSchema,
+      migrationStrategies: {
+        1: function(oldDoc) {
+          return oldDoc;
+        }
+      }
+    }
   });
 
   // Hydrate seed catalog if empty
