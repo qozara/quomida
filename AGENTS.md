@@ -42,6 +42,12 @@ This document contains operational guidelines, architectural constraints, and st
    - It is NOT intended to be persisted or committed to the repository.
    - Its content may change completely as features evolve. Official documentation should go in `docs/`, ADRs in `docs/adr/`, and tasks in GitHub issues.
 
+9. **Local-First WebApp Security Posture**:
+   - Content Security Policy (CSP): `apps/webapp/index.html` MUST maintain a strict CSP preventing `unsafe-eval` and unauthorized domains.
+   - Subresource Integrity (SRI): Vite MUST build with `@small-tech/vite-plugin-sri` to generate script/style integrity hashes.
+   - XSS Prevention: NEVER use `dangerouslySetInnerHTML` or raw DOM injection in React.
+   - Cloud Credentials: Cloud provider tokens stored in IndexedDB (RxDB) MUST use minimal scopes (e.g., `drive.file`, `drive.appdata`) and short expirations to minimize local extraction blast radius.
+
 ---
 
 ## 📐 Mandatory Coding Principles & Feature Lifecycle Guidelines
