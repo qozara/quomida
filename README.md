@@ -50,6 +50,18 @@ quomida/
 
 ---
 
+## ☁️ Cloud Connectors
+
+Quomida uses a Bring Your Own Storage (BYOS) architecture, allowing users to sync their local RxDB data to their own personal cloud storage. This ensures total data ownership and privacy.
+
+The application includes several connectors:
+- **[Google Drive & Sheets](docs/connectors/google-drive-sheets.md)**: Syncs raw configuration to private Drive app data and tabular data (logs, catalog) to user-readable Google Sheets.
+- **[Mock Sync Adapter](docs/connectors/mock-adapter.md)**: An in-memory/local storage fallback used for offline local development and zero-config evaluations.
+
+Developers can implement additional connectors by fulfilling the `SyncAdapter` interface in `packages/sync-adapters`.
+
+---
+
 ## 🚀 Quickstart (Local Development)
 
 ### 1. Install Dependencies
