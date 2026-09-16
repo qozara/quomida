@@ -28,11 +28,13 @@ describe('RxDB Schema Specs', () => {
     expect(portionsSchema.required).toContain('equivalent_weight_g');
   });
 
-  it('defines daily_logs schema with hardcoded macros snapshot', () => {
+  it('defines daily_logs schema with hardcoded macros snapshot and optional food_name', () => {
     expect(dailyLogsSchema.title).toBe('daily_logs');
     expect(dailyLogsSchema.primaryKey).toBe('id');
     expect(dailyLogsSchema.required).toContain('date');
     expect(dailyLogsSchema.required).toContain('macros');
+    expect(dailyLogsSchema.properties.food_name).toBeDefined();
+    expect(dailyLogsSchema.properties.food_name.type).toBe('string');
   });
 
   it('defines user_settings schema with global_settings key', () => {

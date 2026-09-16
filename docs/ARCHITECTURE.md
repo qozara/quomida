@@ -92,6 +92,7 @@ classDiagram
         +string date
         +string meal_type
         +string food_reference_id
+        +string food_name
         +float quantity
         +string portion_name
         +MacroSnapshot macros
@@ -107,7 +108,7 @@ classDiagram
 
     Portion --> BaseIngredient : references base_food_id
     Portion --> Recipe : references base_food_id
-    DailyLog --> BaseIngredient : snapshots macros from food_reference_id
+    DailyLog --> BaseIngredient : snapshots macros & food_name from food_reference_id
     Recipe --> BaseIngredient : contains ingredient_id array
 ```
 
@@ -115,7 +116,7 @@ classDiagram
 - **`base_ingredients`**: Edible portion normalized to 100g base.
 - **`recipes`**: Compound meals applying cooking yield retention factors (FAO/INFOODS standard).
 - **`portions`**: Domestic household portion unit mappings (e.g. 1 slice, 1 portion = 150g).
-- **`daily_logs`**: Transactional ledger of consumed items. Hardcodes macro snapshots at creation time for historical immutability.
+- **`daily_logs`**: Transactional ledger of consumed items. Hardcodes macro snapshots and food names at creation time for historical immutability.
 - **`user_settings`**: Cross-device global preferences (`global_settings`).
 
 ---
@@ -126,14 +127,18 @@ classDiagram
 sequenceDiagram
     participant UI as React WebApp
     participant DB as RxDB (IndexedDB)
-    participant Sync as SyncAdapter
-    participant Remote as User Storage (Google Drive)
+    participant Sync as CompositeSyncAdapter
+    participant Blob as BlobStorageDriver (appData)
+    participant Tabular as TabularStorageDriver (Sheets)
 
     UI->>DB: insertDailyLog(data)
     DB-->>UI: Reactive Observable update (Instant UX)
-    DB->>Sync: Trigger replication event
-    Sync->>Remote: Push delta payload (debounced)
-    Remote-->>Sync: Acknowledge sync
+    DB->>Sync: Push delta payload (debounced)
+    alt Collection is user_settings
+        Sync->>Blob: writeBlob(settings.json)
+    else Collection is daily_logs / catalog
+        Sync->>Tabular: writeTable(Quomida Daily Logs / Catalog)
+    end
     Sync-->>UI: Update SyncStatus badge ("Synced")
 ```
 
@@ -141,8 +146,9 @@ sequenceDiagram
 
 ## 5. Design Patterns Applied
 
+- **Storage Strategy Pattern**: Decouples remote storage formats across domains. `CompositeSyncAdapter` routes unformatted application configuration (`user_settings`) to `BlobStorageDriver` and tabular data (`daily_logs`, `base_ingredients`, `recipes`, `portions`) to `TabularStorageDriver`, enabling plug-and-play support for Google Drive, OneDrive, or Box.
 - **Adapter Pattern**: Swappable storage backends (Mock storage for offline dev/tests vs Google Drive Sheets for production).
-- **Repository Pattern**: Wraps RxDB collections into typed domain methods.
+- **Repository Pattern**: Wraps RxDB collections into typed domain methods (`LocalDBService`).
 - **Observer Pattern**: Native RxDB observables push live updates to React component state.
 - **Isomorphic Domain Core**: Math calculations execute identically in Node.js (CLI/ETL) and Browser environments.
 

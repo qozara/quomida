@@ -1,54 +1,70 @@
-import type { SyncAdapter, SyncDeltaPayload, SyncStatus } from './types.js';
+import type { SyncDeltaPayload, SyncStatus } from './types.js';
+import { CompositeSyncAdapter } from './strategy/CompositeSyncAdapter.js';
+import type { CollectionRoute } from './strategy/types.js';
+import { GoogleDriveBlobDriver } from './google/GoogleDriveBlobDriver.js';
+import { GoogleSheetsTabularDriver } from './google/GoogleSheetsTabularDriver.js';
+import type { GoogleHttpClient } from './google/types.js';
 
-export class GoogleDriveSheetsSyncAdapter implements SyncAdapter {
-  id = 'google-drive-sheets';
-  name = 'Google Drive / Sheets BYOS Adapter';
-  description = 'Direct synchronization to personal Google Drive spreadsheets';
-  private initialized = false;
-  private status: SyncStatus = 'disconnected';
-  private lastSyncedTime: string | null = null;
+export interface GoogleDriveSheetsSyncAdapterOptions {
+  httpClient?: GoogleHttpClient;
+  routes?: Record<string, CollectionRoute>;
+}
+
+export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
   private accessToken: string | null = null;
-  private statusListeners: Set<(status: SyncStatus) => void> = new Set();
+  private userEmail: string | null = null;
+  private httpClient?: GoogleHttpClient;
 
-  isInitialized(): boolean {
+  constructor(options?: GoogleDriveSheetsSyncAdapterOptions) {
+    const httpClient = options?.httpClient;
+
+    let getAccessToken = () => null as string | null;
+
+    const blobDriver = new GoogleDriveBlobDriver({
+      getAccessToken: () => getAccessToken(),
+      httpClient
+    });
+
+    const tabularDriver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => getAccessToken(),
+      httpClient
+    });
+
+    super({
+      id: 'google-drive-sheets',
+      name: 'Google Drive / Sheets BYOS Adapter',
+      description: 'Direct synchronization to personal Google Drive spreadsheets',
+      blobDriver,
+      tabularDriver,
+      routes: options?.routes
+    });
+
+    this.httpClient = httpClient;
+    getAccessToken = () => this.accessToken;
+  }
+
+  override isInitialized(): boolean {
     return this.initialized && !!this.accessToken;
   }
 
-  getStatus(): SyncStatus {
-    return this.status;
+  override getConnectedAccount(): string | null {
+    if (!this.isInitialized()) return null;
+    return this.userEmail || 'google-user@drive.google.com';
   }
 
-  getLastSyncedTime(): string | null {
-    return this.lastSyncedTime;
-  }
-
-  getConnectedAccount(): string | null {
-    return this.accessToken ? 'google-user@drive.google.com' : null;
-  }
-
-  onStatusChange(listener: (status: SyncStatus) => void): () => void {
-    this.statusListeners.add(listener);
-    return () => {
-      this.statusListeners.delete(listener);
-    };
-  }
-
-  private setStatus(newStatus: SyncStatus): void {
-    this.status = newStatus;
-    for (const listener of this.statusListeners) {
-      try {
-        listener(newStatus);
-      } catch (err) {
-        console.error('Error in status change listener', err);
-      }
-    }
-  }
-
-  async initialize(credentials?: string | Record<string, any>): Promise<void> {
+  override async initialize(credentials?: string | Record<string, any>): Promise<void> {
     if (typeof credentials === 'string') {
       this.accessToken = credentials;
-    } else if (credentials && typeof credentials === 'object' && credentials.accessToken) {
-      this.accessToken = credentials.accessToken;
+    } else if (credentials && typeof credentials === 'object') {
+      if (credentials.accessToken) {
+        this.accessToken = credentials.accessToken;
+      }
+      if (credentials.userEmail) {
+        this.userEmail = credentials.userEmail;
+      }
+      if (credentials.httpClient) {
+        this.httpClient = credentials.httpClient;
+      }
     }
 
     if (this.accessToken) {
@@ -56,18 +72,18 @@ export class GoogleDriveSheetsSyncAdapter implements SyncAdapter {
       this.lastSyncedTime = new Date().toISOString();
       this.setStatus('idle');
     } else {
+      this.initialized = false;
       this.setStatus('disconnected');
     }
   }
 
-  async disconnect(): Promise<void> {
+  override async disconnect(): Promise<void> {
     this.accessToken = null;
-    this.initialized = false;
-    this.setStatus('disconnected');
+    this.userEmail = null;
+    await super.disconnect();
   }
 
-  async reauthenticate(): Promise<void> {
-    // In production this triggers OAuth popup or token refresh
+  override async reauthenticate(): Promise<void> {
     if (this.accessToken) {
       this.setStatus('idle');
       this.lastSyncedTime = new Date().toISOString();
@@ -76,30 +92,17 @@ export class GoogleDriveSheetsSyncAdapter implements SyncAdapter {
     }
   }
 
-  async forceSync(): Promise<void> {
-    if (!this.initialized || !this.accessToken) return;
-    this.setStatus('syncing');
-    this.lastSyncedTime = new Date().toISOString();
-    this.setStatus('idle');
-  }
-
-  async pull(): Promise<SyncDeltaPayload[]> {
-    if (!this.initialized || !this.accessToken) {
-      return [];
-    }
-    // Remote Google Sheets fetch logic here (when active session present)
-    this.lastSyncedTime = new Date().toISOString();
-    return [];
-  }
-
-  async push(_payload: SyncDeltaPayload): Promise<void> {
-    if (!this.initialized || !this.accessToken) {
+  override async push(payload: SyncDeltaPayload): Promise<void> {
+    if (!this.isInitialized()) {
       return;
     }
-    this.setStatus('syncing');
-    // Remote Google Sheets update logic here
-    this.lastSyncedTime = new Date().toISOString();
-    this.setStatus('idle');
+    await super.push(payload);
+  }
+
+  override async pull(): Promise<SyncDeltaPayload[]> {
+    if (!this.isInitialized()) {
+      return [];
+    }
+    return await super.pull();
   }
 }
-

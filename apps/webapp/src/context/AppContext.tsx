@@ -296,6 +296,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date: selectedDate,
       meal_type: mealType,
       food_reference_id: ingredient.id,
+      food_name: ingredient.name,
       quantity,
       portion_name: portionName,
       macros: macrosSnapshot

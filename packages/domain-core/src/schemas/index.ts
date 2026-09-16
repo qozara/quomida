@@ -84,6 +84,7 @@ export const dailyLogsSchema: RxJsonSchema<DailyLog> = {
       enum: ['meal_breakfast', 'meal_lunch', 'meal_dinner', 'meal_snack']
     },
     food_reference_id: { type: 'string' },
+    food_name: { type: 'string' },
     quantity: { type: 'number', minimum: 0.01 },
     portion_name: { type: 'string' },
     macros: {

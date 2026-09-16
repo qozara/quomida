@@ -19,12 +19,15 @@ All architectural decisions, product specifications, component blueprints, and c
 ---
 
 ## 🌟 Key Architecture Principles
-
-1. **BYOS (Bring Your Own Storage)**: Quomida decouples presentation and business logic from persistent servers. Your data is stored locally in your browser/device using **RxDB (IndexedDB)** and can be seamlessly synced to your personal Google Drive / Sheets.
+ 
+1. **BYOS (Bring Your Own Storage) & Storage Strategy Pattern**: Quomida decouples presentation and business logic from persistent servers. Your data is stored locally in your browser/device using **RxDB (IndexedDB)** and replicated across multi-format cloud backends via `CompositeSyncAdapter`:
+   - Application configuration (`user_settings`) persists as private JSON blobs in hidden cloud storage (e.g. Google Drive `appDataFolder`).
+   - Transactional consumption history (`daily_logs`) syncs to private spreadsheets (`Quomida Daily Logs`) with auto-generated human-readable summary columns (`food_details_readonly`).
+   - Food catalogs (`base_ingredients`, `recipes`, `portions`) sync to separate, shareable spreadsheets (`Quomida Food Catalog`), allowing users to share custom ingredients without exposing personal calorie logs.
 2. **Local-First & Zero Latency**: Instant reads and writes with zero network latency. Full offline functionality out of the box.
 3. **Curated Latin American Food Engine**: Incorporates ARGENFOODS, LATINFOODS, and USDA datasets for accurate regional meat cuts (*vacío*, *asado de tira*, *entraña*, *matambre*) and local ingredients (*palta*, *frutilla*, *choclo*).
 4. **FAO/INFOODS Recipe Yield Modeling**: Tracks cooked food by modeling raw ingredient weights and cooking yield retention factors instead of arbitrary static guesses.
-5. **Historical Immutability**: Daily log entries snapshot macro values at logging time so future recipe or portion changes never corrupt past nutrition history.
+5. **Historical Immutability**: Daily log entries snapshot macro values and food names at logging time so future recipe or portion changes never corrupt past nutrition history.
 
 ---
 
@@ -34,7 +37,7 @@ All architectural decisions, product specifications, component blueprints, and c
 quomida/
 ├── packages/
 │   ├── domain-core/      # Isomorphic TypeScript SDK: RxDB schemas, yield formulas & calculations
-│   ├── sync-adapters/    # Unified SyncAdapter interface, MockSyncAdapter, Google Drive sync
+│   ├── sync-adapters/    # Unified SyncAdapter, Composite strategy, Mock & Google Drive/Sheets connectors
 │   ├── llm-engine/       # Natural language meal log parser with fallback handlers
 │   └── i18n-locales/     # Centralized English & Spanish translation dictionaries
 ├── apps/

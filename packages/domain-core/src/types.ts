@@ -48,6 +48,7 @@ export interface DailyLog {
   date: string; // YYYY-MM-DD
   meal_type: MealType;
   food_reference_id: string;
+  food_name?: string;
   quantity: number;
   portion_name: string;
   macros: MacroSnapshot;
