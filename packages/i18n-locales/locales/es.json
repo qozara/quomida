@@ -57,5 +57,79 @@
   "appStatus": {
     "offline": "Estado de la aplicación: Sin conexión. Los cambios se guardan localmente.",
     "connected": "Estado de la aplicación: Conectado."
+  },
+  "sync": {
+    "header": {
+      "idle": "Todos los cambios guardados",
+      "synced": "Todos los cambios guardados",
+      "syncing": "Sincronizando cambios...",
+      "offline": "Trabajando sin conexión",
+      "waiting": "Sincronización en pausa",
+      "error": "Acción requerida",
+      "local": "Solo almacenamiento local"
+    },
+    "subtitle": {
+      "idle": "Guardado en el dispositivo. Sincronizado con tu nube.",
+      "synced": "Guardado en el dispositivo. Sincronizado con tu nube.",
+      "syncing": "Subiendo y actualizando registros en la nube.",
+      "offline": "Cambios guardados localmente. La sincronización se reanudará al reconectar.",
+      "waiting": "Sincronización pausada temporalmente por el proveedor. Reintentando automáticamente.",
+      "error": "Conexión perdida. Vuelve a autenticarte para mantener los respaldos al día.",
+      "local": "Usando solo almacenamiento local. Toca para configurar copias en la nube."
+    },
+
+    "diagnostics": {
+      "connection": "Conexión a internet",
+      "cloudProvider": "Proveedor en la nube",
+      "connected": "Conectado",
+      "offline": "Sin conexión",
+      "paused": "Pausado",
+      "syncing": "Sincronizando...",
+      "reauthenticating": "Reautenticando en segundo plano...",
+      "needsAttention": "Requiere atención",
+      "notConnected": "No conectado",
+      "lastSync": "Última sincronización: {{time}}",
+      "never": "Nunca",
+      "justNow": "Recién"
+    },
+
+    "banner": {
+      "expired": "Tu sesión con {{provider}} ha expirado. Vuelve a autenticarte para mantener tus copias en la nube.",
+      "reconnect": "Reconectar {{provider}}"
+    },
+    "actions": {
+      "forceSync": "Forzar sincronización ahora",
+      "syncing": "Sincronizando...",
+      "storageSettings": "Ajustes de Almacenamiento →"
+    },
+    "panel": {
+      "back": "Volver",
+      "title": "Almacenamiento y Sincronización",
+      "close": "Cerrar",
+      "localTitle": "Almacenamiento Local del Dispositivo",
+      "localDescription": "Quomida almacena tus registros de comidas y catálogos en este dispositivo primero para máxima velocidad sin conexión.",
+      "localMetadata": "Motor de almacenamiento: IndexedDB (RxDB) · Elementos: {{logs}} registros, {{foods}} alimentos personalizados",
+      "remoteTitle": "Sincronización Remota (BYOS)",
+      "remoteDescription": "Conecta un proveedor de almacenamiento para respaldar tus registros y sincronizar entre dispositivos.",
+      "connect": "Conectar",
+      "disconnect": "Desconectar",
+      "reconnect": "Reconectar",
+      "connected": "Conectado",
+      "needsReconnect": "Requiere Reconexión",
+      "paused": "Pausado",
+      "configure": "Configurar / Ver Archivos Remotos",
+      "localFirstGuarantee": "Garantía local-first: Desconectar un proveedor de nube nunca eliminará registros de este dispositivo.",
+      "confirmTitle": "¿Desconectar {{provider}}?",
+      "confirmMessage": "Tus datos locales permanecerán intactos, pero los cambios ya no se respaldarán remotamente.",
+      "confirmAction": "Desconectar",
+      "cancelAction": "Cancelar"
+    },
+    "a11y": {
+      "syncing": "Sincronizando datos con el almacenamiento remoto.",
+      "offline": "Internet desconectado. Operando en modo sin conexión. Cambios guardados localmente.",
+      "error": "Error de sincronización en la nube. Se requiere acción para reanudar el respaldo.",
+      "synced": "Todos los cambios guardados en el dispositivo y la nube.",
+      "local": "Modo de solo almacenamiento local. Cambios guardados localmente."
+    }
   }
 }

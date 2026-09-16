@@ -7,12 +7,14 @@ import { MealSection } from './components/MealSection.js';
 import { PortionBottomSheet } from './components/PortionBottomSheet.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { CatalogManager } from './components/CatalogManager.js';
+import { StorageSettingsPanel } from './components/sync/index.js';
 import type { BaseIngredient, MealType } from '@quomida/domain-core';
 import { Plus } from 'lucide-react';
 
 const DashboardContent: React.FC = () => {
-  const { t } = useApp();
+  const { t, isStorageSettingsOpen, setIsStorageSettingsOpen } = useApp();
   const [selectedIngredient, setSelectedIngredient] = useState<BaseIngredient | null>(null);
+
   const [targetMealType, setTargetMealType] = useState<MealType>('meal_lunch');
 
   const handleOpenPortionModal = (ingredient: BaseIngredient, mealType: MealType) => {
@@ -86,9 +88,14 @@ const DashboardContent: React.FC = () => {
       />
       <SettingsModal />
       <CatalogManager />
+      <StorageSettingsPanel
+        isOpen={isStorageSettingsOpen}
+        onClose={() => setIsStorageSettingsOpen(false)}
+      />
     </div>
   );
 };
+
 
 export const App: React.FC = () => {
   return (
