@@ -1,18 +1,18 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.js';
-import { Settings, BookOpen, ChevronLeft, ChevronRight, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Settings, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { HeaderSyncTrigger } from './sync/index.js';
 
 export const Header: React.FC = () => {
   const {
     selectedDate,
     setSelectedDate,
     locale,
-    syncStatus,
-    lastSyncedTime,
     setIsSettingsOpen,
     setIsCatalogOpen,
     t
   } = useApp();
+
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate + 'T00:00:00');
@@ -79,29 +79,10 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Sync Status Badge (WCAG aria-live polite) */}
-        <div
-          aria-live="polite"
-          id="sync-status-badge"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 shadow-sm"
-          title={`Status: ${syncStatus} (Last: ${lastSyncedTime || 'Now'})`}
-        >
-          {syncStatus === 'syncing' ? (
-            <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-          ) : syncStatus === 'synced' ? (
-            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-          ) : (
-            <CloudOff className="w-3.5 h-3.5 text-amber-400" />
-          )}
-          <span className="hidden xs:inline">{syncStatus === 'synced' ? 'Local' : syncStatus}</span>
-          <span className="sr-only">
-            {syncStatus === 'disconnected'
-              ? (t as any).appStatus?.offline || 'Application status: Offline. Changes are saved locally.'
-              : (t as any).appStatus?.connected || 'Application status: Connected.'}
-          </span>
-        </div>
-
+        {/* Right Sync Inspector Trigger Button (WCAG 2.2 compliant) */}
+        <HeaderSyncTrigger />
       </div>
     </header>
   );
 };
+

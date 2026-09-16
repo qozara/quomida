@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { LocalDBService, type QuomidaDatabase } from '../db/rxdb.js';
 import {
   type BaseIngredient,
@@ -10,11 +10,19 @@ import {
   convertPortionToGrams,
   createMacroSnapshot
 } from '@quomida/domain-core';
-import { MockSyncAdapter, type SyncAdapter, type SyncStatus } from '@quomida/sync-adapters';
+import {
+  MockSyncAdapter,
+  GoogleDriveSheetsSyncAdapter,
+  resolveUXStatus,
+  type SyncAdapter,
+  type SyncStatus,
+  type UXSyncState
+} from '@quomida/sync-adapters';
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
 
 interface AppContextType {
   db: QuomidaDatabase | null;
+  dbService: LocalDBService;
   selectedDate: string; // YYYY-MM-DD
   setSelectedDate: (date: string) => void;
   locale: LocaleKey;
@@ -28,7 +36,15 @@ interface AppContextType {
   portions: Portion[];
   dailyLogs: DailyLog[];
   syncStatus: SyncStatus;
+  uxSyncState: UXSyncState;
+  activeAdapter: SyncAdapter | null;
+  isOnline: boolean;
   lastSyncedTime: string | null;
+  itemCounts: { logs: number; customFoods: number };
+  forceSync: () => Promise<void>;
+  reconnectAdapter: () => Promise<void>;
+  disconnectAdapter: () => Promise<void>;
+  connectAdapter: (adapterId: string) => Promise<void>;
   logFoodItem: (
     ingredient: BaseIngredient,
     mealType: MealType,
@@ -41,6 +57,8 @@ interface AppContextType {
   setIsSettingsOpen: (open: boolean) => void;
   isCatalogOpen: boolean;
   setIsCatalogOpen: (open: boolean) => void;
+  isStorageSettingsOpen: boolean;
+  setIsStorageSettingsOpen: (open: boolean) => void;
 }
 
 const defaultSettings: UserSettings = {
@@ -54,7 +72,12 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [dbService] = useState<LocalDBService>(() => new LocalDBService(undefined, new MockSyncAdapter()));
+  const [initialAdapter] = useState<SyncAdapter>(() => new MockSyncAdapter());
+  const [dbService] = useState<LocalDBService>(() => new LocalDBService(undefined, initialAdapter));
+  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(initialAdapter);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
   const [db, setDb] = useState<QuomidaDatabase | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
@@ -65,10 +88,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
   const [portions, setPortions] = useState<Portion[]>([]);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(new Date().toLocaleTimeString());
+  const [itemCounts, setItemCounts] = useState<{ logs: number; customFoods: number }>({ logs: 0, customFoods: 0 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
+
+
+  // Initialize LocalDBService & RxDB Adapters
+  // Subscribe to active adapter status changes
+  useEffect(() => {
+    if (!activeAdapter) {
+      setSyncStatus('disconnected');
+      return;
+    }
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime());
+    if (activeAdapter.onStatusChange) {
+      const unsub = activeAdapter.onStatusChange((newStatus) => {
+        setSyncStatus(newStatus);
+        setLastSyncedTime(activeAdapter.getLastSyncedTime());
+      });
+      return unsub;
+    }
+  }, [activeAdapter]);
+
+  // Online/Offline & Heartbeat connectivity monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (activeAdapter && activeAdapter.isInitialized() && activeAdapter.getStatus() !== 'disconnected') {
+        setSyncStatus(activeAdapter.getStatus());
+      } else {
+        setSyncStatus('disconnected');
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const checkHeartbeat = async () => {
+      if (!navigator.onLine) {
+        setIsOnline(false);
+        return;
+      }
+      try {
+        const response = await fetch('/', { method: 'HEAD', cache: 'no-store' });
+        setIsOnline(response.ok);
+      } catch {
+        setIsOnline(false);
+      }
+    };
+
+    checkHeartbeat();
+    const interval = setInterval(checkHeartbeat, 30000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, [activeAdapter]);
 
   // Initialize LocalDBService & RxDB Adapters
   useEffect(() => {
@@ -77,7 +161,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
-      const adapter = dbService.getSyncAdapter();
+      const adapter = dbService.getSyncAdapter() || null;
+      setActiveAdapter(adapter);
       if (adapter && navigator.onLine) {
         setSyncStatus(adapter.getStatus());
       } else if (!navigator.onLine) {
@@ -111,43 +196,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [selectedDate, dbService]);
 
-  // Online/Offline & Heartbeat connectivity monitoring
-  useEffect(() => {
-    const updateConnectivity = async () => {
-      if (!navigator.onLine) {
-        setSyncStatus('disconnected');
-        return;
-      }
-
-      try {
-        const response = await fetch('/', { method: 'HEAD', cache: 'no-store' });
-        if (response.ok) {
-          const adapterStatus = dbService.getSyncAdapter()?.getStatus() || 'synced';
-          setSyncStatus(adapterStatus);
-        } else {
-          setSyncStatus('disconnected');
-        }
-      } catch {
-        setSyncStatus('disconnected');
-      }
-    };
-
-    const handleOnline = () => updateConnectivity();
-    const handleOffline = () => setSyncStatus('disconnected');
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    updateConnectivity();
-
-    const interval = setInterval(updateConnectivity, 30000);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(interval);
-    };
+  // Update item counts for storage settings panel
+  const updateItemCounts = useCallback(async () => {
+    try {
+      const counts = await dbService.getItemCounts();
+      setItemCounts(counts);
+    } catch {
+      // Ignore if db not ready
+    }
   }, [dbService]);
+
+  useEffect(() => {
+    if (db) {
+      updateItemCounts();
+    }
+  }, [db, dailyLogs.length, ingredients.length, updateItemCounts]);
 
   // Update HTML tag lang & dark mode
   useEffect(() => {
@@ -173,7 +236,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await dbService.saveSettings(newSettings);
     const updated = await dbService.getSettings();
     setUserSettings(updated);
-    setLastSyncedTime(dbService.getSyncAdapter()?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const forceSync = async () => {
+    if (!activeAdapter || !isOnline || syncStatus === 'syncing') return;
+    setSyncStatus('syncing');
+    if (activeAdapter.forceSync) {
+      await activeAdapter.forceSync();
+    }
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const reconnectAdapter = async () => {
+    if (!activeAdapter) return;
+    if (activeAdapter.reauthenticate) {
+      await activeAdapter.reauthenticate();
+    }
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const disconnectAdapter = async () => {
+    if (activeAdapter && activeAdapter.disconnect) {
+      await activeAdapter.disconnect();
+    }
+    dbService.setSyncAdapter(undefined);
+    setActiveAdapter(null);
+    setSyncStatus('disconnected');
+  };
+
+  const connectAdapter = async (adapterId: string) => {
+    let newAdapter: SyncAdapter;
+    if (adapterId === 'google-drive-sheets') {
+      newAdapter = new GoogleDriveSheetsSyncAdapter();
+      await newAdapter.initialize('mock-google-token-456');
+    } else {
+      newAdapter = new MockSyncAdapter();
+      await newAdapter.initialize();
+    }
+    dbService.setSyncAdapter(newAdapter);
+    setActiveAdapter(newAdapter);
+    setSyncStatus(newAdapter.getStatus());
+    setLastSyncedTime(newAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const logFoodItem = async (
@@ -195,17 +301,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       macros: macrosSnapshot
     });
 
-    setLastSyncedTime(dbService.getSyncAdapter()?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const deleteLogItem = async (id: string) => {
     await dbService.deleteLogItem(id);
-    setLastSyncedTime(dbService.getSyncAdapter()?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>) => {
     await dbService.saveCustomFood(ingData);
   };
+
+  const hasActiveAdapter = Boolean(
+    activeAdapter &&
+    activeAdapter.isInitialized() &&
+    activeAdapter.getStatus() !== 'disconnected'
+  );
+
+  const uxSyncState: UXSyncState = resolveUXStatus({
+    isOnline,
+    adapter: hasActiveAdapter ? activeAdapter : null,
+    adapterStatus: hasActiveAdapter ? syncStatus : 'disconnected'
+  });
 
   const t = dictionaries[locale] || dictionaries.es;
 
@@ -213,6 +331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         db,
+        dbService,
         selectedDate,
         setSelectedDate,
         locale,
@@ -226,14 +345,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         portions,
         dailyLogs,
         syncStatus,
+        uxSyncState,
+        activeAdapter,
+        isOnline,
         lastSyncedTime,
+        itemCounts,
+        forceSync,
+        reconnectAdapter,
+        disconnectAdapter,
+        connectAdapter,
         logFoodItem,
         deleteLogItem,
         addCustomIngredient,
         isSettingsOpen,
         setIsSettingsOpen,
         isCatalogOpen,
-        setIsCatalogOpen
+        setIsCatalogOpen,
+        isStorageSettingsOpen,
+        setIsStorageSettingsOpen
       }}
     >
       {children}
@@ -246,3 +375,4 @@ export const useApp = () => {
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 };
+

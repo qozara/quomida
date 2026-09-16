@@ -13,10 +13,58 @@ describe('MockSyncAdapter', () => {
     expect(adapter.getStatus()).toBe('disconnected');
   });
 
-  it('initializes cleanly', async () => {
+  it('initializes cleanly to idle status', async () => {
     await adapter.initialize('mock-token-123');
     expect(adapter.isInitialized()).toBe(true);
-    expect(adapter.getStatus()).toBe('synced');
+    expect(adapter.getStatus()).toBe('idle');
+  });
+
+  it('supports simulated failure states and recovery', async () => {
+    await adapter.initialize('mock-token-123');
+    expect(adapter.getStatus()).toBe('idle');
+
+    adapter.simulateThrottled();
+    expect(adapter.getStatus()).toBe('throttled');
+
+    adapter.simulateAuthFailed();
+    expect(adapter.getStatus()).toBe('auth_failed');
+
+    await adapter.reauthenticate();
+    expect(adapter.getStatus()).toBe('idle');
+
+    adapter.simulateSyncing();
+    expect(adapter.getStatus()).toBe('syncing');
+
+    adapter.simulateIdle();
+    expect(adapter.getStatus()).toBe('idle');
+  });
+
+  it('notifies status change subscribers', async () => {
+    const statuses: string[] = [];
+    const unsubscribe = adapter.onStatusChange((status) => {
+      statuses.push(status);
+    });
+
+    await adapter.initialize('mock-token');
+    adapter.simulateThrottled();
+    adapter.simulateAuthFailed();
+    unsubscribe();
+    adapter.simulateIdle();
+
+    expect(statuses).toEqual(['idle', 'throttled', 'auth_failed']);
+  });
+
+  it('supports forceSync and disconnect', async () => {
+    await adapter.initialize('mock-token');
+    expect(adapter.getConnectedAccount()).toBe('test-user@mock-cloud.internal');
+
+    await adapter.forceSync();
+    expect(adapter.getLastSyncedTime()).not.toBeNull();
+    expect(adapter.getStatus()).toBe('idle');
+
+    await adapter.disconnect();
+    expect(adapter.isInitialized()).toBe(false);
+    expect(adapter.getStatus()).toBe('disconnected');
   });
 
   it('allows pushing and pulling payload deltas', async () => {
@@ -45,3 +93,4 @@ describe('MockSyncAdapter', () => {
     expect(pulled[0].documents[0].id).toBe('log-1');
   });
 });
+

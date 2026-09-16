@@ -139,6 +139,20 @@ export class LocalDBService {
     return this.syncAdapter;
   }
 
+  setSyncAdapter(syncAdapter?: SyncAdapter): void {
+    this.syncAdapter = syncAdapter;
+  }
+
+  async getItemCounts(): Promise<{ logs: number; customFoods: number }> {
+    if (!this.db) await this.init();
+    const logs = await this.db!.daily_logs.find().exec();
+    const customFoods = await this.db!.base_ingredients.find({ selector: { source: 'custom' } }).exec();
+    return {
+      logs: logs.length,
+      customFoods: customFoods.length
+    };
+  }
+
   async getSettings(): Promise<UserSettings> {
     if (!this.db) await this.init();
     const doc = await this.db!.user_settings.findOne('global_settings').exec();

@@ -57,5 +57,79 @@
   "appStatus": {
     "offline": "Application status: Offline. Changes are saved locally.",
     "connected": "Application status: Connected."
+  },
+  "sync": {
+    "header": {
+      "idle": "All changes saved",
+      "synced": "All changes saved",
+      "syncing": "Syncing changes...",
+      "offline": "Working offline",
+      "waiting": "Sync paused",
+      "error": "Action required",
+      "local": "Local storage only"
+    },
+    "subtitle": {
+      "idle": "Saved to device. Synced with your cloud.",
+      "synced": "Saved to device. Synced with your cloud.",
+      "syncing": "Uploading and updating cloud records.",
+      "offline": "Changes saved locally. Syncing will resume when connection returns.",
+      "waiting": "Sync temporarily paused by provider. Retrying automatically.",
+      "error": "Connection lost. Please re-authenticate.",
+      "local": "Using local storage only. Tap to set up cloud backups."
+    },
+
+    "diagnostics": {
+      "connection": "Internet connection",
+      "cloudProvider": "Cloud Provider",
+      "connected": "Connected",
+      "offline": "Offline",
+      "paused": "Paused",
+      "syncing": "Syncing...",
+      "reauthenticating": "Re-authenticating in background...",
+      "needsAttention": "Needs attention",
+      "notConnected": "Not connected",
+      "lastSync": "Last sync: {{time}}",
+      "never": "Never",
+      "justNow": "Just now"
+    },
+
+    "banner": {
+      "expired": "Your session with {{provider}} expired. Re-authenticate to keep cloud backups current.",
+      "reconnect": "Reconnect {{provider}}"
+    },
+    "actions": {
+      "forceSync": "Force Sync Now",
+      "syncing": "Syncing...",
+      "storageSettings": "Storage Settings →"
+    },
+    "panel": {
+      "back": "Back",
+      "title": "Storage & Sync",
+      "close": "Close",
+      "localTitle": "Local Device Storage",
+      "localDescription": "Quomida stores your meal logs and food catalogs on this device first for offline speed.",
+      "localMetadata": "Storage Engine: IndexedDB (RxDB) · Items: {{logs}} logs, {{foods}} custom foods",
+      "remoteTitle": "Remote Synchronization (BYOS)",
+      "remoteDescription": "Connect a storage provider to back up your logs and sync across devices.",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "reconnect": "Reconnect",
+      "connected": "Connected",
+      "needsReconnect": "Needs Reconnect",
+      "paused": "Paused",
+      "configure": "Configure / View Remote Files",
+      "localFirstGuarantee": "Local-first guarantee: Disconnecting a cloud provider will never delete records from this device.",
+      "confirmTitle": "Disconnect {{provider}}?",
+      "confirmMessage": "Your local data remains intact, but changes will no longer back up remotely.",
+      "confirmAction": "Disconnect",
+      "cancelAction": "Cancel"
+    },
+    "a11y": {
+      "syncing": "Syncing data to remote storage.",
+      "offline": "Internet disconnected. Operating in offline mode. Changes saved locally.",
+      "error": "Cloud sync error. Action required to resume backup.",
+      "synced": "All changes saved to device and cloud.",
+      "local": "Local storage only mode. Changes saved locally."
+    }
   }
 }

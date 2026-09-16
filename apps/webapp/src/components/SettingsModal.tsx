@@ -11,11 +11,14 @@ export const SettingsModal: React.FC = () => {
     userSettings,
     updateUserSettings,
     syncStatus,
+    activeAdapter,
     lastSyncedTime,
     isSettingsOpen,
     setIsSettingsOpen,
+    setIsStorageSettingsOpen,
     t
   } = useApp();
+
 
   const [calorieTarget, setCalorieTarget] = useState(userSettings.daily_calorie_target || 2000);
   const [proteinTarget, setProteinTarget] = useState(userSettings.custom_macros?.protein || 150);
@@ -163,26 +166,51 @@ export const SettingsModal: React.FC = () => {
 
         {/* Section 3: BYOS Sync Info */}
         <div className="space-y-3 pt-2 border-t border-slate-800">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
-            <Cloud className="w-4 h-4 text-emerald-400" />
-            <span>{t.settings.syncTitle}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+              <Cloud className="w-4 h-4 text-emerald-400" />
+              <span>{t.sync?.panel?.title || t.settings.syncTitle}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsStorageSettingsOpen(true);
+              }}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 hover:underline"
+            >
+              <span>{t.sync?.actions?.storageSettings || 'Storage Settings →'}</span>
+            </button>
           </div>
 
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
             <div className="text-xs text-slate-300 font-semibold flex items-center justify-between">
               <span>Storage Adapter</span>
               <span className="text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800/50">
-                MockSyncAdapter (Local-First)
+                {activeAdapter && activeAdapter.isInitialized() && activeAdapter.getStatus() !== 'disconnected'
+                  ? activeAdapter.name
+                  : 'Local Only (No Adapter)'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
               Quomida runs 100% offline in your browser using RxDB IndexedDB. You can connect your personal Google Drive / Sheets account anytime.
             </p>
-            <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-900">
-              {t.settings.syncLastSynced.replace('{{time}}', lastSyncedTime || 'Now')}
+            <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-900 flex justify-between items-center">
+              <span>{t.settings.syncLastSynced.replace('{{time}}', lastSyncedTime || 'Now')}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSettingsOpen(false);
+                  setIsStorageSettingsOpen(true);
+                }}
+                className="text-emerald-400 hover:underline text-[11px] font-medium"
+              >
+                Manage Storage
+              </button>
             </div>
           </div>
         </div>
+
 
         {/* Section 4: App Version */}
         <div className="pt-2 border-t border-slate-800/80 text-center">
