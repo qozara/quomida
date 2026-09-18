@@ -122,7 +122,11 @@
       "confirmTitle": "¿Desconectar {{provider}}?",
       "confirmMessage": "Tus datos locales permanecerán intactos, pero los cambios ya no se respaldarán remotamente.",
       "confirmAction": "Desconectar",
-      "cancelAction": "Cancelar"
+      "cancelAction": "Cancelar",
+      "emptyDatabase": "Vaciar Base de Datos Local (v0)",
+      "emptyDatabaseConfirmTitle": "¿Vaciar base de datos local?",
+      "emptyDatabaseConfirmMessage": "Se eliminarán permanentemente todos los registros locales y alimentos personalizados, resembrando los datos iniciales para la versión 0.",
+      "emptyDatabaseAction": "Vaciar Base de Datos"
     },
     "a11y": {
       "syncing": "Sincronizando datos con el almacenamiento remoto.",

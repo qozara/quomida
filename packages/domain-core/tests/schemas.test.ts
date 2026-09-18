@@ -30,6 +30,7 @@ describe('RxDB Schema Specs', () => {
 
   it('defines daily_logs schema with hardcoded macros snapshot and optional food_name', () => {
     expect(dailyLogsSchema.title).toBe('daily_logs');
+    expect(dailyLogsSchema.version).toBe(0);
     expect(dailyLogsSchema.primaryKey).toBe('id');
     expect(dailyLogsSchema.required).toContain('date');
     expect(dailyLogsSchema.required).toContain('macros');
@@ -37,8 +38,9 @@ describe('RxDB Schema Specs', () => {
     expect(dailyLogsSchema.properties.food_name.type).toBe('string');
   });
 
-  it('defines user_settings schema with global_settings key', () => {
+  it('defines user_settings schema with global_settings key and version 0', () => {
     expect(userSettingsSchema.title).toBe('user_settings');
+    expect(userSettingsSchema.version).toBe(0);
     expect(userSettingsSchema.primaryKey).toBe('id');
   });
 });

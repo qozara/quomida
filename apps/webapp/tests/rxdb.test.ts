@@ -85,4 +85,43 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     expect(logs.length).toBe(1);
     expect(logs[0].food_reference_id).toBe(customId);
   });
+
+  it('empties and resets local database cleanly via clearLocalDatabase and resetDatabase', async () => {
+    const dbName = `reset_test_db_${Date.now()}`;
+    const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName });
+    await service.init();
+
+    // Log a custom food and a daily log
+    const customId = await service.saveCustomFood({
+      name: 'Temp Food',
+      lang: 'es',
+      calories_100g: 100,
+      protein_100g: 10,
+      carbs_100g: 10,
+      fats_100g: 2
+    });
+    await service.logFood({
+      date: '2026-09-17',
+      meal_type: 'meal_snack',
+      food_reference_id: customId,
+      quantity: 1,
+      portion_name: '100g',
+      macros: { calories: 100, protein: 10, carbs: 10, fats: 2 }
+    });
+
+    const beforeReset = await service.getItemCounts();
+    expect(beforeReset.logs).toBe(1);
+    expect(beforeReset.customFoods).toBe(1);
+
+    // Empty and reset the database
+    await service.resetDatabase();
+
+    // Verify it re-initialized fresh with 0 logs and 0 custom foods (seed catalog re-hydrated)
+    const afterReset = await service.getItemCounts();
+    expect(afterReset.logs).toBe(0);
+    expect(afterReset.customFoods).toBe(0);
+
+    const baseFoods = await service.getDatabaseInstance()!.base_ingredients.find().exec();
+    expect(baseFoods.length).toBeGreaterThan(0);
+  });
 });

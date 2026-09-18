@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/validate-schemas.js",
     "test": "vitest run"
   },
   "dependencies": {

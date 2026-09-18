@@ -1,4 +1,4 @@
-import { createRxDatabase, addRxPlugin, type RxDatabase, type RxStorage } from 'rxdb';
+import { createRxDatabase, removeRxDatabase, addRxPlugin, type RxDatabase, type RxStorage } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
@@ -20,6 +20,55 @@ import type { SyncAdapter } from '@quomida/sync-adapters';
 import { Observable } from 'rxjs';
 import seedData from '../assets/seed_v1.json' with { type: 'json' };
 
+export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
+
+export interface QuomidaDBError extends Error {
+  type: DBErrorType;
+  rxdbError?: any;
+  backupData?: string;
+}
+
+async function exportRawDexieBackup(dbName: string): Promise<string> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return '';
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const backup: any = {};
+        const objectStoreNames = Array.from(db.objectStoreNames);
+        if (objectStoreNames.length === 0) {
+           db.close();
+           resolve('{}');
+           return;
+        }
+        
+        let completed = 0;
+        const transaction = db.transaction(objectStoreNames, 'readonly');
+        
+        objectStoreNames.forEach(storeName => {
+          const store = transaction.objectStore(storeName);
+          const getAllRequest = store.getAll();
+          getAllRequest.onsuccess = () => {
+            backup[storeName] = getAllRequest.result;
+            completed++;
+            if (completed === objectStoreNames.length) {
+              db.close();
+              resolve(JSON.stringify(backup, null, 2));
+            }
+          };
+          getAllRequest.onerror = () => {
+            // Error handling for getAll
+          };
+        });
+      };
+    });
+  } catch (err) {
+    console.error('Failed to export raw backup:', err);
+    return '';
+  }
+}
 export type QuomidaDatabaseCollections = {
   base_ingredients: any;
   recipes: any;
@@ -43,6 +92,10 @@ export function getDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     dbPromise = initDatabase(options).then((db) => {
       dbInstance = db;
       return db;
+    }).catch((err) => {
+      // Clear cached promise on failure so subsequent attempts or resets can retry cleanly
+      dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;
@@ -60,6 +113,33 @@ export async function destroyDatabase(): Promise<void> {
   dbPromise = null;
 }
 
+export async function clearLocalDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
+  const storage =
+    options?.storage ||
+    (typeof window !== 'undefined' && 'indexedDB' in window
+      ? getRxStorageDexie()
+      : getRxStorageMemory());
+  const name = options?.name || 'quomidadb_v1';
+
+  await destroyDatabase();
+
+  try {
+    await removeRxDatabase(name, storage);
+  } catch (err) {
+    console.warn('[RxDB] removeRxDatabase notice:', err);
+  }
+
+  if (typeof window !== 'undefined' && 'indexedDB' in window) {
+    try {
+      window.indexedDB.deleteDatabase(name);
+    } catch {
+      // Ignore browser deletion fallback error
+    }
+  }
+
+  return getDatabase(options);
+}
+
 async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   const storage =
     options?.storage ||
@@ -72,20 +152,50 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     storage
   });
 
-  await db.addCollections({
-    base_ingredients: { schema: baseIngredientsSchema },
-    recipes: { schema: recipesSchema },
-    portions: { schema: portionsSchema },
-    daily_logs: { schema: dailyLogsSchema },
-    user_settings: { 
-      schema: userSettingsSchema,
-      migrationStrategies: {
-        1: function(oldDoc) {
-          return oldDoc;
-        }
-      }
+  try {
+    await db.addCollections({
+      base_ingredients: { schema: baseIngredientsSchema },
+      recipes: { schema: recipesSchema },
+      portions: { schema: portionsSchema },
+      daily_logs: { schema: dailyLogsSchema },
+      user_settings: { schema: userSettingsSchema }
+    });
+  } catch (err: any) {
+    try {
+      await db.close();
+    } catch {
+      // ignore
     }
-  });
+    
+    let errorType: DBErrorType = 'UNKNOWN';
+    const errStr = String(err);
+    
+    if (err?.code === 'DB6' || errStr.includes('DB6')) {
+      errorType = 'SCHEMA_MISMATCH';
+    } else if (err?.code === 'DM5' || err?.code === 'DM4' || errStr.includes('DM5') || errStr.includes('DM4')) {
+      errorType = 'MIGRATION_FAILED';
+    } else {
+      errorType = 'CORRUPTION';
+    }
+    
+    let backupData = '';
+    if (errorType === 'MIGRATION_FAILED' || errorType === 'CORRUPTION') {
+      backupData = await exportRawDexieBackup(options?.name || 'quomidadb_v1');
+    }
+
+    const customError = new Error(err?.message || 'Database initialization failed') as QuomidaDBError;
+    customError.type = errorType;
+    customError.rxdbError = err;
+    customError.backupData = backupData;
+
+    if (errorType === 'SCHEMA_MISMATCH') {
+      console.error(
+        '[RxDB DB6 Schema Mismatch] Stored local database schema hash differs from the application code without a version bump. ' +
+        'To reset and start fresh with version 0, call clearLocalDatabase() or use the UI reset button in Settings/Recovery screen.'
+      );
+    }
+    throw customError;
+  }
 
   // Hydrate seed catalog if empty
   const existingCount = await db.base_ingredients.find().exec();
@@ -131,6 +241,19 @@ export class LocalDBService {
   constructor(options?: InitDBOptions, syncAdapter?: SyncAdapter) {
     this.options = options;
     this.syncAdapter = syncAdapter;
+  }
+
+  async resetDatabase(): Promise<QuomidaDatabase> {
+    if (this.db) {
+      try {
+        await this.db.close();
+      } catch {
+        // ignore
+      }
+      this.db = null;
+    }
+    this.db = await clearLocalDatabase(this.options);
+    return this.db;
   }
 
   async init(): Promise<QuomidaDatabase> {

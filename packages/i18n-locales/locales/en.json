@@ -122,7 +122,11 @@
       "confirmTitle": "Disconnect {{provider}}?",
       "confirmMessage": "Your local data remains intact, but changes will no longer back up remotely.",
       "confirmAction": "Disconnect",
-      "cancelAction": "Cancel"
+      "cancelAction": "Cancel",
+      "emptyDatabase": "Empty Local Database (v0)",
+      "emptyDatabaseConfirmTitle": "Empty local database?",
+      "emptyDatabaseConfirmMessage": "All local daily logs and custom ingredients will be permanently removed, and initial foods will be re-seeded fresh for version 0.",
+      "emptyDatabaseAction": "Empty Database"
     },
     "a11y": {
       "syncing": "Syncing data to remote storage.",
