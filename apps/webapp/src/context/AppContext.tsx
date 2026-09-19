@@ -19,7 +19,7 @@ import {
   type UXSyncState
 } from '@quomida/cloud-providers';
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
-import { useCloudSyncProviderRegistry } from '../cloud-providers/index.js';
+import { useCloudProviderRegistry } from '../cloud-providers/index.js';
 
 interface AppContextType {
   db: QuomidaDatabase | null;
@@ -78,7 +78,7 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const providerFactories = useCloudSyncProviderRegistry();
+  const providerFactories = useCloudProviderRegistry();
   const [dbService] = useState<LocalDBService>(() => new LocalDBService());
   const [activeProvider, setActiveAdapter] = useState<CloudSyncProvider | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(
@@ -210,9 +210,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Check if we need to auto-connect
-      const activeProviderSettings = settings.active_sync_adapter;
+      const activeProviderSettings = settings.active_cloud_provider;
       if (activeProviderSettings) {
-        const factory = providerFactories.find(f => f.id === activeProviderSettings.id);
+        const factory = providerFactories.find((f: any) => f.id === activeProviderSettings.id);
         if (factory && !adapter) {
           try {
             const newAdapter = await factory.restore(activeProviderSettings.credentials);
@@ -371,19 +371,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Clear cloud tokens
     if (userSettings) {
       await updateUserSettings({
-        active_sync_adapter: undefined
+        active_cloud_provider: undefined
       });
     }
   };
 
   const connectProvider = async (adapterId: string) => {
-    const factory = providerFactories.find(f => f.id === adapterId);
+    const factory = providerFactories.find((f: any) => f.id === adapterId);
     if (!factory) return;
     
     const { adapter, credentials } = await factory.connect();
     
     await updateUserSettings({
-      active_sync_adapter: { id: adapterId, credentials }
+      active_cloud_provider: { id: adapterId, credentials }
     });
 
     dbService.setCloudSyncProvider(adapter);

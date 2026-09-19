@@ -34,7 +34,7 @@ export const CloudProviderList: React.FC<CloudProviderListProps> = ({ onDisconne
       </div>
 
       <div className="space-y-3">
-        {registry.map((provider) => {
+        {registry.map((provider: any) => {
           const isActive = Boolean(
             activeProvider &&
             activeProvider.id === provider.id &&
@@ -48,7 +48,7 @@ export const CloudProviderList: React.FC<CloudProviderListProps> = ({ onDisconne
               isActive={isActive}
               onConnect={handleConnect}
               onDisconnectClick={onDisconnectRequest}
-              onReconnect={() => handleReconnect(provider.id)}
+              onReconnect={handleReconnect}
             />
           );
         })}

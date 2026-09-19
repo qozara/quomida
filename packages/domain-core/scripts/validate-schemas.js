@@ -30,7 +30,7 @@ const V0_BASELINE = {
   user_settings: {
     version: 0,
     properties: [
-      'id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros', 'cloud_providers', 'updatedAt'
+      'id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros', 'active_cloud_provider', 'updatedAt'
     ]
   }
 };
