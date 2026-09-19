@@ -159,11 +159,43 @@ describe('GoogleSheetsTabularDriver', () => {
       httpClient: mockClient
     });
 
-    const headers = ['id', 'timestamp', 'date', 'meal_type', 'food_details_readonly', 'updatedAt', '_deleted'];
+    const headers = [
+      'id',
+      'timestamp',
+      'date',
+      'meal_type',
+      'food_reference_id',
+      'food_name',
+      'quantity',
+      'portion_name',
+      'calories',
+      'protein',
+      'carbs',
+      'fats',
+      'food_details_readonly',
+      'updatedAt',
+      '_deleted'
+    ];
     const rows = [
       {
         id: 'log_1',
-        values: ['log_1', '2026-09-15T12:00:00Z', '2026-09-15', 'meal_lunch', 'Pollo | 200kcal', 1726440000000, false]
+        values: [
+          'log_1',
+          '2026-09-15T12:00:00Z',
+          '2026-09-15',
+          'meal_lunch',
+          'food_ref_1',
+          'Pollo',
+          1,
+          '100g',
+          200,
+          30,
+          0,
+          5,
+          'Pollo | 200kcal',
+          1726440000000,
+          false
+        ]
       }
     ];
 

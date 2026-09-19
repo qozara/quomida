@@ -11,6 +11,7 @@ export interface TabularRow {
   values: (string | number | boolean | null)[];
   updatedAt?: number;
   _deleted?: boolean;
+  headers?: string[];
 }
 
 export interface TabularStorageDriver {
@@ -19,6 +20,9 @@ export interface TabularStorageDriver {
   ensureDocument(title: string, tabs: string[]): Promise<string>;
   readTable(documentId: string, tabName: string): Promise<TabularRow[]>;
   writeTable(documentId: string, tabName: string, headers: string[], rows: TabularRow[]): Promise<void>;
+  repairTable?(documentId: string, tabName?: string, expectedLastModified?: string): Promise<void>;
+  migrateTable?(documentId: string, expectedLastModified?: string): Promise<void>;
+  checkHealth?(documentId: string): Promise<any>;
 }
 
 export type CollectionRoute =

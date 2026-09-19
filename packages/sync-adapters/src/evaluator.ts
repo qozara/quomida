@@ -46,8 +46,8 @@ export function resolveUXStatus(params: ResolveUXStatusParams): UXSyncState {
     return 'waiting';
   }
 
-  // Auth Revoked / Persistent Error
-  if (status === 'auth_failed' || status === 'error') {
+  // Auth Revoked / Persistent Error / Schema Remediation Needed
+  if (status === 'auth_failed' || status === 'error' || status === 'corrupted' || status === 'upgrade_required') {
     return 'error';
   }
 

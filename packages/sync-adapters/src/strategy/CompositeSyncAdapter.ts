@@ -95,6 +95,14 @@ export class CompositeSyncAdapter implements SyncAdapter {
     }
   }
 
+  setCorruptedStatus(): void {
+    this.setStatus('corrupted');
+  }
+
+  setUpgradeRequiredStatus(): void {
+    this.setStatus('upgrade_required');
+  }
+
   async initialize(_credentials?: string | Record<string, any>): Promise<void> {
     this.initialized = true;
     this.lastSyncedTime = new Date().toISOString();
@@ -124,8 +132,110 @@ export class CompositeSyncAdapter implements SyncAdapter {
     this.setStatus('idle');
   }
 
+  async repair(): Promise<void> {
+    if (!this.tabularDriver || !this.tabularDriver.repairTable) {
+      throw new Error('Repair is not supported by this sync adapter driver');
+    }
+
+    this.setStatus('syncing');
+    try {
+      const docIds = new Set<string>();
+      for (const route of Object.values(this.routes)) {
+        if (route.target === 'tabular') {
+          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
+          docIds.add(docId);
+        }
+      }
+
+      for (const docId of docIds) {
+        await this.tabularDriver.repairTable(docId);
+      }
+
+      this.setStatus('idle');
+    } catch (err) {
+      this.setStatus('corrupted');
+      throw err;
+    }
+  }
+
+  async migrate(): Promise<void> {
+    if (!this.tabularDriver || !this.tabularDriver.migrateTable) {
+      throw new Error('Migration is not supported by this sync adapter driver');
+    }
+
+    this.setStatus('syncing');
+    try {
+      const docIds = new Set<string>();
+      for (const route of Object.values(this.routes)) {
+        if (route.target === 'tabular') {
+          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
+          docIds.add(docId);
+        }
+      }
+
+      for (const docId of docIds) {
+        await this.tabularDriver.migrateTable(docId);
+      }
+
+      this.setStatus('idle');
+    } catch (err) {
+      this.setStatus('upgrade_required');
+      throw err;
+    }
+  }
+
+  async getSchemaDiagnostic(): Promise<{
+    status: SyncStatus;
+    missingColumns?: Record<string, string[]>;
+    missingTabs?: string[];
+  } | null> {
+    if (this.status !== 'corrupted' && this.status !== 'upgrade_required') {
+      return null;
+    }
+    if (!this.tabularDriver || !this.tabularDriver.checkHealth) {
+      return { status: this.status };
+    }
+
+    try {
+      const allMissingCols: Record<string, string[]> = {};
+      const allMissingTabs: string[] = [];
+
+      for (const route of Object.values(this.routes)) {
+        if (route.target === 'tabular') {
+          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
+          const health = await this.tabularDriver.checkHealth(docId);
+          if (health?.missingColumns) {
+            Object.assign(allMissingCols, health.missingColumns);
+          }
+          if (health?.missingTabs) {
+            allMissingTabs.push(...health.missingTabs);
+          }
+        }
+      }
+
+      return {
+        status: this.status,
+        missingColumns: allMissingCols,
+        missingTabs: allMissingTabs
+      };
+    } catch {
+      return { status: this.status };
+    }
+  }
+
   async push(payload: SyncDeltaPayload): Promise<void> {
     if (!this.initialized) return;
+    if (this.status === 'corrupted') {
+      throw new Error(
+        'Sync suspended: remote spreadsheet schema is corrupted. Please repair the spreadsheet before syncing.'
+      );
+    }
+    if (this.status === 'upgrade_required') {
+      throw new Error(
+        'Sync suspended: remote spreadsheet schema requires upgrade. Please migrate the spreadsheet before syncing.'
+      );
+    }
+
     this.setStatus('syncing');
 
     try {
@@ -168,14 +278,37 @@ export class CompositeSyncAdapter implements SyncAdapter {
 
       this.lastSyncedTime = new Date().toISOString();
       this.setStatus('idle');
-    } catch (err) {
-      this.setStatus('error');
+    } catch (err: any) {
+      if (
+        err?.message?.includes('corruption') ||
+        err?.message?.includes('missing required column')
+      ) {
+        this.setStatus('corrupted');
+      } else if (
+        err?.message?.includes('upgrade') ||
+        err?.message?.includes('SchemaUpgradeRequired')
+      ) {
+        this.setStatus('upgrade_required');
+      } else {
+        this.setStatus('error');
+      }
       throw err;
     }
   }
 
   async pull(): Promise<SyncDeltaPayload[]> {
     if (!this.initialized) return [];
+    if (this.status === 'corrupted') {
+      throw new Error(
+        'Sync suspended: remote spreadsheet schema is corrupted. Please repair the spreadsheet before syncing.'
+      );
+    }
+    if (this.status === 'upgrade_required') {
+      throw new Error(
+        'Sync suspended: remote spreadsheet schema requires upgrade. Please migrate the spreadsheet before syncing.'
+      );
+    }
+
     this.setStatus('syncing');
 
     try {
@@ -195,7 +328,13 @@ export class CompositeSyncAdapter implements SyncAdapter {
               const rows = await this.tabularDriver.readTable(docId, route.tabName);
               const documents = rows.map(r => serializer.rowToDoc(r));
               results.push({ collection, documents });
-            } catch {
+            } catch (tabErr: any) {
+              if (
+                tabErr?.message?.includes('corruption') ||
+                tabErr?.message?.includes('missing required column')
+              ) {
+                throw tabErr;
+              }
               // Document or sheet tab might not exist yet; gracefully return empty
               results.push({ collection, documents: [] });
             }
@@ -206,8 +345,20 @@ export class CompositeSyncAdapter implements SyncAdapter {
       this.lastSyncedTime = new Date().toISOString();
       this.setStatus('idle');
       return results;
-    } catch (err) {
-      this.setStatus('error');
+    } catch (err: any) {
+      if (
+        err?.message?.includes('corruption') ||
+        err?.message?.includes('missing required column')
+      ) {
+        this.setStatus('corrupted');
+      } else if (
+        err?.message?.includes('upgrade') ||
+        err?.message?.includes('SchemaUpgradeRequired')
+      ) {
+        this.setStatus('upgrade_required');
+      } else {
+        this.setStatus('error');
+      }
       throw err;
     }
   }

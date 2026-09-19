@@ -63,6 +63,8 @@ interface AppContextType {
   dbInitError: QuomidaDBError | null;
   dbVersion: number;
   clearLocalDatabase: () => Promise<void>;
+  repairSync: () => Promise<void>;
+  migrateSync: () => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -311,6 +313,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
+  const repairSync = async () => {
+    if (!activeAdapter || !activeAdapter.repair) return;
+    await activeAdapter.repair();
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const migrateSync = async () => {
+    if (!activeAdapter || !activeAdapter.migrate) return;
+    await activeAdapter.migrate();
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
   const disconnectAdapter = async () => {
     if (activeAdapter && activeAdapter.disconnect) {
       await activeAdapter.disconnect();
@@ -425,6 +441,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reconnectAdapter,
         disconnectAdapter,
         connectAdapter,
+        repairSync,
+        migrateSync,
         logFoodItem,
         deleteLogItem,
         addCustomIngredient,

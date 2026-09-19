@@ -6,6 +6,23 @@ export interface CollectionSerializer {
   rowToDoc(row: TabularRow): Record<string, any>;
 }
 
+function createFieldGetter(row: TabularRow) {
+  const headers = row.headers;
+  const v = row.values;
+  return (colName: string, fallbackIndex: number) => {
+    if (headers && headers.length > 0) {
+      const idx = headers.indexOf(colName);
+      if (idx !== -1) return v[idx];
+    }
+    return v[fallbackIndex];
+  };
+}
+
+const parseBool = (val: any) => {
+  if (typeof val === 'string') return val.toLowerCase() === 'true';
+  return Boolean(val);
+};
+
 export const dailyLogsSerializer: CollectionSerializer = {
   headers: [
     'id',
@@ -53,36 +70,47 @@ export const dailyLogsSerializer: CollectionSerializer = {
     };
   },
   rowToDoc(row: TabularRow): Record<string, any> {
-    const v = row.values;
-    const parseBool = (val: any) => {
-      if (typeof val === 'string') return val.toLowerCase() === 'true';
-      return Boolean(val);
-    };
+    const getField = createFieldGetter(row);
+    const idVal = getField('id', 0);
+    const timestampVal = getField('timestamp', 1);
+    const dateVal = getField('date', 2);
+    const mealTypeVal = getField('meal_type', 3);
+    const foodRefIdVal = getField('food_reference_id', 4);
+    const foodNameVal = getField('food_name', 5);
+    const quantityVal = getField('quantity', 6);
+    const portionNameVal = getField('portion_name', 7);
+    const caloriesVal = getField('calories', 8);
+    const proteinVal = getField('protein', 9);
+    const carbsVal = getField('carbs', 10);
+    const fatsVal = getField('fats', 11);
+    const updatedAtVal = getField('updatedAt', 13);
+    const deletedVal = getField('_deleted', 14);
+
     const doc: Record<string, any> = {
-      id: String(v[0] || row.id),
-      timestamp: String(v[1] || ''),
-      date: String(v[2] || ''),
-      meal_type: String(v[3] || 'meal_lunch'),
-      food_reference_id: String(v[4] || ''),
-      quantity: Number(v[6] || 0),
-      portion_name: String(v[7] || ''),
+      id: String(idVal || row.id),
+      timestamp: String(timestampVal || ''),
+      date: String(dateVal || ''),
+      meal_type: String(mealTypeVal || 'meal_lunch'),
+      food_reference_id: String(foodRefIdVal || ''),
+      quantity: Number(quantityVal || 0),
+      portion_name: String(portionNameVal || ''),
       macros: {
-        calories: Number(v[8] || 0),
-        protein: Number(v[9] || 0),
-        carbs: Number(v[10] || 0),
-        fats: Number(v[11] || 0)
+        calories: Number(caloriesVal || 0),
+        protein: Number(proteinVal || 0),
+        carbs: Number(carbsVal || 0),
+        fats: Number(fatsVal || 0)
       }
     };
-    if (v[5]) {
-      doc.food_name = String(v[5]);
+    if (foodNameVal) {
+      doc.food_name = String(foodNameVal);
     }
-    if (v[13] !== undefined && v[13] !== null) {
-      doc.updatedAt = Number(v[13]);
+    if (updatedAtVal !== undefined && updatedAtVal !== null && updatedAtVal !== '') {
+      doc.updatedAt = Number(updatedAtVal);
     } else if (row.updatedAt) {
       doc.updatedAt = row.updatedAt;
     }
-    if (v[14] !== undefined) {
-      doc._deleted = parseBool(v[14]);
+    if (deletedVal !== undefined && deletedVal !== null && deletedVal !== '') {
+      doc._deleted = parseBool(deletedVal);
     }
     return doc;
   }
@@ -121,22 +149,29 @@ export const baseIngredientsSerializer: CollectionSerializer = {
     };
   },
   rowToDoc(row: TabularRow): Record<string, any> {
-    const v = row.values;
-    const parseBool = (val: any) => {
-      if (typeof val === 'string') return val.toLowerCase() === 'true';
-      return Boolean(val);
-    };
+    const getField = createFieldGetter(row);
+    const idVal = getField('id', 0);
+    const nameVal = getField('name', 1);
+    const sourceVal = getField('source', 2);
+    const langVal = getField('lang', 3);
+    const caloriesVal = getField('calories_100g', 4);
+    const proteinVal = getField('protein_100g', 5);
+    const carbsVal = getField('carbs_100g', 6);
+    const fatsVal = getField('fats_100g', 7);
+    const updatedAtVal = getField('updatedAt', 8);
+    const deletedVal = getField('_deleted', 9);
+
     return {
-      id: String(v[0] || row.id),
-      name: String(v[1] || ''),
-      source: String(v[2] || 'custom'),
-      lang: String(v[3] || 'en'),
-      calories_100g: Number(v[4] || 0),
-      protein_100g: Number(v[5] || 0),
-      carbs_100g: Number(v[6] || 0),
-      fats_100g: Number(v[7] || 0),
-      updatedAt: v[8] ? Number(v[8]) : row.updatedAt,
-      _deleted: parseBool(v[9] ?? row._deleted)
+      id: String(idVal || row.id),
+      name: String(nameVal || ''),
+      source: String(sourceVal || 'custom'),
+      lang: String(langVal || 'en'),
+      calories_100g: Number(caloriesVal || 0),
+      protein_100g: Number(proteinVal || 0),
+      carbs_100g: Number(carbsVal || 0),
+      fats_100g: Number(fatsVal || 0),
+      updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
+      _deleted: parseBool(deletedVal ?? row._deleted)
     };
   }
 };
@@ -159,24 +194,27 @@ export const recipesSerializer: CollectionSerializer = {
     };
   },
   rowToDoc(row: TabularRow): Record<string, any> {
-    const v = row.values;
+    const getField = createFieldGetter(row);
+    const idVal = getField('id', 0);
+    const nameVal = getField('name', 1);
+    const ingredientsVal = getField('ingredients', 2);
+    const yieldFactorVal = getField('yield_factor', 3);
+    const updatedAtVal = getField('updatedAt', 4);
+    const deletedVal = getField('_deleted', 5);
+
     let ingredients = [];
     try {
-      ingredients = typeof v[2] === 'string' ? JSON.parse(v[2]) : v[2] || [];
+      ingredients = typeof ingredientsVal === 'string' ? JSON.parse(ingredientsVal) : ingredientsVal || [];
     } catch {
       ingredients = [];
     }
-    const parseBool = (val: any) => {
-      if (typeof val === 'string') return val.toLowerCase() === 'true';
-      return Boolean(val);
-    };
     return {
-      id: String(v[0] || row.id),
-      name: String(v[1] || ''),
+      id: String(idVal || row.id),
+      name: String(nameVal || ''),
       ingredients,
-      yield_factor: Number(v[3] || 1.0),
-      updatedAt: v[4] ? Number(v[4]) : row.updatedAt,
-      _deleted: parseBool(v[5] ?? row._deleted)
+      yield_factor: Number(yieldFactorVal || 1.0),
+      updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
+      _deleted: parseBool(deletedVal ?? row._deleted)
     };
   }
 };
@@ -199,18 +237,21 @@ export const portionsSerializer: CollectionSerializer = {
     };
   },
   rowToDoc(row: TabularRow): Record<string, any> {
-    const v = row.values;
-    const parseBool = (val: any) => {
-      if (typeof val === 'string') return val.toLowerCase() === 'true';
-      return Boolean(val);
-    };
+    const getField = createFieldGetter(row);
+    const idVal = getField('id', 0);
+    const baseFoodIdVal = getField('base_food_id', 1);
+    const nameVal = getField('name', 2);
+    const weightVal = getField('equivalent_weight_g', 3);
+    const updatedAtVal = getField('updatedAt', 4);
+    const deletedVal = getField('_deleted', 5);
+
     return {
-      id: String(v[0] || row.id),
-      base_food_id: String(v[1] || ''),
-      name: String(v[2] || ''),
-      equivalent_weight_g: Number(v[3] || 0),
-      updatedAt: v[4] ? Number(v[4]) : row.updatedAt,
-      _deleted: parseBool(v[5] ?? row._deleted)
+      id: String(idVal || row.id),
+      base_food_id: String(baseFoodIdVal || ''),
+      name: String(nameVal || ''),
+      equivalent_weight_g: Number(weightVal || 0),
+      updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
+      _deleted: parseBool(deletedVal ?? row._deleted)
     };
   }
 };

@@ -134,6 +134,20 @@
       "error": "Error de sincronización en la nube. Se requiere acción para reanudar el respaldo.",
       "synced": "Todos los cambios guardados en el dispositivo y la nube.",
       "local": "Modo de solo almacenamiento local. Cambios guardados localmente."
+    },
+    "remediation": {
+      "corruptedTitle": "Discrepancia en la estructura de la planilla",
+      "corruptedDesc": "Se modificaron columnas o pestañas en tu planilla en la nube vinculada. Quomida puede reparar la estructura de forma segura agregando las columnas faltantes sin borrar tus datos existentes.",
+      "upgradeTitle": "Actualización de esquema requerida",
+      "upgradeDesc": "Tu planilla en la nube vinculada fue creada con una versión anterior del esquema. Se requiere una migración automática para continuar la sincronización.",
+      "backupNote": "Se creará automáticamente una copia de respaldo en tu unidad en la nube antes de aplicar los cambios.",
+      "repairButton": "Reparar planilla",
+      "upgradeButton": "Actualizar planilla",
+      "repairing": "Reparando planilla...",
+      "upgrading": "Actualizando planilla...",
+      "repairSuccess": "Planilla reparada con éxito. Sincronización reanudada.",
+      "upgradeSuccess": "Planilla actualizada con éxito. Sincronización reanudada.",
+      "dismiss": "Descartar por ahora"
     }
   }
 }

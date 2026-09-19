@@ -8,7 +8,7 @@ import { MealSection } from './components/MealSection.js';
 import { PortionBottomSheet } from './components/PortionBottomSheet.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { CatalogManager } from './components/CatalogManager.js';
-import { StorageSettingsPanel } from './components/sync/index.js';
+import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import type { BaseIngredient, MealType } from '@quomida/domain-core';
 import { Plus } from 'lucide-react';
@@ -98,6 +98,7 @@ const DashboardContent: React.FC = () => {
         isOpen={isStorageSettingsOpen}
         onClose={() => setIsStorageSettingsOpen(false)}
       />
+      <SchemaRemediationModal />
     </div>
   );
 };

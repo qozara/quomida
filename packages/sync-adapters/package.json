@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@qozara/gdocs-schema": "^1.0.4",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {

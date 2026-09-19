@@ -134,6 +134,20 @@
       "error": "Cloud sync error. Action required to resume backup.",
       "synced": "All changes saved to device and cloud.",
       "local": "Local storage only mode. Changes saved locally."
+    },
+    "remediation": {
+      "corruptedTitle": "Spreadsheet Structure Mismatch",
+      "corruptedDesc": "Columns or tabs have been altered in your linked cloud spreadsheet. Quomida can safely repair the structure by appending missing columns without deleting your existing data.",
+      "upgradeTitle": "Spreadsheet Schema Upgrade Required",
+      "upgradeDesc": "Your linked cloud spreadsheet was created with an older schema version. An automatic migration is required to continue syncing.",
+      "backupNote": "A backup copy of your spreadsheet will be created in your cloud drive before applying changes.",
+      "repairButton": "Repair Spreadsheet",
+      "upgradeButton": "Upgrade Spreadsheet",
+      "repairing": "Repairing spreadsheet...",
+      "upgrading": "Upgrading spreadsheet...",
+      "repairSuccess": "Spreadsheet repaired successfully. Sync has resumed.",
+      "upgradeSuccess": "Spreadsheet upgraded successfully. Sync has resumed.",
+      "dismiss": "Dismiss for now"
     }
   }
 }
