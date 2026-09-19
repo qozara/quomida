@@ -27,12 +27,11 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
   }
 
   async getRemoteLinks(): Promise<string[]> {
-    const links: string[] = [];
-    if (this.documentSchemas.size > 0) {
-      for (const docId of this.documentSchemas.keys()) {
-        links.push(`https://docs.google.com/spreadsheets/d/${docId}/edit`);
-      }
-      return links;
+    const linkSet = new Set<string>();
+    
+    // Always include any currently cached document IDs
+    for (const docId of this.documentSchemas.keys()) {
+      linkSet.add(`https://docs.google.com/spreadsheets/d/${docId}/edit`);
     }
 
     try {
@@ -46,14 +45,14 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
         if (res.ok) {
           const json = await res.json();
           if (json.files && json.files.length > 0) {
-             links.push(`https://docs.google.com/spreadsheets/d/${json.files[0].id}/edit`);
+             linkSet.add(`https://docs.google.com/spreadsheets/d/${json.files[0].id}/edit`);
           }
         }
       }
     } catch (e) {
       console.warn('Failed to resolve remote links via Google Drive API:', e);
     }
-    return links;
+    return Array.from(linkSet);
   }
 
   private getAuthHeaders(): Record<string, string> {
