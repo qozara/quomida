@@ -17,7 +17,7 @@ import {
   type DailyLog,
   type UserSettings
 } from '@quomida/domain-core';
-import type { SyncAdapter } from '@quomida/sync-adapters';
+import type { CloudSyncProvider } from '@quomida/cloud-providers';
 import { Observable } from 'rxjs';
 import seedData from '../assets/seed_v1.json' with { type: 'json' };
 
@@ -159,22 +159,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       recipes: { schema: recipesSchema },
       portions: { schema: portionsSchema },
       daily_logs: { schema: dailyLogsSchema },
-      user_settings: { 
-        schema: userSettingsSchema,
-        migrationStrategies: {
-          1: (oldDoc: any) => {
-            const newDoc = { ...oldDoc };
-            if (oldDoc.cloud_providers?.google?.accessToken) {
-              newDoc.active_sync_adapter = {
-                id: 'google-drive-sheets',
-                credentials: { ...oldDoc.cloud_providers.google }
-              };
-            }
-            delete newDoc.cloud_providers;
-            return newDoc;
-          }
-        }
-      }
+      user_settings: { schema: userSettingsSchema }
     });
   } catch (err: any) {
     try {
@@ -252,11 +237,11 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
 export class LocalDBService {
   private db: QuomidaDatabase | null = null;
   private options?: InitDBOptions;
-  private syncAdapter?: SyncAdapter;
+  private cloudSyncProvider?: CloudSyncProvider;
 
-  constructor(options?: InitDBOptions, syncAdapter?: SyncAdapter) {
+  constructor(options?: InitDBOptions, cloudSyncProvider?: CloudSyncProvider) {
     this.options = options;
-    this.syncAdapter = syncAdapter;
+    this.cloudSyncProvider = cloudSyncProvider;
   }
 
   async resetDatabase(): Promise<QuomidaDatabase> {
@@ -274,8 +259,8 @@ export class LocalDBService {
 
   async init(): Promise<QuomidaDatabase> {
     this.db = await getDatabase(this.options);
-    if (this.syncAdapter) {
-      await this.syncAdapter.initialize();
+    if (this.cloudSyncProvider) {
+      await this.cloudSyncProvider.initialize();
     }
     return this.db;
   }
@@ -284,12 +269,12 @@ export class LocalDBService {
     return this.db;
   }
 
-  getSyncAdapter(): SyncAdapter | undefined {
-    return this.syncAdapter;
+  getCloudSyncProvider(): CloudSyncProvider | undefined {
+    return this.cloudSyncProvider;
   }
 
-  setSyncAdapter(syncAdapter?: SyncAdapter): void {
-    this.syncAdapter = syncAdapter;
+  setCloudSyncProvider(cloudSyncProvider?: CloudSyncProvider): void {
+    this.cloudSyncProvider = cloudSyncProvider;
   }
 
   async getItemCounts(): Promise<{ logs: number; customFoods: number }> {

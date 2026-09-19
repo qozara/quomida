@@ -1,9 +1,9 @@
-import type { SyncAdapter, SyncDeltaPayload, SyncStatus } from '../types.js';
+import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from '../types.js';
 import type {
   BlobStorageDriver,
   TabularStorageDriver,
   CollectionRoute,
-  CompositeSyncAdapterOptions
+  CompositeCloudSyncProviderOptions
 } from './types.js';
 import { collectionSerializers } from './serializers.js';
 
@@ -38,7 +38,7 @@ export const DEFAULT_COLLECTION_ROUTES: Record<string, CollectionRoute> = {
   }
 };
 
-export class CompositeSyncAdapter implements SyncAdapter {
+export class CompositeCloudSyncProvider implements CloudSyncProvider {
   id: string;
   name: string;
   description?: string;
@@ -54,7 +54,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
   protected documentIdCache: Map<string, string> = new Map();
   protected tabularCache: Map<string, Record<string, any>[]> = new Map();
 
-  constructor(options: CompositeSyncAdapterOptions) {
+  constructor(options: CompositeCloudSyncProviderOptions) {
     this.id = options.id;
     this.name = options.name;
     this.description = options.description;

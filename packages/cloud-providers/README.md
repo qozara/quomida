@@ -6,7 +6,7 @@ Bring Your Own Storage (BYOS) synchronization layer for Quomida. Provides decoup
 
 ## 🏛️ Storage Strategy Architecture
 
-The storage layer employs the **Storage Strategy Pattern** via `CompositeSyncAdapter`. Instead of forcing all data into a single file or remote format, sync operations are routed based on the data domain:
+The storage layer employs the **Storage Strategy Pattern** via `CompositeCloudSyncProvider`. Instead of forcing all data into a single file or remote format, sync operations are routed based on the data domain:
 
 | Domain Collection | Format | Target Driver | Document / File Target | Privacy & Access |
 | :--- | :--- | :--- | :--- | :--- |
@@ -33,7 +33,7 @@ Serializers in `src/strategy/serializers.ts` dynamically inspect `row.headers` (
 During `GoogleSheetsTabularDriver.readTable()`, headers are validated against the schema's required columns. If any required column is missing, the driver throws a descriptive `Schema corruption` error, transitioning the adapter status to `'corrupted'`.
 
 ### 3. Automatic Background Suspension
-If `SyncStatus` enters `'corrupted'` or `'upgrade_required'`, `CompositeSyncAdapter` **suspends all automatic `pull()` and `push()` polling**, protecting both the local RxDB database and the remote spreadsheet from corrupted state synchronization.
+If `SyncStatus` enters `'corrupted'` or `'upgrade_required'`, `CompositeCloudSyncProvider` **suspends all automatic `pull()` and `push()` polling**, protecting both the local RxDB database and the remote spreadsheet from corrupted state synchronization.
 
 ### 4. Non-Destructive Repair with Automated Backups
 When the user clicks "Repair Spreadsheet" in the UI (`SchemaRemediationModal`), `ValidationService`:
@@ -45,10 +45,10 @@ When the user clicks "Repair Spreadsheet" in the UI (`SchemaRemediationModal`), 
 
 ## 🧩 Core Interfaces & Contracts
 
-### 1. `SyncAdapter`
+### 1. `CloudSyncProvider`
 The primary interface consumed by the presentation layer:
 ```typescript
-export interface SyncAdapter {
+export interface CloudSyncProvider {
   id: string;
   name: string;
   description?: string;
@@ -115,7 +115,7 @@ export interface TabularStorageDriver {
 }
 ```
 
-### 5. `CompositeSyncAdapter`
+### 5. `CompositeCloudSyncProvider`
 Orchestrating base class that routes `SyncDeltaPayload` to either `BlobStorageDriver` or `TabularStorageDriver` based on declarative route configurations. Handles automatic suspension on corruption or upgrade needed, and coordinates `repair()` and `migrate()` across registered documents.
 
 ---
@@ -176,9 +176,9 @@ export class ExcelOnlineTabularDriver implements TabularStorageDriver {
 
 ### Step 3: Bundle into Composite Connector
 ```typescript
-import { CompositeSyncAdapter } from '@quomida/sync-adapters';
+import { CompositeCloudSyncProvider } from '@quomida/sync-adapters';
 
-export class OneDriveExcelSyncAdapter extends CompositeSyncAdapter {
+export class OneDriveExcelCloudSyncProvider extends CompositeCloudSyncProvider {
   constructor(options: { getAccessToken: () => string | null }) {
     super({
       id: 'onedrive-excel',

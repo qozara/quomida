@@ -16,7 +16,7 @@ How should Quomida track versions, coordinate schema migrations across both stor
 ## Decision Drivers
 
 * **Local-First Independence (Pillar 7):** The local database must initialize instantly and execute local migrations without requiring internet access or cloud provider tokens.
-* **BYOS Isolation (Repository Invariant 4):** Presentation logic must communicate with cloud storage strictly via the `SyncAdapter` interface; local persistence must not depend on cloud persistence schemas.
+* **BYOS Isolation (Repository Invariant 4):** Presentation logic must communicate with cloud storage strictly via the `CloudSyncProvider` interface; local persistence must not depend on cloud persistence schemas.
 * **Zero Data Loss Guarantee:** Both local and remote migrations must provide safety backups before applying schema mutations.
 * **Zero Silent Corruption:** Structural mismatches or outdated remote schemas must halt auto-sync and require explicit, non-destructive remediation.
 * **Developer Clarity:** Clear boundaries and documentation must enable future developers and AI coding agents to add schema fields or migrations without breaking either layer.
@@ -60,14 +60,14 @@ Quomida establishes three distinct, explicitly tracked version artifacts:
 - **Where it is tracked**:
   - Google Drive metadata: `appProperties.quomida_schema_version` (e.g. `"1"`).
   - Google Sheets: Hidden `_migrations` tab recording `[version, migrated_at]`.
-  - In-memory mock version for `MockSyncAdapter`.
+  - In-memory mock version for `MockCloudSyncProvider`.
 - **Migration Engine**: **`@qozara/gdocs-schema`** (`MigrationManager`, `SchemaValidator`, `GoogleSheetsFetchClient`), encapsulated within `packages/sync-adapters/src/google/ValidationService.ts`.
-- **Execution**: Triggered when connecting or syncing via `CompositeSyncAdapter.repair()` and `migrate()`.
+- **Execution**: Triggered when connecting or syncing via `CompositeCloudSyncProvider.repair()` and `migrate()`.
 - **Safety Mechanism**: Prior to any remote migration or column repair, `createBackup()` creates a full Google Drive copy (`Backup of <id> - <timestamp>`). Missing columns are appended non-destructively.
 
 ## Decision Outcome
 
-Chosen option: **Explicit Dual Migration Engines coordinated by CompositeSyncAdapter**.
+Chosen option: **Explicit Dual Migration Engines coordinated by CompositeCloudSyncProvider**.
 
 ### How the Two Engines Coexist
 
@@ -76,11 +76,11 @@ Chosen option: **Explicit Dual Migration Engines coordinated by CompositeSyncAda
    - It performs a health check against Tier 3 (`ValidationService.checkHealth()`).
    - If `remoteVersion < expectedVersion`: The adapter status enters `'upgrade_required'`.
    - If columns or tabs are missing: The adapter status enters `'corrupted'`.
-3. **Automatic Suspension**: `CompositeSyncAdapter` intercepts `'upgrade_required'` and `'corrupted'` statuses and immediately suspends all background `pull()` and `push()` operations to protect both local and remote data.
+3. **Automatic Suspension**: `CompositeCloudSyncProvider` intercepts `'upgrade_required'` and `'corrupted'` statuses and immediately suspends all background `pull()` and `push()` operations to protect both local and remote data.
 4. **Remediation UX**: The presentation layer renders `SchemaRemediationModal`, informing the user that:
    - A backup will be generated automatically.
    - Existing data will be preserved.
-   - Clicking "Repair" or "Upgrade" invokes `activeAdapter.repair()` or `activeAdapter.migrate()`.
+   - Clicking "Repair" or "Upgrade" invokes `activeProvider.repair()` or `activeProvider.migrate()`.
 5. **Resumption**: Once remote remediation succeeds, Tier 3 version updates to match Tier 1/2 expectations, the adapter transitions to `'idle'`, and synchronization resumes seamlessly.
 
 ### Positive Consequences

@@ -14,7 +14,7 @@ How can Quomida protect against silent corruption, support structural flexibilit
 ## Decision Drivers
 
 * **Zero Silent Data Corruption (Pillar 1 & 7):** Sync must immediately halt and protect user data if structural discrepancies occur.
-* **Connector Agnosticism:** The UI (`SchemaRemediationModal`) and orchestration (`CompositeSyncAdapter`) must be 100% agnostic of cloud providers (Google, Box, OneDrive).
+* **Connector Agnosticism:** The UI (`SchemaRemediationModal`) and orchestration (`CompositeCloudSyncProvider`) must be 100% agnostic of cloud providers (Google, Box, OneDrive).
 * **Non-Destructive Repairs:** Structure fixes must append missing columns to the existing sheet rather than wiping or overwriting user changes.
 * **Automated Safety Backups:** Any repair or migration operation must create a remote backup copy of the spreadsheet before modifying it.
 * **Optimistic Concurrency Control (OCC):** Prevent race conditions by checking file timestamps or metadata before applying schema modifications.
@@ -36,8 +36,8 @@ Chosen option: **Option 3**.
 4. **Non-Destructive Repair:** Missing columns are appended to the end of the existing sheet using Google Sheets API `appendDimension` and `updateCells`, preserving the user's manual column order and personal data.
 5. **Generic Orchestration & UI:**
    - `SyncStatus` includes `'corrupted'` and `'upgrade_required'`.
-   - `CompositeSyncAdapter` suspends background polling while in `'corrupted'` or `'upgrade_required'` status.
-   - `SchemaRemediationModal.tsx` provides a generic, WCAG 2.2 accessible dialog informing the user of the mismatch, guaranteeing backups, and triggering `activeAdapter.repair()` or `activeAdapter.migrate()`.
+   - `CompositeCloudSyncProvider` suspends background polling while in `'corrupted'` or `'upgrade_required'` status.
+   - `SchemaRemediationModal.tsx` provides a generic, WCAG 2.2 accessible dialog informing the user of the mismatch, guaranteeing backups, and triggering `activeProvider.repair()` or `activeProvider.migrate()`.
 6. **Dual-Language Parity:** English and Spanish i18n dictionaries are kept in 100% sync under `t.sync.remediation`.
 
 ### Negative Consequences / Tradeoffs

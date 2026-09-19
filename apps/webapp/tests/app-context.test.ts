@@ -18,7 +18,7 @@ vi.stubGlobal('navigator', { onLine: true });
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 describe('AppContext auto-connect logic (Issue 1)', () => {
-  it('should auto-connect to GoogleDriveSheetsSyncAdapter on load if token is present', async () => {
+  it('should auto-connect to GoogleDriveSheetsCloudSyncProvider on load if token is present', async () => {
     vi.spyOn(LocalDBService.prototype, 'getSettings').mockResolvedValue({
       active_sync_adapter: {
         id: 'google-drive-sheets',
@@ -27,8 +27,8 @@ describe('AppContext auto-connect logic (Issue 1)', () => {
     } as any);
 
     const TestComponent = () => {
-      const { activeAdapter } = useApp();
-      return React.createElement('div', { 'data-testid': 'adapter-id' }, activeAdapter?.id || 'none');
+      const { activeProvider } = useApp();
+      return React.createElement('div', { 'data-testid': 'adapter-id' }, activeProvider?.id || 'none');
     };
 
     const { container } = render(

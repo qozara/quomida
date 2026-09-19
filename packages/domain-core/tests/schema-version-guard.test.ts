@@ -57,7 +57,7 @@ const V0_BASELINE: Record<string, { version: number; properties: string[]; requi
       'theme',
       'daily_calorie_target',
       'custom_macros',
-      'cloud_providers',
+      'active_cloud_provider',
       'updatedAt'
     ],
     required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']

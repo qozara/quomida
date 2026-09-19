@@ -14,12 +14,12 @@ import {
 } from '@quomida/domain-core';
 import {
   resolveUXStatus,
-  type SyncAdapter,
+  type CloudSyncProvider,
   type SyncStatus,
   type UXSyncState
-} from '@quomida/sync-adapters';
+} from '@quomida/cloud-providers';
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
-import { useSyncAdapterRegistry } from '../adapters/index.js';
+import { useCloudSyncProviderRegistry } from '../cloud-providers/index.js';
 
 interface AppContextType {
   db: QuomidaDatabase | null;
@@ -38,14 +38,14 @@ interface AppContextType {
   dailyLogs: DailyLog[];
   syncStatus: SyncStatus;
   uxSyncState: UXSyncState;
-  activeAdapter: SyncAdapter | null;
+  activeProvider: CloudSyncProvider | null;
   isOnline: boolean;
   lastSyncedTime: string | null;
   itemCounts: { logs: number; customFoods: number };
   forceSync: () => Promise<void>;
-  reconnectAdapter: () => Promise<void>;
-  disconnectAdapter: () => Promise<void>;
-  connectAdapter: (adapterId: string, token?: string) => Promise<void>;
+  reconnectProvider: () => Promise<void>;
+  disconnectProvider: () => Promise<void>;
+  connectProvider: (adapterId: string, token?: string) => Promise<void>;
   logFoodItem: (
     ingredient: BaseIngredient,
     mealType: MealType,
@@ -78,9 +78,9 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const adapterFactories = useSyncAdapterRegistry();
+  const providerFactories = useCloudSyncProviderRegistry();
   const [dbService] = useState<LocalDBService>(() => new LocalDBService());
-  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(null);
+  const [activeProvider, setActiveAdapter] = useState<CloudSyncProvider | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
@@ -133,27 +133,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initialize LocalDBService & RxDB Adapters
   // Subscribe to active adapter status changes
   useEffect(() => {
-    if (!activeAdapter) {
+    if (!activeProvider) {
       setSyncStatus('disconnected');
       return;
     }
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime());
-    if (activeAdapter.onStatusChange) {
-      const unsub = activeAdapter.onStatusChange((newStatus) => {
+    setSyncStatus(activeProvider.getStatus());
+    setLastSyncedTime(activeProvider.getLastSyncedTime());
+    if (activeProvider.onStatusChange) {
+      const unsub = activeProvider.onStatusChange((newStatus) => {
         setSyncStatus(newStatus);
-        setLastSyncedTime(activeAdapter.getLastSyncedTime());
+        setLastSyncedTime(activeProvider.getLastSyncedTime());
       });
       return unsub;
     }
-  }, [activeAdapter]);
+  }, [activeProvider]);
 
   // Online/Offline & Heartbeat connectivity monitoring
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      if (activeAdapter && activeAdapter.isInitialized() && activeAdapter.getStatus() !== 'disconnected') {
-        setSyncStatus(activeAdapter.getStatus());
+      if (activeProvider && activeProvider.isInitialized() && activeProvider.getStatus() !== 'disconnected') {
+        setSyncStatus(activeProvider.getStatus());
       } else {
         setSyncStatus('disconnected');
       }
@@ -186,7 +186,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
-  }, [activeAdapter]);
+  }, [activeProvider]);
 
   // Initialize LocalDBService & RxDB Adapters
   useEffect(() => {
@@ -195,7 +195,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
-      const adapter = dbService.getSyncAdapter() || null;
+      const adapter = dbService.getCloudSyncProvider() || null;
       setActiveAdapter(adapter);
       if (adapter && navigator.onLine) {
         setSyncStatus(adapter.getStatus());
@@ -210,13 +210,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Check if we need to auto-connect
-      const activeAdapterSettings = settings.active_sync_adapter;
-      if (activeAdapterSettings) {
-        const factory = adapterFactories.find(f => f.id === activeAdapterSettings.id);
+      const activeProviderSettings = settings.active_sync_adapter;
+      if (activeProviderSettings) {
+        const factory = providerFactories.find(f => f.id === activeProviderSettings.id);
         if (factory && !adapter) {
           try {
-            const newAdapter = await factory.restore(activeAdapterSettings.credentials);
-            dbService.setSyncAdapter(newAdapter);
+            const newAdapter = await factory.restore(activeProviderSettings.credentials);
+            dbService.setCloudSyncProvider(newAdapter);
             setActiveAdapter(newAdapter);
             if (navigator.onLine) {
               setSyncStatus(newAdapter.getStatus());
@@ -302,19 +302,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forceSync = useCallback(async () => {
-    if (!activeAdapter || !isOnline || syncLock.current) return;
+    if (!activeProvider || !isOnline || syncLock.current) return;
     syncLock.current = true;
     setSyncStatus('syncing');
     try {
       if (db) {
-        await syncDatabaseWithRemote(db, activeAdapter);
+        await syncDatabaseWithRemote(db, activeProvider);
       }
     } finally {
-      setSyncStatus(activeAdapter.getStatus());
-      setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+      setSyncStatus(activeProvider.getStatus());
+      setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
       syncLock.current = false;
     }
-  }, [activeAdapter, isOnline, db]);
+  }, [activeProvider, isOnline, db]);
 
   // Transparent Background Sync: Polling and Visibility focus
   useEffect(() => {
@@ -337,34 +337,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [forceSync]);
 
-  const reconnectAdapter = async () => {
-    if (!activeAdapter) return;
-    if (activeAdapter.reauthenticate) {
-      await activeAdapter.reauthenticate();
+  const reconnectProvider = async () => {
+    if (!activeProvider) return;
+    if (activeProvider.reauthenticate) {
+      await activeProvider.reauthenticate();
     }
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+    setSyncStatus(activeProvider.getStatus());
+    setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const repairSync = async () => {
-    if (!activeAdapter || !activeAdapter.repair) return;
-    await activeAdapter.repair();
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+    if (!activeProvider || !activeProvider.repair) return;
+    await activeProvider.repair();
+    setSyncStatus(activeProvider.getStatus());
+    setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const migrateSync = async () => {
-    if (!activeAdapter || !activeAdapter.migrate) return;
-    await activeAdapter.migrate();
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+    if (!activeProvider || !activeProvider.migrate) return;
+    await activeProvider.migrate();
+    setSyncStatus(activeProvider.getStatus());
+    setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
-  const disconnectAdapter = async () => {
-    if (activeAdapter && activeAdapter.disconnect) {
-      await activeAdapter.disconnect();
+  const disconnectProvider = async () => {
+    if (activeProvider && activeProvider.disconnect) {
+      await activeProvider.disconnect();
     }
-    dbService.setSyncAdapter(undefined);
+    dbService.setCloudSyncProvider(undefined);
     setActiveAdapter(null);
     setSyncStatus('disconnected');
     
@@ -376,8 +376,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const connectAdapter = async (adapterId: string) => {
-    const factory = adapterFactories.find(f => f.id === adapterId);
+  const connectProvider = async (adapterId: string) => {
+    const factory = providerFactories.find(f => f.id === adapterId);
     if (!factory) return;
     
     const { adapter, credentials } = await factory.connect();
@@ -386,7 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       active_sync_adapter: { id: adapterId, credentials }
     });
 
-    dbService.setSyncAdapter(adapter);
+    dbService.setCloudSyncProvider(adapter);
     setActiveAdapter(adapter);
     setSyncStatus(adapter.getStatus());
     setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
@@ -427,14 +427,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const hasActiveAdapter = Boolean(
-    activeAdapter &&
-    activeAdapter.isInitialized() &&
-    activeAdapter.getStatus() !== 'disconnected'
+    activeProvider &&
+    activeProvider.isInitialized() &&
+    activeProvider.getStatus() !== 'disconnected'
   );
 
   const uxSyncState: UXSyncState = resolveUXStatus({
     isOnline,
-    adapter: hasActiveAdapter ? activeAdapter : null,
+    adapter: hasActiveAdapter ? activeProvider : null,
     adapterStatus: hasActiveAdapter ? syncStatus : 'disconnected'
   });
 
@@ -459,14 +459,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dailyLogs,
         syncStatus,
         uxSyncState,
-        activeAdapter,
+        activeProvider,
         isOnline,
         lastSyncedTime,
         itemCounts,
         forceSync,
-        reconnectAdapter,
-        disconnectAdapter,
-        connectAdapter,
+        reconnectProvider,
+        disconnectProvider,
+        connectProvider,
         repairSync,
         migrateSync,
         logFoodItem,

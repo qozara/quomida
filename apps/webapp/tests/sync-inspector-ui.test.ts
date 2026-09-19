@@ -3,9 +3,9 @@ import { formatRelativeTime } from '../src/components/sync/SyncTimestamp.js';
 import {
   resolveUXStatus,
   resolveProviderDiagnostic,
-  MockSyncAdapter,
-  GoogleDriveSheetsSyncAdapter
-} from '@quomida/sync-adapters';
+  MockCloudSyncProvider,
+  GoogleDriveSheetsCloudSyncProvider
+} from '@quomida/cloud-providers';
 
 
 describe('Sync Inspector UI Logic & Time Formatter (WCAG 2.2)', () => {
@@ -28,7 +28,7 @@ describe('Sync Inspector UI Logic & Time Formatter (WCAG 2.2)', () => {
   it('verifies non-visual status updates for screen readers (WCAG SC 4.1.3)', () => {
     // Check that all UX states produce distinct accessible announcements
     const states = ['syncing', 'offline', 'waiting', 'error', 'idle', 'local'] as const;
-    const adapter = new MockSyncAdapter();
+    const adapter = new MockCloudSyncProvider();
 
     states.forEach((state) => {
       let uxState;
@@ -58,14 +58,14 @@ describe('Sync Inspector UI Logic & Time Formatter (WCAG 2.2)', () => {
     });
   });
 
-  it('allows seamless swapping between MockSyncAdapter and GoogleDriveSheetsSyncAdapter without altering core contracts', async () => {
-    const mockAdapter = new MockSyncAdapter();
+  it('allows seamless swapping between MockCloudSyncProvider and GoogleDriveSheetsCloudSyncProvider without altering core contracts', async () => {
+    const mockAdapter = new MockCloudSyncProvider();
     await mockAdapter.initialize();
     expect(mockAdapter.id).toBe('mock-sync-adapter');
     expect(mockAdapter.getStatus()).toBe('idle');
     expect(mockAdapter.getConnectedAccount()).toBe('test-user@mock-cloud.internal');
 
-    const gdriveAdapter = new GoogleDriveSheetsSyncAdapter();
+    const gdriveAdapter = new GoogleDriveSheetsCloudSyncProvider();
     expect(gdriveAdapter.id).toBe('google-drive-sheets');
     expect(gdriveAdapter.getStatus()).toBe('disconnected');
 
@@ -80,7 +80,7 @@ describe('Sync Inspector UI Logic & Time Formatter (WCAG 2.2)', () => {
   });
 
   it('guarantees cloud provider diagnostic consistency across popover and storage panel when offline', async () => {
-    const adapter = new MockSyncAdapter();
+    const adapter = new MockCloudSyncProvider();
     await adapter.initialize();
     // Device is offline while adapter was previously synced/idle
     const uxState = resolveUXStatus({ isOnline: false, adapter });

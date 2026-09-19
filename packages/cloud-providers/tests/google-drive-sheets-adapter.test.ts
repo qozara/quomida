@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GoogleDriveSheetsSyncAdapter } from '../src/GoogleDriveSheetsSyncAdapter.js';
+import { GoogleDriveSheetsCloudSyncProvider } from '../src/GoogleDriveSheetsCloudSyncProvider.js';
 import type { GoogleHttpClient } from '../src/google/types.js';
 
-describe('GoogleDriveSheetsSyncAdapter (Integrated Strategy)', () => {
+describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
   it('instantiates, initializes with OAuth token, and manages connection state', async () => {
-    const adapter = new GoogleDriveSheetsSyncAdapter();
+    const adapter = new GoogleDriveSheetsCloudSyncProvider();
     expect(adapter.id).toBe('google-drive-sheets');
     expect(adapter.getStatus()).toBe('disconnected');
     expect(adapter.isInitialized()).toBe(false);
@@ -107,7 +107,7 @@ describe('GoogleDriveSheetsSyncAdapter (Integrated Strategy)', () => {
       })
     };
 
-    const adapter = new GoogleDriveSheetsSyncAdapter({ httpClient: mockClient });
+    const adapter = new GoogleDriveSheetsCloudSyncProvider({ httpClient: mockClient });
     await adapter.initialize({ accessToken: 'valid-oauth-token' });
 
     // 1. Push user settings

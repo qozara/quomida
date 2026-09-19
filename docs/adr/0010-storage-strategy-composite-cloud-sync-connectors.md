@@ -22,7 +22,7 @@ Directly coupling the app to Google Drive/Sheets APIs would contaminate domain a
 
 ## Decision Outcome
 
-Chosen option: **Storage Strategy Pattern with `CompositeSyncAdapter`, Abstract Storage Drivers, and Document-Based Collection Routing**.
+Chosen option: **Storage Strategy Pattern with `CompositeCloudSyncProvider`, Abstract Storage Drivers, and Document-Based Collection Routing**.
 
 ### Architectural Blueprint
 
@@ -33,7 +33,7 @@ Chosen option: **Storage Strategy Pattern with `CompositeSyncAdapter`, Abstract 
                                  │ SyncDeltaPayload
                                  ▼
                      ┌────────────────────────┐
-                     │  CompositeSyncAdapter  │
+                     │  CompositeCloudSyncProvider  │
                      └─────┬────────────┬─────┘
                            │            │
              Collection    │            │ Collection
@@ -67,8 +67,8 @@ Chosen option: **Storage Strategy Pattern with `CompositeSyncAdapter`, Abstract 
    - Contract for structured multi-sheet documents: `ensureDocument(title, tabs)`, `readTable(documentId, tabName)`, `writeTable(documentId, tabName, headers, rows)`.
    - Google implementation: `GoogleSheetsTabularDriver` manages spreadsheet creation and `values:batchUpdate` calls.
 
-3. **`CompositeSyncAdapter`**:
-   - Extensible base class implementing `SyncAdapter`.
+3. **`CompositeCloudSyncProvider`**:
+   - Extensible base class implementing `CloudSyncProvider`.
    - Dispatches collections according to declarative routing:
      - `user_settings` ➔ Blob driver (`settings.json`).
      - `daily_logs` ➔ Tabular driver (Document: `Quomida Daily Logs`, Tab: `daily_logs`).
@@ -80,7 +80,7 @@ Chosen option: **Storage Strategy Pattern with `CompositeSyncAdapter`, Abstract 
 
 ## Positive Consequences
 
-* **Future Provider Readiness**: Implementing Microsoft OneDrive with Excel Online or Box requires only creating `OneDriveBlobDriver` and `ExcelOnlineTabularDriver`, plugging directly into `CompositeSyncAdapter`.
+* **Future Provider Readiness**: Implementing Microsoft OneDrive with Excel Online or Box requires only creating `OneDriveBlobDriver` and `ExcelOnlineTabularDriver`, plugging directly into `CompositeCloudSyncProvider`.
 * **Zero Cross-Contamination**: Neither `apps/webapp` nor `@quomida/domain-core` import or reference Google SDKs.
 * **Full Data Sovereignty**: Users can share their `Quomida Food Catalog` Google Sheet with anyone using Google Drive's native sharing dialog, while their calorie consumption logs stay strictly private in `Quomida Daily Logs`.
 * **Isolated Testing**: All drivers and composite routing are covered by comprehensive unit tests using mocked HTTP interfaces without network calls or third-party credentials.

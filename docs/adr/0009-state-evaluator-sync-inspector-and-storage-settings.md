@@ -46,7 +46,7 @@ UI Presentation Layer (apps/webapp/src/components/sync):
 
 ### Positive Consequences
 
-* **Testability**: `MockSyncAdapter` includes test hooks (`simulateThrottled`, `simulateAuthFailed`, `simulateSyncing`) allowing comprehensive unit and integration test verification of all state flows without third-party network access.
-* **Extensibility**: Cloud adapters (Google Drive, Supabase, etc.) only need to implement the `SyncAdapter` interface and fire `onStatusChange`.
+* **Testability**: `MockCloudSyncProvider` includes test hooks (`simulateThrottled`, `simulateAuthFailed`, `simulateSyncing`) allowing comprehensive unit and integration test verification of all state flows without third-party network access.
+* **Extensibility**: Cloud adapters (Google Drive, Supabase, etc.) only need to implement the `CloudSyncProvider` interface and fire `onStatusChange`.
 * **Zero Anxiety UX**: Users see clear distinctions between self-healing transient delays and actionable authentication requirements.
 * **Accessibility**: Screen readers receive non-intrusive status updates; keyboard navigation adheres to WAI-ARIA dialog practices.

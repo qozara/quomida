@@ -2,23 +2,23 @@ import React from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { ProviderCard, type ProviderInfo } from './ProviderCard.js';
 
-export interface CloudAdapterListProps {
+export interface CloudProviderListProps {
   onDisconnectRequest: (id: string, name: string) => void;
 }
 
-import { useSyncAdapterRegistry } from '../../adapters/index.js';
+import { useCloudProviderRegistry } from '../../cloud-providers/index.js';
 
-export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnectRequest }) => {
-  const { activeAdapter, connectAdapter, reconnectAdapter, t } = useApp();
+export const CloudProviderList: React.FC<CloudProviderListProps> = ({ onDisconnectRequest }) => {
+  const { activeProvider, connectProvider, reconnectProvider, t } = useApp();
 
-  const registry = useSyncAdapterRegistry();
+  const registry = useCloudProviderRegistry();
 
   const handleConnect = async (providerId: string) => {
-    await connectAdapter(providerId);
+    await connectProvider(providerId);
   };
 
   const handleReconnect = async () => {
-    await reconnectAdapter();
+    await reconnectProvider();
   };
 
   return (
@@ -36,10 +36,10 @@ export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnect
       <div className="space-y-3">
         {registry.map((provider) => {
           const isActive = Boolean(
-            activeAdapter &&
-            activeAdapter.id === provider.id &&
-            activeAdapter.isInitialized() &&
-            activeAdapter.getStatus() !== 'disconnected'
+            activeProvider &&
+            activeProvider.id === provider.id &&
+            activeProvider.isInitialized() &&
+            activeProvider.getStatus() !== 'disconnected'
           );
           return (
             <ProviderCard

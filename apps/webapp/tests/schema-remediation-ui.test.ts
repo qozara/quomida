@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resolveUXStatus, resolveProviderDiagnostic } from '@quomida/sync-adapters';
+import { resolveUXStatus, resolveProviderDiagnostic } from '@quomida/cloud-providers';
 import enDict from '../../../packages/i18n-locales/locales/en.json';
 import esDict from '../../../packages/i18n-locales/locales/es.json';
 

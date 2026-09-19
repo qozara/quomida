@@ -1,9 +1,9 @@
 import { useMemo, useRef, useCallback } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
-import { GoogleDriveSheetsSyncAdapter } from '@quomida/sync-adapters';
-import type { AdapterFactory } from '../types.js';
+import { GoogleDriveSheetsCloudSyncProvider } from '@quomida/cloud-providers';
+import type { CloudProviderFactory } from '../types.js';
 
-export const useGoogleDriveAdapter = (): AdapterFactory => {
+export const useGoogleDriveProvider = (): CloudProviderFactory => {
   const loginResolver = useRef<((token: string) => void) | null>(null);
   const loginRejecter = useRef<((err: any) => void) | null>(null);
 
@@ -31,7 +31,7 @@ export const useGoogleDriveAdapter = (): AdapterFactory => {
     
     connect: async () => {
       const token = await triggerLogin();
-      const adapter = new GoogleDriveSheetsSyncAdapter({ onTokenRefresh: triggerLogin });
+      const adapter = new GoogleDriveSheetsCloudSyncProvider({ onTokenRefresh: triggerLogin });
       await adapter.initialize(token);
       return { 
         adapter, 
@@ -40,7 +40,7 @@ export const useGoogleDriveAdapter = (): AdapterFactory => {
     },
     
     restore: async (credentials: any) => {
-      const adapter = new GoogleDriveSheetsSyncAdapter({ onTokenRefresh: triggerLogin });
+      const adapter = new GoogleDriveSheetsCloudSyncProvider({ onTokenRefresh: triggerLogin });
       const token = credentials?.accessToken;
       await adapter.initialize(token);
       return adapter;

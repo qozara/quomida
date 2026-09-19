@@ -1,5 +1,5 @@
 import { calculateItemMacros } from '@quomida/domain-core';
-import { MockSyncAdapter } from '@quomida/sync-adapters';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers';
 
 console.log('====================================================');
 console.log('  🥗 Quomida CLI Admin & Domain Core Test Tool');
@@ -22,7 +22,7 @@ console.log(`Weight: 200g`);
 console.log(`Calculated Macros: ${macros200g.calories} kcal | Protein: ${macros200g.protein}g | Carbs: ${macros200g.carbs}g | Fats: ${macros200g.fats}g`);
 
 async function testSync() {
-  const adapter = new MockSyncAdapter();
+  const adapter = new MockCloudSyncProvider();
   await adapter.initialize('cli-mock-auth');
   console.log(`\nMock Sync Status: ${adapter.getStatus()}`);
   console.log('====================================================\n');

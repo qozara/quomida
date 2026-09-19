@@ -65,7 +65,7 @@ export interface UserSettings {
     carbs: number;
     fats: number;
   };
-  active_sync_adapter?: {
+  active_cloud_provider?: {
     id: string;
     credentials?: any;
   };

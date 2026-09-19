@@ -104,7 +104,7 @@ export const dailyLogsSchema: RxJsonSchema<DailyLog> = {
 
 export const userSettingsSchema: RxJsonSchema<UserSettings> = {
   title: 'user_settings',
-  version: 1,
+  version: 0,
   description: 'Global application preferences and nutritional targets',
   primaryKey: 'id',
   type: 'object',
@@ -122,7 +122,7 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
       },
       required: ['protein', 'carbs', 'fats']
     },
-    active_sync_adapter: {
+    active_cloud_provider: {
       type: 'object',
       properties: {
         id: { type: 'string' },

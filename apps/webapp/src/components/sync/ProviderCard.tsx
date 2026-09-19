@@ -2,7 +2,7 @@ import React from 'react';
 import { Cloud, HardDrive, AlertTriangle, ExternalLink } from 'lucide-react';
 import { StatusDot } from './StatusDot.js';
 import { useApp } from '../../context/AppContext.js';
-import { resolveProviderDiagnostic, type UXSyncState } from '@quomida/sync-adapters';
+import { resolveProviderDiagnostic, type UXSyncState } from '@quomida/cloud-providers';
 
 export interface ProviderInfo {
   id: string;
@@ -26,11 +26,11 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   onDisconnectClick,
   onReconnect
 }) => {
-  const { uxSyncState, activeAdapter, t } = useApp();
+  const { uxSyncState, activeProvider, t } = useApp();
 
   const providerDiag = resolveProviderDiagnostic(uxSyncState, isActive);
   const isError = isActive && providerDiag.statusKey === 'needsAttention';
-  const accountInfo = isActive ? activeAdapter?.getConnectedAccount?.() || 'user@connected-account' : null;
+  const accountInfo = isActive ? activeProvider?.getConnectedAccount?.() || 'user@connected-account' : null;
 
   const getStatusBadge = () => {
     if (!isActive || providerDiag.statusKey === 'notConnected') return null;
@@ -121,8 +121,8 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
               </button>
               <span
                 onClick={async () => {
-                  if (activeAdapter?.getRemoteLinks) {
-                    const links = await activeAdapter.getRemoteLinks();
+                  if (activeProvider?.getRemoteLinks) {
+                    const links = await activeProvider.getRemoteLinks();
                     links.forEach(link => window.open(link, '_blank'));
                   }
                 }}

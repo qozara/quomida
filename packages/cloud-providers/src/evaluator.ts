@@ -1,8 +1,8 @@
-import type { SyncAdapter, SyncStatus, UXSyncState } from './types.js';
+import type { CloudSyncProvider, SyncStatus, UXSyncState } from './types.js';
 
 export interface ResolveUXStatusParams {
   isOnline: boolean;
-  adapter?: SyncAdapter | { getStatus(): SyncStatus } | null;
+  adapter?: CloudSyncProvider | { getStatus(): SyncStatus } | null;
   adapterStatus?: SyncStatus;
 }
 

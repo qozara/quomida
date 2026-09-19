@@ -1,6 +1,6 @@
-import { SyncAdapter } from '@quomida/sync-adapters';
+import { CloudSyncProvider } from '@quomida/cloud-providers';
 
-export interface AdapterFactory {
+export interface CloudProviderFactory {
   id: string;
   name: string;
   description: string;
@@ -10,10 +10,10 @@ export interface AdapterFactory {
    * Connects interactively or fetches new credentials if necessary.
    * Returns the initialized adapter and the credentials to persist.
    */
-  connect: () => Promise<{ adapter: SyncAdapter, credentials: any }>;
+  connect: () => Promise<{ adapter: CloudSyncProvider, credentials: any }>;
 
   /**
    * Restores a previously connected adapter using stored credentials without prompting the user.
    */
-  restore: (credentials: any) => Promise<SyncAdapter>;
+  restore: (credentials: any) => Promise<CloudSyncProvider>;
 }

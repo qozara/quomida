@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { GoogleDriveSheetsSyncAdapter } from '@quomida/sync-adapters';
+import { GoogleDriveSheetsCloudSyncProvider } from '@quomida/cloud-providers';
 import { CREDENTIALS_PATH } from '../auth.js';
 
 async function main() {
@@ -17,7 +17,7 @@ async function main() {
 
         console.log(`✅ Loaded credentials for user: ${credentials.user?.email}`);
 
-        const adapter = new GoogleDriveSheetsSyncAdapter();
+        const adapter = new GoogleDriveSheetsCloudSyncProvider();
         console.log('Initializing adapter...');
         
         await adapter.initialize({

@@ -1,5 +1,5 @@
 {
-  "name": "@quomida/sync-adapters",
+  "name": "@quomida/cloud-providers",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",

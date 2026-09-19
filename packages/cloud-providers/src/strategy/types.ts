@@ -39,7 +39,7 @@ export type CollectionRoute =
       tabName: string;
     };
 
-export interface CompositeSyncAdapterOptions {
+export interface CompositeCloudSyncProviderOptions {
   id: string;
   name: string;
   description?: string;

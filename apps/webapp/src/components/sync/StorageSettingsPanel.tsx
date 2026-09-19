@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.js';
-import { CloudAdapterList } from './CloudAdapterList.js';
+import { CloudProviderList } from './CloudProviderList.js';
 import { ChevronLeft, X, Database, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
 
 export interface StorageSettingsPanelProps {
@@ -14,7 +14,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
   onClose,
   onBack
 }) => {
-  const { itemCounts, disconnectAdapter, clearLocalDatabase, t, dbVersion } = useApp();
+  const { itemCounts, disconnectProvider, clearLocalDatabase, t, dbVersion } = useApp();
   const [disconnectTarget, setDisconnectTarget] = useState<{ id: string; name: string } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -22,7 +22,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
 
   const handleConfirmDisconnect = async () => {
     if (disconnectTarget) {
-      await disconnectAdapter();
+      await disconnectProvider();
       setDisconnectTarget(null);
     }
   };
@@ -91,7 +91,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
         </div>
 
         {/* Remote Synchronization (BYOS) Section */}
-        <CloudAdapterList
+        <CloudProviderList
           onDisconnectRequest={(id, name) => setDisconnectTarget({ id, name })}
         />
 

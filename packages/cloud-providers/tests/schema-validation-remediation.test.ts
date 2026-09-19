@@ -3,7 +3,7 @@ import { dailyLogsSerializer, baseIngredientsSerializer } from '../src/strategy/
 import { GoogleSheetsTabularDriver } from '../src/google/GoogleSheetsTabularDriver.js';
 import { ValidationService, ValidationStatus } from '../src/google/ValidationService.js';
 import { QuomidaDailyLogsSpreadsheetSchema, QuomidaFoodCatalogSpreadsheetSchema } from '../src/google/schemas.js';
-import { CompositeSyncAdapter } from '../src/strategy/CompositeSyncAdapter.js';
+import { CompositeCloudSyncProvider } from '../src/strategy/CompositeCloudSyncProvider.js';
 import type { GoogleHttpClient } from '../src/google/types.js';
 
 describe('Dynamic Header Mapping in Serializers', () => {
@@ -303,7 +303,7 @@ describe('Google ValidationService & Repair Strategy', () => {
   });
 });
 
-describe('CompositeSyncAdapter with Schema Remediation', () => {
+describe('CompositeCloudSyncProvider with Schema Remediation', () => {
   it('suspends sync when status is corrupted, and allows repair', async () => {
     let repairCalled = false;
 
@@ -320,7 +320,7 @@ describe('CompositeSyncAdapter with Schema Remediation', () => {
       })
     };
 
-    const adapter = new CompositeSyncAdapter({
+    const adapter = new CompositeCloudSyncProvider({
       id: 'test-adapter',
       name: 'Test Adapter',
       tabularDriver: mockTabularDriver as any,

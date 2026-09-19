@@ -6,7 +6,7 @@ import { createRxDatabase, addRxPlugin, prepareQuery } from 'rxdb';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { syncDatabaseWithRemote } from '../src/db/replication.js';
-import type { SyncAdapter, SyncDeltaPayload } from '@quomida/sync-adapters';
+import type { CloudSyncProvider, SyncDeltaPayload } from '@quomida/cloud-providers';
 
 addRxPlugin(RxDBMigrationSchemaPlugin);
 
@@ -36,7 +36,7 @@ describe('Undelete Bug Test', () => {
     return db;
   };
 
-  const createMockAdapter = (): SyncAdapter => ({
+  const createMockAdapter = (): CloudSyncProvider => ({
     id: 'mock',
     name: 'Mock',
     isInitialized: () => true,
@@ -49,10 +49,10 @@ describe('Undelete Bug Test', () => {
 
   it('should not undelete a locally deleted document if remote is stale', async () => {
     const db = await createTestDb();
-    const mockSyncAdapter = createMockAdapter();
+    const mockCloudSyncProvider = createMockAdapter();
 
     // Setup: document exists remotely
-    mockSyncAdapter.pull = vi.fn().mockResolvedValue([
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
       {
         collection: 'daily_logs',
         documents: [{ id: 'log_bug', name: 'To be deleted locally', updatedAt: 100, _deleted: false }]
@@ -67,7 +67,7 @@ describe('Undelete Bug Test', () => {
     await patchedDoc.remove();
 
     // Now a sync happens (before push completes, pull fetches the stale remote doc)
-    await syncDatabaseWithRemote(db as any, mockSyncAdapter);
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
 
     // Let's query storage directly to see the tombstone
     const q = prepareQuery(db.daily_logs.schema.jsonSchema, { selector: { _deleted: true }, skip: 0, limit: 10, sort: [{ id: 'asc' }] });
@@ -79,8 +79,8 @@ describe('Undelete Bug Test', () => {
     expect(checkDoc).toBeNull();
     
     // Verify it pushed the tombstone back
-    expect(mockSyncAdapter.push).toHaveBeenCalled();
-    const pushCall = (mockSyncAdapter.push as any).mock.calls[0][0] as SyncDeltaPayload;
+    expect(mockCloudSyncProvider.push).toHaveBeenCalled();
+    const pushCall = (mockCloudSyncProvider.push as any).mock.calls[0][0] as SyncDeltaPayload;
     expect(pushCall.documents[0].id).toBe('log_bug');
     expect(pushCall.documents[0]._deleted).toBe(true);
 

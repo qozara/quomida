@@ -1,7 +1,7 @@
 import { type QuomidaDatabase, prepareQuery } from './rxdb.js';
-import type { SyncAdapter } from '@quomida/sync-adapters';
+import type { CloudSyncProvider } from '@quomida/cloud-providers';
 
-export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: SyncAdapter) {
+export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: CloudSyncProvider) {
   if (!adapter.isInitialized()) return;
 
   try {

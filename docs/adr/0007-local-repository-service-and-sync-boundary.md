@@ -10,7 +10,7 @@ Quomida operates as a local-first application where user settings, food logs, an
 ## Decision Drivers
 
 * Strict separation of concerns between presentation components and local persistence logic.
-* Guaranteed synchronization of all local collections (`user_settings`, `base_ingredients`, `daily_logs`) to the same active `SyncAdapter`.
+* Guaranteed synchronization of all local collections (`user_settings`, `base_ingredients`, `daily_logs`) to the same active `CloudSyncProvider`.
 * Native RxJS observable subscriptions driving reactive UI updates on local writes or remote pull merges.
 * Centralized domain validation (such as `validateMacroAlignment`) preventing invalid document insertion.
 
@@ -21,7 +21,7 @@ Chosen option: **`LocalDBService` Repository Pattern with Unified Sync Boundary*
 ### Implementation Details
 
 1. **Storage Adapter Selection**: Initializes RxDB using `getRxStorageDexie()` in browser environments with automatic fallback to memory storage during Vitest unit testing.
-2. **Unified BYOS Sync Boundary**: All write operations (`saveSettings`, `saveCustomFood`, `logFood`, `deleteLogItem`) mutate RxDB and automatically dispatch payload deltas to the configured `SyncAdapter`.
+2. **Unified BYOS Sync Boundary**: All write operations (`saveSettings`, `saveCustomFood`, `logFood`, `deleteLogItem`) mutate RxDB and automatically dispatch payload deltas to the configured `CloudSyncProvider`.
 3. **Reactive Stream Subscriptions**: Exposes `observeLogsByDate()` and `observeIngredients()` streams, allowing React components in `apps/webapp` to re-render automatically when local database updates occur.
 
 ### Positive Consequences

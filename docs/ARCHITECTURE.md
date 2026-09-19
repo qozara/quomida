@@ -19,9 +19,9 @@ graph TD
     end
 
     subgraph BYOS Persistence Adapter
-        DB -->|Delta Replication| SyncAdapter[SyncAdapter Interface]
-        SyncAdapter -->|Mock / Test| MockSync[MockSyncAdapter]
-        SyncAdapter -->|Production| GSheetsSync[GoogleDriveSheetsSyncAdapter]
+        DB -->|Delta Replication| CloudSyncProvider[CloudSyncProvider Interface]
+        CloudSyncProvider -->|Mock / Test| MockSync[MockCloudSyncProvider]
+        CloudSyncProvider -->|Production| GSheetsSync[GoogleDriveSheetsCloudSyncProvider]
     end
 
     subgraph User Personal Storage
@@ -39,7 +39,7 @@ Quomida operates as a clean monorepo structured to ensure complete isolation bet
 quomida/
 ├── packages/
 │   ├── domain-core/        # Isomorphic TS logic: RxDB JSON schemas, formulas, domain types
-│   ├── sync-adapters/      # SyncAdapter interface, MockSyncAdapter, Google Drive adapter
+│   ├── sync-adapters/      # CloudSyncProvider interface, MockCloudSyncProvider, Google Drive adapter
 │   ├── llm-engine/         # Natural language log parser with fallback handlers
 │   └── i18n-locales/       # Centralized localization keys (es.json, en.json)
 ├── apps/
@@ -127,7 +127,7 @@ classDiagram
 sequenceDiagram
     participant UI as React WebApp
     participant DB as RxDB (IndexedDB)
-    participant Sync as CompositeSyncAdapter
+    participant Sync as CompositeCloudSyncProvider
     participant Blob as BlobStorageDriver (appData)
     participant Tabular as TabularStorageDriver (Sheets)
 
@@ -146,7 +146,7 @@ sequenceDiagram
 
 ## 5. Design Patterns Applied
 
-- **Storage Strategy Pattern**: Decouples remote storage formats across domains. `CompositeSyncAdapter` routes unformatted application configuration (`user_settings`) to `BlobStorageDriver` and tabular data (`daily_logs`, `base_ingredients`, `recipes`, `portions`) to `TabularStorageDriver`, enabling plug-and-play support for Google Drive, OneDrive, or Box.
+- **Storage Strategy Pattern**: Decouples remote storage formats across domains. `CompositeCloudSyncProvider` routes unformatted application configuration (`user_settings`) to `BlobStorageDriver` and tabular data (`daily_logs`, `base_ingredients`, `recipes`, `portions`) to `TabularStorageDriver`, enabling plug-and-play support for Google Drive, OneDrive, or Box.
 - **Adapter Pattern**: Swappable storage backends (Mock storage for offline dev/tests vs Google Drive Sheets for production).
 - **Repository Pattern**: Wraps RxDB collections into typed domain methods (`LocalDBService`).
 - **Observer Pattern**: Native RxDB observables push live updates to React component state.

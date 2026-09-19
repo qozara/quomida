@@ -23,14 +23,14 @@ export interface SyncDeltaPayload {
   checkpoint?: string;
 }
 
-export interface SyncAdapterMetadata {
+export interface CloudSyncProviderMetadata {
   id: string;
   name: string;
   description?: string;
   connectedAccount?: string | null;
 }
 
-export interface SyncAdapter {
+export interface CloudSyncProvider {
   id: string;
   name: string;
   description?: string;

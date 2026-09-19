@@ -1,6 +1,6 @@
-import type { SyncAdapter, SyncDeltaPayload, SyncStatus } from './types.js';
+import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from './types.js';
 
-export class MockSyncAdapter implements SyncAdapter {
+export class MockCloudSyncProvider implements CloudSyncProvider {
   id = 'mock-sync-adapter';
   name = 'Mock Cloud Connector';
   description = 'Local in-memory cloud simulator for testing sync states';

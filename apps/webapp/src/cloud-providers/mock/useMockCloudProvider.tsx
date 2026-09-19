@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { MockSyncAdapter } from '@quomida/sync-adapters';
-import type { AdapterFactory } from '../types.js';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers';
+import type { CloudProviderFactory } from '../types.js';
 
-export const useMockAdapter = (): AdapterFactory => {
+export const useMockCloudProvider = (): CloudProviderFactory => {
   return useMemo(() => ({
     id: 'mock-sync-adapter',
     name: 'Mock Cloud Sync',
@@ -10,13 +10,13 @@ export const useMockAdapter = (): AdapterFactory => {
     iconType: 'mock',
     
     connect: async () => {
-      const adapter = new MockSyncAdapter();
+      const adapter = new MockCloudSyncProvider();
       await adapter.initialize();
       return { adapter, credentials: {} };
     },
     
     restore: async () => {
-      const adapter = new MockSyncAdapter();
+      const adapter = new MockCloudSyncProvider();
       await adapter.initialize();
       return adapter;
     }

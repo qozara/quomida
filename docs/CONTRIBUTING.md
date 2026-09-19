@@ -28,7 +28,7 @@ npm run test
 npm run dev
 ```
 
-The web application runs locally at `http://localhost:3000` using `MockSyncAdapter` in zero-config offline mode.
+The web application runs locally at `http://localhost:3000` using `MockCloudSyncProvider` in zero-config offline mode.
 
 ---
 

@@ -38,9 +38,9 @@ describe('RxDB Schema Specs', () => {
     expect(dailyLogsSchema.properties.food_name.type).toBe('string');
   });
 
-  it('defines user_settings schema with global_settings key and version 1', () => {
+  it('defines user_settings schema with global_settings key and version 0', () => {
     expect(userSettingsSchema.title).toBe('user_settings');
-    expect(userSettingsSchema.version).toBe(1);
+    expect(userSettingsSchema.version).toBe(0);
     expect(userSettingsSchema.primaryKey).toBe('id');
   });
 });

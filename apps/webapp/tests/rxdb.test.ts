@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getDatabase, destroyDatabase, LocalDBService } from '../src/db/rxdb.js';
-import { MockSyncAdapter } from '@quomida/sync-adapters';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { firstValueFrom } from 'rxjs';
 
@@ -34,13 +34,13 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     expect(settings?.toJSON().updatedAt).toBeDefined();
   });
 
-  it('[APP-103] initializes with MockSyncAdapter decoupling UI thread from background sync lifecycle', async () => {
+  it('[APP-103] initializes with MockCloudSyncProvider decoupling UI thread from background sync lifecycle', async () => {
     const dbName = `test_db_${Date.now()}`;
-    const mockAdapter = new MockSyncAdapter();
+    const mockAdapter = new MockCloudSyncProvider();
     const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName }, mockAdapter);
     
     await service.init();
-    expect(service.getSyncAdapter()?.isInitialized()).toBe(true);
+    expect(service.getCloudSyncProvider()?.isInitialized()).toBe(true);
 
     // Save a setting and verify sync push occurs asynchronously
     await service.saveSettings({ daily_calorie_target: 2500 });

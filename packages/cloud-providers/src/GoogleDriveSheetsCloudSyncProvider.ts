@@ -1,23 +1,23 @@
 import type { SyncDeltaPayload, SyncStatus } from './types.js';
-import { CompositeSyncAdapter } from './strategy/CompositeSyncAdapter.js';
+import { CompositeCloudSyncProvider } from './strategy/CompositeCloudSyncProvider.js';
 import type { CollectionRoute } from './strategy/types.js';
 import { GoogleDriveBlobDriver } from './google/GoogleDriveBlobDriver.js';
 import { GoogleSheetsTabularDriver } from './google/GoogleSheetsTabularDriver.js';
 import type { GoogleHttpClient } from './google/types.js';
 
-export interface GoogleDriveSheetsSyncAdapterOptions {
+export interface GoogleDriveSheetsCloudSyncProviderOptions {
   httpClient?: GoogleHttpClient;
   routes?: Record<string, CollectionRoute>;
   onTokenRefresh?: () => Promise<string>;
 }
 
-export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
+export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvider {
   private accessToken: string | null = null;
   private userEmail: string | null = null;
   private httpClient?: GoogleHttpClient;
   private onTokenRefresh?: () => Promise<string>;
 
-  constructor(options?: GoogleDriveSheetsSyncAdapterOptions) {
+  constructor(options?: GoogleDriveSheetsCloudSyncProviderOptions) {
     const httpClient = options?.httpClient;
 
     let getAccessToken = () => null as string | null;

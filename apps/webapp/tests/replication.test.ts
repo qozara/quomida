@@ -6,7 +6,7 @@ import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { syncDatabaseWithRemote } from '../src/db/replication.js';
-import type { SyncAdapter, SyncDeltaPayload } from '@quomida/sync-adapters';
+import type { CloudSyncProvider, SyncDeltaPayload } from '@quomida/cloud-providers';
 
 addRxPlugin(RxDBMigrationSchemaPlugin);
 
@@ -36,7 +36,7 @@ describe('syncDatabaseWithRemote', () => {
     return db;
   };
 
-  const createMockAdapter = (): SyncAdapter => ({
+  const createMockAdapter = (): CloudSyncProvider => ({
     id: 'mock',
     name: 'Mock',
     isInitialized: () => true,
@@ -47,19 +47,19 @@ describe('syncDatabaseWithRemote', () => {
     push: vi.fn().mockResolvedValue(undefined)
   });
 
-  it('should push local updates to the SyncAdapter if not found in remote payload', async () => {
+  it('should push local updates to the CloudSyncProvider if not found in remote payload', async () => {
     const db = await createTestDb();
-    const mockSyncAdapter = createMockAdapter();
-    mockSyncAdapter.pull = vi.fn().mockResolvedValue([
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
       { collection: 'daily_logs', documents: [] }
     ]);
 
     await db.daily_logs.insert({ id: 'log_1', name: 'Apple', updatedAt: 100 });
     
-    await syncDatabaseWithRemote(db as any, mockSyncAdapter);
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
 
-    expect(mockSyncAdapter.push).toHaveBeenCalled();
-    const pushCall = (mockSyncAdapter.push as any).mock.calls[0][0] as SyncDeltaPayload;
+    expect(mockCloudSyncProvider.push).toHaveBeenCalled();
+    const pushCall = (mockCloudSyncProvider.push as any).mock.calls[0][0] as SyncDeltaPayload;
     expect(pushCall.collection).toBe('daily_logs');
     expect(pushCall.documents[0].id).toBe('log_1');
 
@@ -68,8 +68,8 @@ describe('syncDatabaseWithRemote', () => {
 
   it('should pull remote updates and resolve conflicts (LWW)', async () => {
     const db = await createTestDb();
-    const mockSyncAdapter = createMockAdapter();
-    mockSyncAdapter.pull = vi.fn().mockResolvedValue([
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
       {
         collection: 'daily_logs',
         documents: [{ id: 'log_2', name: 'Banana Remote', updatedAt: 200, _deleted: false }]
@@ -78,7 +78,7 @@ describe('syncDatabaseWithRemote', () => {
 
     await db.daily_logs.insert({ id: 'log_2', name: 'Banana Local', updatedAt: 100 });
 
-    await syncDatabaseWithRemote(db as any, mockSyncAdapter);
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
 
     const doc = await db.daily_logs.findOne('log_2').exec();
     expect(doc.name).toBe('Banana Remote');
@@ -88,8 +88,8 @@ describe('syncDatabaseWithRemote', () => {
 
   it('should keep local document if local updatedAt is newer than remote', async () => {
     const db = await createTestDb();
-    const mockSyncAdapter = createMockAdapter();
-    mockSyncAdapter.pull = vi.fn().mockResolvedValue([
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
       {
         collection: 'daily_logs',
         documents: [{ id: 'log_3', name: 'Stale Remote', updatedAt: 50, _deleted: false }]
@@ -98,13 +98,13 @@ describe('syncDatabaseWithRemote', () => {
 
     await db.daily_logs.insert({ id: 'log_3', name: 'Fresh Local', updatedAt: 150 });
 
-    await syncDatabaseWithRemote(db as any, mockSyncAdapter);
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
 
     const doc = await db.daily_logs.findOne('log_3').exec();
     expect(doc.name).toBe('Fresh Local');
     
-    expect(mockSyncAdapter.push).toHaveBeenCalled();
-    const pushCall = (mockSyncAdapter.push as any).mock.calls[0][0] as SyncDeltaPayload;
+    expect(mockCloudSyncProvider.push).toHaveBeenCalled();
+    const pushCall = (mockCloudSyncProvider.push as any).mock.calls[0][0] as SyncDeltaPayload;
     expect(pushCall.documents[0].id).toBe('log_3');
 
     await db.remove();
@@ -112,8 +112,8 @@ describe('syncDatabaseWithRemote', () => {
 
   it('should handle remote _deleted soft deletes', async () => {
     const db = await createTestDb();
-    const mockSyncAdapter = createMockAdapter();
-    mockSyncAdapter.pull = vi.fn().mockResolvedValue([
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
       {
         collection: 'daily_logs',
         documents: [{ id: 'log_4', name: 'To be deleted', updatedAt: 300, _deleted: true }]
@@ -122,7 +122,7 @@ describe('syncDatabaseWithRemote', () => {
 
     await db.daily_logs.insert({ id: 'log_4', name: 'To be deleted', updatedAt: 100 });
 
-    await syncDatabaseWithRemote(db as any, mockSyncAdapter);
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
 
     const doc = await db.daily_logs.findOne('log_4').exec();
     expect(doc).toBeNull();

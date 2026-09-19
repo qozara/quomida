@@ -56,7 +56,7 @@ npm run test:e2e --workspace=@quomida/cli
 ```
 The test verifies:
 - Loading saved credentials.
-- Initializing `GoogleDriveSheetsSyncAdapter`.
+- Initializing `GoogleDriveSheetsCloudSyncProvider`.
 - Pushing a custom ingredient to the `appDataFolder` (`settings.json`).
 - Pushing a meal log to `Quomida Daily Logs` Google Sheet.
 - Pulling state and verifying structure.

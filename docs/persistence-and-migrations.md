@@ -32,7 +32,7 @@ Because both environments have distinct storage paradigms (relational JSON docum
 | :--- | :--- | :--- | :--- | :--- |
 | **Tier 1: App Version** | Codebase release bundle | `package.json` SemVer + Git commit SHA | Automated during build / release tagging | N/A (code artifact) |
 | **Tier 2: Local DB Version** | Local RxDB collections in IndexedDB | RxDB internal metadata + `localStorage['rxdb_schema_hashes']` | Incremented in `packages/domain-core/src/schemas/index.ts` with an RxDB migration strategy | **Yes (100% offline)** |
-| **Tier 3: Cloud Store Version** | Remote user-owned cloud files | Google Drive `appProperties.quomida_schema_version` + `_migrations` spreadsheet tab | Incremented via `@qozara/gdocs-schema` migrations when running `activeAdapter.migrate()` | No (requires cloud connectivity) |
+| **Tier 3: Cloud Store Version** | Remote user-owned cloud files | Google Drive `appProperties.quomida_schema_version` + `_migrations` spreadsheet tab | Incremented via `@qozara/gdocs-schema` migrations when running `activeProvider.migrate()` | No (requires cloud connectivity) |
 
 ```mermaid
 graph TD
@@ -49,7 +49,7 @@ graph TD
         CME -->|Health Check| CMG[Suspension Guard<br/>SchemaRemediationModal]
     end
 
-    LME -.->|SyncAdapter Boundary| CME
+    LME -.->|CloudSyncProvider Boundary| CME
 ```
 
 ---
@@ -139,7 +139,7 @@ Manages schema health, column structure, safety backups, and version migrations 
 
 ## 🔄 Runtime Coordination & Synchronization State Flow
 
-When both layers run together in the web application, `CompositeSyncAdapter` acts as the bridge:
+When both layers run together in the web application, `CompositeCloudSyncProvider` acts as the bridge:
 
 ```mermaid
 sequenceDiagram
@@ -147,7 +147,7 @@ sequenceDiagram
     actor User
     participant WebApp as WebApp (AppContext)
     participant RxDB as Local RxDB (IndexedDB)
-    participant Adapter as CompositeSyncAdapter
+    participant Adapter as CompositeCloudSyncProvider
     participant GDrive as Google Drive / Sheets
 
     Note over WebApp,RxDB: 1. BOOT (Offline-Ready)

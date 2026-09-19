@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  CompositeSyncAdapter,
+  CompositeCloudSyncProvider,
   type BlobStorageDriver,
   type TabularStorageDriver,
   type TabularRow
@@ -68,15 +68,15 @@ class InMemoryTabularDriver implements TabularStorageDriver {
   }
 }
 
-describe('CompositeSyncAdapter & Strategy Pattern', () => {
+describe('CompositeCloudSyncProvider & Strategy Pattern', () => {
   let blobDriver: InMemoryBlobDriver;
   let tabularDriver: InMemoryTabularDriver;
-  let adapter: CompositeSyncAdapter;
+  let adapter: CompositeCloudSyncProvider;
 
   beforeEach(async () => {
     blobDriver = new InMemoryBlobDriver();
     tabularDriver = new InMemoryTabularDriver();
-    adapter = new CompositeSyncAdapter({
+    adapter = new CompositeCloudSyncProvider({
       id: 'test-composite-adapter',
       name: 'Test Composite Adapter',
       blobDriver,

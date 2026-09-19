@@ -81,9 +81,9 @@ npm run logout --workspace=@quomida/cli
 ## 🔄 Using the Adapter in Code
 
 ```typescript
-import { GoogleDriveSheetsSyncAdapter } from '@quomida/sync-adapters';
+import { GoogleDriveSheetsCloudSyncProvider } from '@quomida/sync-adapters';
 
-const adapter = new GoogleDriveSheetsSyncAdapter();
+const adapter = new GoogleDriveSheetsCloudSyncProvider();
 
 // Initialize with user access token
 await adapter.initialize({
