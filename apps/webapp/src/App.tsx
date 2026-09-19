@@ -11,10 +11,19 @@ import { CatalogManager } from './components/CatalogManager.js';
 import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import type { BaseIngredient, MealType } from '@quomida/domain-core';
-import { Plus } from 'lucide-react';
+import { Plus, Cloud } from 'lucide-react';
 
 const DashboardContent: React.FC = () => {
-  const { t, isStorageSettingsOpen, setIsStorageSettingsOpen, dbInitError, dbVersion, clearLocalDatabase } = useApp();
+  const {
+    t,
+    isStorageSettingsOpen,
+    setIsStorageSettingsOpen,
+    dbInitError,
+    dbVersion,
+    clearLocalDatabase,
+    uxSyncState,
+    itemCounts
+  } = useApp();
   const [selectedIngredient, setSelectedIngredient] = useState<BaseIngredient | null>(null);
 
   const [targetMealType, setTargetMealType] = useState<MealType>('meal_lunch');
@@ -44,6 +53,29 @@ const DashboardContent: React.FC = () => {
       {/* Main Container */}
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">
         
+        {/* Onboarding Banner for Fresh Devices */}
+        {uxSyncState === 'local' && itemCounts.logs === 0 && (
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95">
+            <div className="flex gap-3 items-start">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-full shrink-0">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Returning User?</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Connect a cloud storage provider to restore your data and sync seamlessly across devices.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsStorageSettingsOpen(true)}
+              className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]"
+            >
+              Connect Cloud Storage
+            </button>
+          </div>
+        )}
+
         {/* Dynamic Macro Summary Rings */}
         <MacroRings />
 
