@@ -51,6 +51,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
   protected tabularDriver?: TabularStorageDriver;
   protected routes: Record<string, CollectionRoute>;
   protected documentIdCache: Map<string, string> = new Map();
+  protected tabularCache: Map<string, Record<string, any>[]> = new Map();
 
   constructor(options: CompositeSyncAdapterOptions) {
     this.id = options.id;
@@ -112,6 +113,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
   async disconnect(): Promise<void> {
     this.initialized = false;
     this.documentIdCache.clear();
+    this.tabularCache.clear();
     this.setStatus('disconnected');
   }
 
@@ -272,7 +274,41 @@ export class CompositeSyncAdapter implements SyncAdapter {
         }
 
         const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-        const rows = payload.documents.map(doc => serializer.docToRow(doc));
+        const cacheKey = `${docId}_${route.tabName}`;
+
+        let existingDocs: Record<string, any>[] = [];
+        if (this.tabularCache.has(cacheKey)) {
+          existingDocs = this.tabularCache.get(cacheKey)!;
+        } else {
+          try {
+            const existingRows = await this.tabularDriver.readTable(docId, route.tabName);
+            existingDocs = existingRows.map(r => serializer.rowToDoc(r));
+          } catch (err: any) {
+            if (
+              err?.message?.includes('corruption') ||
+              err?.message?.includes('missing required column')
+            ) {
+              throw err;
+            }
+            // If table doesn't exist or is empty, we start with empty existingDocs
+          }
+        }
+
+        const docMap = new Map(existingDocs.map(d => [d.id, d]));
+        for (const doc of payload.documents) {
+          if (doc.id) {
+            if (doc._deleted) {
+              docMap.delete(doc.id);
+            } else {
+              docMap.set(doc.id, doc);
+            }
+          }
+        }
+
+        const mergedDocs = Array.from(docMap.values());
+        this.tabularCache.set(cacheKey, mergedDocs);
+
+        const rows = mergedDocs.map(doc => serializer.docToRow(doc));
         await this.tabularDriver.writeTable(docId, route.tabName, serializer.headers, rows);
       }
 
@@ -327,6 +363,8 @@ export class CompositeSyncAdapter implements SyncAdapter {
               const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
               const rows = await this.tabularDriver.readTable(docId, route.tabName);
               const documents = rows.map(r => serializer.rowToDoc(r));
+              const cacheKey = `${docId}_${route.tabName}`;
+              this.tabularCache.set(cacheKey, documents);
               results.push({ collection, documents });
             } catch (tabErr: any) {
               if (

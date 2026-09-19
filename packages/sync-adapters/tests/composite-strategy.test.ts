@@ -229,4 +229,50 @@ describe('CompositeSyncAdapter & Strategy Pattern', () => {
     // Ensure read-only denormalized string is stripped/omitted in RxDB document on pull
     expect((logsPayload!.documents[0] as any).food_details_readonly).toBeUndefined();
   });
+  it('merges sequential pushes to TabularStorageDriver without overwriting previous data (Issue 2/3)', async () => {
+    // 1. Push first log
+    await adapter.push({
+      collection: 'daily_logs',
+      documents: [
+        {
+          id: 'log_day1',
+          timestamp: '2026-09-15T12:00:00.000Z',
+          date: '2026-09-15',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'food_1',
+          food_name: 'Pollo',
+          quantity: 1,
+          portion_name: 'Plato',
+          macros: { calories: 200, protein: 40, carbs: 0, fats: 5 },
+          updatedAt: 1726440000000
+        }
+      ]
+    });
+
+    // 2. Push second log (this simulates the RxDB delta which only contains the newly added log)
+    await adapter.push({
+      collection: 'daily_logs',
+      documents: [
+        {
+          id: 'log_day2',
+          timestamp: '2026-09-16T12:00:00.000Z',
+          date: '2026-09-16',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'food_2',
+          food_name: 'Carne',
+          quantity: 1,
+          portion_name: 'Plato',
+          macros: { calories: 300, protein: 50, carbs: 0, fats: 10 },
+          updatedAt: 1726440000001
+        }
+      ]
+    });
+
+    // Both logs should exist in the driver (verifies merge logic / tabularCache)
+    const logsDocId = await tabularDriver.ensureDocument('Quomida Daily Logs', ['daily_logs']);
+    const rows = await tabularDriver.readTable(logsDocId, 'daily_logs');
+    expect(rows.length).toBe(2);
+    expect(rows.find(r => r.id === 'log_day1')).toBeDefined();
+    expect(rows.find(r => r.id === 'log_day2')).toBeDefined();
+  });
 });

@@ -209,7 +209,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Check if we need to auto-connect to Google
-      if (!adapter && settings.cloud_providers?.google?.accessToken) {
+      const isInitialOrNone = !adapter || adapter.id === 'mock-sync-adapter';
+      if (isInitialOrNone && settings.cloud_providers?.google?.accessToken) {
         const expiresAt = settings.cloud_providers.google.expiresAt;
         if (Date.now() < expiresAt) {
           const newAdapter = new GoogleDriveSheetsSyncAdapter();
