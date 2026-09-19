@@ -11,7 +11,7 @@ import { CatalogManager } from './components/CatalogManager.js';
 import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import type { BaseIngredient, MealType } from '@quomida/domain-core';
-import { Plus, Cloud } from 'lucide-react';
+import { Plus, Cloud, X } from 'lucide-react';
 
 const DashboardContent: React.FC = () => {
   const {
@@ -28,9 +28,18 @@ const DashboardContent: React.FC = () => {
 
   const [targetMealType, setTargetMealType] = useState<MealType>('meal_lunch');
 
+  const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
+    return localStorage.getItem('quomida_onboarding_dismissed') === 'true';
+  });
+
   if (dbInitError) {
     return <DatabaseRecoveryScreen error={dbInitError} dbVersion={dbVersion} />;
   }
+
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true);
+    localStorage.setItem('quomida_onboarding_dismissed', 'true');
+  };
 
   const handleOpenPortionModal = (ingredient: BaseIngredient, mealType: MealType) => {
     setSelectedIngredient(ingredient);
@@ -54,16 +63,23 @@ const DashboardContent: React.FC = () => {
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">
         
         {/* Onboarding Banner for Fresh Devices */}
-        {uxSyncState === 'local' && itemCounts.logs === 0 && (
-          <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95">
-            <div className="flex gap-3 items-start">
+        {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && (
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">
+            <button 
+              onClick={handleDismissBanner}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex gap-3 items-start pr-6">
               <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-full shrink-0">
                 <Cloud className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Returning User?</h3>
+                <h3 className="text-sm font-bold text-white">{t.dashboard.onboarding?.title || 'Returning User?'}</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Connect a cloud storage provider to restore your data and sync seamlessly across devices.
+                  {t.dashboard.onboarding?.description || 'Connect a cloud storage provider to restore your data and sync seamlessly across devices.'}
                 </p>
               </div>
             </div>
@@ -71,7 +87,7 @@ const DashboardContent: React.FC = () => {
               onClick={() => setIsStorageSettingsOpen(true)}
               className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
-              Connect Cloud Storage
+              {t.dashboard.onboarding?.connect || 'Connect Cloud Storage'}
             </button>
           </div>
         )}

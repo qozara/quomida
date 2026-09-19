@@ -79,9 +79,9 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [initialAdapter] = useState<SyncAdapter>(() => new MockSyncAdapter());
-  const [dbService] = useState<LocalDBService>(() => new LocalDBService(undefined, initialAdapter));
-  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(initialAdapter);
+  const [initialAdapter] = useState<SyncAdapter | null>(null);
+  const [dbService] = useState<LocalDBService>(() => new LocalDBService());
+  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );

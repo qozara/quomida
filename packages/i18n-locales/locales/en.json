@@ -23,7 +23,12 @@
       "snack": "Snacks"
     },
     "noEntries": "No foods logged yet for this meal.",
-    "addFood": "Log Food"
+    "addFood": "Log Food",
+    "onboarding": {
+      "title": "Returning User?",
+      "description": "Connect a cloud storage provider to restore your data and sync seamlessly across devices.",
+      "connect": "Connect Cloud Storage"
+    }
   },
   "search": {
     "placeholder": "Search food or cuts (e.g. Peceto, Aguacate, Milanesa)...",

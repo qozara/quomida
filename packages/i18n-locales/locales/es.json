@@ -23,7 +23,12 @@
       "snack": "Snacks / Colaciones"
     },
     "noEntries": "Aún no registraste alimentos en esta comida.",
-    "addFood": "Registrar Alimento"
+    "addFood": "Registrar Alimento",
+    "onboarding": {
+      "title": "¿Usuario recurrente?",
+      "description": "Conecta un proveedor de almacenamiento en la nube para restaurar tus datos y sincronizar perfectamente entre dispositivos.",
+      "connect": "Conectar Almacenamiento en la Nube"
+    }
   },
   "search": {
     "placeholder": "Buscar alimento o corte (ej. Peceto, Palta, Milanesa)...",
