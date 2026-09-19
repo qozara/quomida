@@ -104,7 +104,18 @@ export class CompositeSyncAdapter implements SyncAdapter {
     this.setStatus('upgrade_required');
   }
 
-  async initialize(_credentials?: string | Record<string, any>): Promise<void> {
+  getRemoteLinks(): string[] {
+    const links: string[] = [];
+    if (this.blobDriver?.getRemoteLinks) {
+      links.push(...this.blobDriver.getRemoteLinks());
+    }
+    if (this.tabularDriver?.getRemoteLinks) {
+      links.push(...this.tabularDriver.getRemoteLinks());
+    }
+    return links;
+  }
+
+  async initialize(credentials?: string | Record<string, any>): Promise<void> {
     this.initialized = true;
     this.lastSyncedTime = new Date().toISOString();
     this.setStatus('idle');

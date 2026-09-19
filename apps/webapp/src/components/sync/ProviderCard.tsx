@@ -119,7 +119,15 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
               >
                 {t.sync?.panel?.disconnect || 'Disconnect'}
               </button>
-              <span className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 cursor-pointer transition-colors">
+              <span
+                onClick={() => {
+                  if (activeAdapter?.getRemoteLinks) {
+                    const links = activeAdapter.getRemoteLinks();
+                    links.forEach(link => window.open(link, '_blank'));
+                  }
+                }}
+                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 cursor-pointer transition-colors"
+              >
                 <span>{t.sync?.panel?.configure || 'Configure'}</span>
                 <ExternalLink className="w-3 h-3" />
               </span>

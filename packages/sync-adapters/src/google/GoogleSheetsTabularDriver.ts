@@ -26,6 +26,14 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     this.validationService = new ValidationService(this.getAccessToken, this.client);
   }
 
+  getRemoteLinks(): string[] {
+    const links: string[] = [];
+    for (const docId of this.documentSchemas.keys()) {
+      links.push(`https://docs.google.com/spreadsheets/d/${docId}/edit`);
+    }
+    return links;
+  }
+
   private getAuthHeaders(): Record<string, string> {
     const token = this.getAccessToken();
     if (!token) {

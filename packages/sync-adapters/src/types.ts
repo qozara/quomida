@@ -42,6 +42,7 @@ export interface SyncAdapter {
   disconnect?(): Promise<void>;
   reauthenticate?(): Promise<void>;
   forceSync?(): Promise<void>;
+  getRemoteLinks?(): string[];
   repair?(): Promise<void>;
   migrate?(): Promise<void>;
   getSchemaDiagnostic?(): Promise<{
