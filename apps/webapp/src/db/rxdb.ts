@@ -314,10 +314,10 @@ export class LocalDBService {
     };
     await this.db!.user_settings.upsert(updated);
     if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      await this.syncAdapter.push({
+      this.syncAdapter.push({
         collection: 'user_settings',
         documents: [updated]
-      });
+      }).catch(err => console.error('[Background Sync] Failed to push user_settings:', err));
     }
   }
 
@@ -332,10 +332,10 @@ export class LocalDBService {
     };
     await this.db!.base_ingredients.insert(newFood);
     if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      await this.syncAdapter.push({
+      this.syncAdapter.push({
         collection: 'base_ingredients',
         documents: [newFood]
-      });
+      }).catch(err => console.error('[Background Sync] Failed to push base_ingredients:', err));
     }
     return id;
   }
@@ -352,10 +352,10 @@ export class LocalDBService {
     };
     await this.db!.daily_logs.insert(logEntry);
     if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      await this.syncAdapter.push({
+      this.syncAdapter.push({
         collection: 'daily_logs',
         documents: [logEntry]
-      });
+      }).catch(err => console.error('[Background Sync] Failed to push daily_logs (insert):', err));
     }
     return id;
   }
@@ -366,10 +366,10 @@ export class LocalDBService {
     if (doc) {
       await doc.remove();
       if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-        await this.syncAdapter.push({
+        this.syncAdapter.push({
           collection: 'daily_logs',
           documents: [{ id, _deleted: true, updatedAt: Date.now() }]
-        });
+        }).catch(err => console.error('[Background Sync] Failed to push daily_logs (delete):', err));
       }
     }
   }
