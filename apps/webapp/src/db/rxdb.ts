@@ -1,9 +1,10 @@
-import { createRxDatabase, removeRxDatabase, addRxPlugin, type RxDatabase, type RxStorage } from 'rxdb';
+import { createRxDatabase, removeRxDatabase, addRxPlugin, prepareQuery, type RxDatabase, type RxStorage } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 
 addRxPlugin(RxDBMigrationSchemaPlugin);
+export { prepareQuery };
 import {
   baseIngredientsSchema,
   recipesSchema,
@@ -313,12 +314,6 @@ export class LocalDBService {
       updatedAt: Date.now()
     };
     await this.db!.user_settings.upsert(updated);
-    if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      this.syncAdapter.push({
-        collection: 'user_settings',
-        documents: [updated]
-      }).catch(err => console.error('[Background Sync] Failed to push user_settings:', err));
-    }
   }
 
   async saveCustomFood(foodInput: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }): Promise<string> {
@@ -331,12 +326,6 @@ export class LocalDBService {
       updatedAt: Date.now()
     };
     await this.db!.base_ingredients.insert(newFood);
-    if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      this.syncAdapter.push({
-        collection: 'base_ingredients',
-        documents: [newFood]
-      }).catch(err => console.error('[Background Sync] Failed to push base_ingredients:', err));
-    }
     return id;
   }
 
@@ -351,12 +340,6 @@ export class LocalDBService {
       updatedAt: Date.now()
     };
     await this.db!.daily_logs.insert(logEntry);
-    if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-      this.syncAdapter.push({
-        collection: 'daily_logs',
-        documents: [logEntry]
-      }).catch(err => console.error('[Background Sync] Failed to push daily_logs (insert):', err));
-    }
     return id;
   }
 
@@ -364,13 +347,8 @@ export class LocalDBService {
     if (!this.db) await this.init();
     const doc = await this.db!.daily_logs.findOne(id).exec();
     if (doc) {
-      await doc.remove();
-      if (this.syncAdapter && this.syncAdapter.isInitialized()) {
-        this.syncAdapter.push({
-          collection: 'daily_logs',
-          documents: [{ id, _deleted: true, updatedAt: Date.now() }]
-        }).catch(err => console.error('[Background Sync] Failed to push daily_logs (delete):', err));
-      }
+      const patchedDoc = await doc.patch({ updatedAt: Date.now() });
+      await patchedDoc.remove();
     }
   }
 

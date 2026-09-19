@@ -44,6 +44,11 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
 
     // Save a setting and verify sync push occurs asynchronously
     await service.saveSettings({ daily_calorie_target: 2500 });
+    
+    // In production, AppContext calls syncDatabaseWithRemote in the background
+    const { syncDatabaseWithRemote } = await import('../src/db/replication.js');
+    await syncDatabaseWithRemote(service.getDatabaseInstance()!, mockAdapter);
+
     const pulled = await mockAdapter.pull();
     expect(pulled.some((p) => p.collection === 'user_settings')).toBe(true);
   });

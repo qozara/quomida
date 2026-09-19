@@ -266,11 +266,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
         const docMap = new Map(existingDocs.map(d => [d.id, d]));
         for (const doc of payload.documents) {
           if (doc.id) {
-            if (doc._deleted) {
-              docMap.delete(doc.id);
-            } else {
-              docMap.set(doc.id, doc);
-            }
+            docMap.set(doc.id, doc);
           }
         }
         await this.blobDriver.writeBlob(route.filename, Array.from(docMap.values()));
@@ -308,11 +304,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
         const docMap = new Map(existingDocs.map(d => [d.id, d]));
         for (const doc of payload.documents) {
           if (doc.id) {
-            if (doc._deleted) {
-              docMap.delete(doc.id);
-            } else {
-              docMap.set(doc.id, doc);
-            }
+            docMap.set(doc.id, doc);
           }
         }
 

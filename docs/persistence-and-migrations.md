@@ -189,6 +189,17 @@ sequenceDiagram
 
 ---
 
+## ⚡ Transparent Background Sync
+
+To provide a seamless, multi-device experience (e.g. switching between phone and laptop without manual refreshing), the application implements transparent synchronization triggers in the core Context (`AppContext.tsx`):
+
+1. **Optimistic UI with Asynchronous Push**: Every time a user modifies data (logs food, changes settings, creates a custom ingredient), the UI reacts instantly using local IndexedDB, while a non-blocking `forceSync` pushes the delta to the cloud asynchronously.
+2. **Periodic Background Polling**: A 1-minute interval `setInterval` routinely checks and pulls remote changes, ensuring an idle device automatically stays up-to-date.
+3. **Visibility Focus Sync**: A `visibilitychange` event listener automatically triggers a synchronization cycle whenever the application regains focus (e.g., pulling the browser out of the background on mobile, or switching tabs on desktop).
+4. **Re-entrancy Protection**: A `syncLock` (`useRef`) prevents overlapping or concurrent sync jobs from corrupting state during frequent rapid network changes.
+
+---
+
 ## 🛠️ Developer & AI Agent Playbook
 
 ### Scenario A: Adding a Field to Local Storage Only (e.g. UI state)

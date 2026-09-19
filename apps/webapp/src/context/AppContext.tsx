@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db/rxdb.js';
+import { syncDatabaseWithRemote } from '../db/replication.js';
 import {
   type BaseIngredient,
   type Portion,
@@ -101,6 +102,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
+  const syncLock = React.useRef(false);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -292,18 +294,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await dbService.saveSettings(newSettings);
     const updated = await dbService.getSettings();
     setUserSettings(updated);
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    
+    // Background sync - do not await to keep UI responsive
+    forceSync().catch(console.error);
   };
 
-  const forceSync = async () => {
-    if (!activeAdapter || !isOnline || syncStatus === 'syncing') return;
+  const forceSync = useCallback(async () => {
+    if (!activeAdapter || !isOnline || syncLock.current) return;
+    syncLock.current = true;
     setSyncStatus('syncing');
-    if (activeAdapter.forceSync) {
-      await activeAdapter.forceSync();
+    try {
+      if (db) {
+        await syncDatabaseWithRemote(db, activeAdapter);
+      }
+    } finally {
+      setSyncStatus(activeAdapter.getStatus());
+      setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+      syncLock.current = false;
     }
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
-  };
+  }, [activeAdapter, isOnline, db]);
+
+  // Transparent Background Sync: Polling and Visibility focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        forceSync().catch(console.error);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Poll for remote changes every 1 minute
+    const syncInterval = setInterval(() => {
+      forceSync().catch(console.error);
+    }, 60000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(syncInterval);
+    };
+  }, [forceSync]);
 
   const reconnectAdapter = async () => {
     if (!activeAdapter) return;
@@ -389,16 +419,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       macros: macrosSnapshot
     });
 
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    // Background sync - do not await
+    forceSync().catch(console.error);
   };
 
   const deleteLogItem = async (id: string) => {
     await dbService.deleteLogItem(id);
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    forceSync().catch(console.error);
   };
 
   const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>) => {
     await dbService.saveCustomFood(ingData);
+    forceSync().catch(console.error);
   };
 
   const hasActiveAdapter = Boolean(
