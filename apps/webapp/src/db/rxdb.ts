@@ -159,7 +159,22 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       recipes: { schema: recipesSchema },
       portions: { schema: portionsSchema },
       daily_logs: { schema: dailyLogsSchema },
-      user_settings: { schema: userSettingsSchema }
+      user_settings: { 
+        schema: userSettingsSchema,
+        migrationStrategies: {
+          1: (oldDoc: any) => {
+            const newDoc = { ...oldDoc };
+            if (oldDoc.cloud_providers?.google?.accessToken) {
+              newDoc.active_sync_adapter = {
+                id: 'google-drive-sheets',
+                credentials: { ...oldDoc.cloud_providers.google }
+              };
+            }
+            delete newDoc.cloud_providers;
+            return newDoc;
+          }
+        }
+      }
     });
   } catch (err: any) {
     try {

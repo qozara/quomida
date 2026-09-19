@@ -8,12 +8,14 @@ import type { GoogleHttpClient } from './google/types.js';
 export interface GoogleDriveSheetsSyncAdapterOptions {
   httpClient?: GoogleHttpClient;
   routes?: Record<string, CollectionRoute>;
+  onTokenRefresh?: () => Promise<string>;
 }
 
 export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
   private accessToken: string | null = null;
   private userEmail: string | null = null;
   private httpClient?: GoogleHttpClient;
+  private onTokenRefresh?: () => Promise<string>;
 
   constructor(options?: GoogleDriveSheetsSyncAdapterOptions) {
     const httpClient = options?.httpClient;
@@ -68,6 +70,7 @@ export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
     });
 
     this.httpClient = httpClient;
+    this.onTokenRefresh = options?.onTokenRefresh;
     getAccessToken = () => this.accessToken;
   }
 
@@ -99,6 +102,16 @@ export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
       this.initialized = true;
       this.lastSyncedTime = new Date().toISOString();
       this.setStatus('idle');
+    } else if (this.onTokenRefresh) {
+      try {
+        this.accessToken = await this.onTokenRefresh();
+        this.initialized = true;
+        this.lastSyncedTime = new Date().toISOString();
+        this.setStatus('idle');
+      } catch (err) {
+        this.initialized = false;
+        this.setStatus('auth_failed');
+      }
     } else {
       this.initialized = false;
       this.setStatus('disconnected');
@@ -112,6 +125,20 @@ export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
   }
 
   override async reauthenticate(): Promise<void> {
+    if (this.onTokenRefresh) {
+      try {
+        const newToken = await this.onTokenRefresh();
+        this.accessToken = newToken;
+        this.setStatus('idle');
+        this.lastSyncedTime = new Date().toISOString();
+        this.notifyCredentialsChange({ accessToken: newToken, expiresAt: Date.now() + 3500000 });
+        return;
+      } catch (e) {
+        this.setStatus('auth_failed');
+        return;
+      }
+    }
+
     if (this.accessToken) {
       this.setStatus('idle');
       this.lastSyncedTime = new Date().toISOString();

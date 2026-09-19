@@ -13,14 +13,13 @@ import {
   dailyLogsSchema
 } from '@quomida/domain-core';
 import {
-  MockSyncAdapter,
-  GoogleDriveSheetsSyncAdapter,
   resolveUXStatus,
   type SyncAdapter,
   type SyncStatus,
   type UXSyncState
 } from '@quomida/sync-adapters';
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
+import { useSyncAdapterRegistry } from '../adapters/index.js';
 
 interface AppContextType {
   db: QuomidaDatabase | null;
@@ -79,7 +78,7 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [initialAdapter] = useState<SyncAdapter | null>(null);
+  const adapterFactories = useSyncAdapterRegistry();
   const [dbService] = useState<LocalDBService>(() => new LocalDBService());
   const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(
@@ -210,17 +209,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.locale?.startsWith('en')) setLocaleState('en');
       if (settings.theme) setThemeState(settings.theme as any);
 
-      // Check if we need to auto-connect to Google
-      const isInitialOrNone = !adapter || adapter.id === 'mock-sync-adapter';
-      if (isInitialOrNone && settings.cloud_providers?.google?.accessToken) {
-        const expiresAt = settings.cloud_providers.google.expiresAt;
-        if (Date.now() < expiresAt) {
-          const newAdapter = new GoogleDriveSheetsSyncAdapter();
-          await newAdapter.initialize(settings.cloud_providers.google.accessToken);
-          dbService.setSyncAdapter(newAdapter);
-          setActiveAdapter(newAdapter);
-          if (navigator.onLine) {
-            setSyncStatus(newAdapter.getStatus());
+      // Check if we need to auto-connect
+      const activeAdapterSettings = settings.active_sync_adapter;
+      if (activeAdapterSettings) {
+        const factory = adapterFactories.find(f => f.id === activeAdapterSettings.id);
+        if (factory && !adapter) {
+          try {
+            const newAdapter = await factory.restore(activeAdapterSettings.credentials);
+            dbService.setSyncAdapter(newAdapter);
+            setActiveAdapter(newAdapter);
+            if (navigator.onLine) {
+              setSyncStatus(newAdapter.getStatus());
+            }
+          } catch (err) {
+            console.error('Failed to restore adapter', err);
           }
         }
       }
@@ -369,34 +371,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Clear cloud tokens
     if (userSettings) {
       await updateUserSettings({
-        cloud_providers: undefined
+        active_sync_adapter: undefined
       });
     }
   };
 
-  const connectAdapter = async (adapterId: string, token?: string) => {
-    let newAdapter: SyncAdapter;
-    if (adapterId === 'google-drive-sheets') {
-      newAdapter = new GoogleDriveSheetsSyncAdapter();
-      // Store token if provided
-      if (token) {
-        await updateUserSettings({
-          cloud_providers: {
-            ...userSettings?.cloud_providers,
-            google: { accessToken: token, expiresAt: Date.now() + 3500000 }
-          }
-        });
-      }
-      const activeToken = token || userSettings?.cloud_providers?.google?.accessToken || '';
-      await newAdapter.initialize(activeToken);
-    } else {
-      newAdapter = new MockSyncAdapter();
-      await newAdapter.initialize();
-    }
-    dbService.setSyncAdapter(newAdapter);
-    setActiveAdapter(newAdapter);
-    setSyncStatus(newAdapter.getStatus());
-    setLastSyncedTime(newAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  const connectAdapter = async (adapterId: string) => {
+    const factory = adapterFactories.find(f => f.id === adapterId);
+    if (!factory) return;
+    
+    const { adapter, credentials } = await factory.connect();
+    
+    await updateUserSettings({
+      active_sync_adapter: { id: adapterId, credentials }
+    });
+
+    dbService.setSyncAdapter(adapter);
+    setActiveAdapter(adapter);
+    setSyncStatus(adapter.getStatus());
+    setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
 
   const logFoodItem = async (

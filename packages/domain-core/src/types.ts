@@ -65,11 +65,9 @@ export interface UserSettings {
     carbs: number;
     fats: number;
   };
-  cloud_providers?: {
-    google?: {
-      accessToken: string;
-      expiresAt: number;
-    };
+  active_sync_adapter?: {
+    id: string;
+    credentials?: any;
   };
   updatedAt?: number;
 }

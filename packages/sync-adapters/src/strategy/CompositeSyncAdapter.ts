@@ -47,6 +47,7 @@ export class CompositeSyncAdapter implements SyncAdapter {
   protected status: SyncStatus = 'disconnected';
   protected lastSyncedTime: string | null = null;
   protected statusListeners: Set<(status: SyncStatus) => void> = new Set();
+  protected credentialsListeners: Set<(credentials: any) => void> = new Set();
   protected blobDriver?: BlobStorageDriver;
   protected tabularDriver?: TabularStorageDriver;
   protected routes: Record<string, CollectionRoute>;
@@ -85,6 +86,13 @@ export class CompositeSyncAdapter implements SyncAdapter {
     };
   }
 
+  onCredentialsChange(listener: (credentials: any) => void): () => void {
+    this.credentialsListeners.add(listener);
+    return () => {
+      this.credentialsListeners.delete(listener);
+    };
+  }
+
   protected setStatus(newStatus: SyncStatus): void {
     this.status = newStatus;
     for (const listener of this.statusListeners) {
@@ -92,6 +100,16 @@ export class CompositeSyncAdapter implements SyncAdapter {
         listener(newStatus);
       } catch (err) {
         console.error('Error in status change listener', err);
+      }
+    }
+  }
+
+  protected notifyCredentialsChange(credentials: any): void {
+    for (const listener of this.credentialsListeners) {
+      try {
+        listener(credentials);
+      } catch (err) {
+        console.error('Error in credentials change listener', err);
       }
     }
   }

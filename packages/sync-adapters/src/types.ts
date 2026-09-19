@@ -53,6 +53,7 @@ export interface SyncAdapter {
   pull(): Promise<SyncDeltaPayload[]>;
   push(payload: SyncDeltaPayload): Promise<void>;
   onStatusChange?(listener: (status: SyncStatus) => void): () => void;
+  onCredentialsChange?(listener: (credentials: any) => void): () => void;
 }
 
 
