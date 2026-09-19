@@ -162,7 +162,7 @@ describe('GoogleSheetsTabularDriver', () => {
       fetch: vi.fn(async (url: string, init?: RequestInit) => {
         // Write batch
         if (url.includes('/values:batchUpdate') && init?.method === 'POST') {
-          const body = JSON.parse(init.body);
+          const body = JSON.parse(String(init?.body));
           savedValues = body.data[0].values;
           return new Response(JSON.stringify({ totalUpdatedRows: savedValues.length }), { status: 200 });
         }
