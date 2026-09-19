@@ -52,6 +52,11 @@ describe('GoogleDriveSheetsSyncAdapter (Integrated Strategy)', () => {
           return new Response(JSON.stringify({ files: found.map(s => ({ id: s.id, name: s.title })) }), { status: 200 });
         }
 
+        // :clear endpoint
+        if (url.includes(':clear') && init?.method === 'POST') {
+          return new Response(JSON.stringify({ clearedRange: 'Sheet1!A1:Z' }), { status: 200 });
+        }
+
         // Create spreadsheet
         if (url.includes('/v4/spreadsheets') && init?.method === 'POST' && !url.includes(':batchUpdate')) {
           const body = JSON.parse(String(init?.body));

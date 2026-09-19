@@ -37,8 +37,17 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: SyncA
       const upserts: any[] = [];
       const pushBacks: any[] = [];
 
+      // 1c. Deduplicate remote payload by ID, keeping the newest (highest updatedAt)
+      const deduplicatedRemoteDocs = new Map<string, any>();
+      for (const doc of payload.documents) {
+        const existing = deduplicatedRemoteDocs.get(doc.id);
+        if (!existing || (doc.updatedAt || 0) > (existing.updatedAt || 0)) {
+          deduplicatedRemoteDocs.set(doc.id, doc);
+        }
+      }
+
       // 2. Iterate remote documents
-      for (const remoteDoc of payload.documents) {
+      for (const remoteDoc of deduplicatedRemoteDocs.values()) {
         const localDoc = localDocsMap.get(remoteDoc.id);
 
         if (localDoc) {
@@ -61,11 +70,12 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: SyncA
           } else {
             // Identical time, if one is deleted, prefer deleted
             if (remoteDoc._deleted !== (localDoc as any)._deleted) {
-              if ((localDoc as any)._deleted) pushBacks.push(localDoc);
-              else {
-                const cleanRemote = { ...remoteDoc };
-                delete cleanRemote._deleted;
-                upserts.push(cleanRemote);
+              if (remoteDoc._deleted) {
+                // Remote is deleted, local is active -> delete local
+                await collection.findOne(remoteDoc.id).remove().catch(() => {});
+              } else {
+                // Local is deleted, remote is active -> push local tombstone to remote
+                pushBacks.push(localDoc);
               }
             }
           }

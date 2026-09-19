@@ -277,6 +277,16 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     rows: TabularRow[]
   ): Promise<void> {
     const authHeaders = this.getAuthHeaders();
+
+    // 1. Clear existing data to prevent trailing leftover rows when the row count shrinks
+    const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${documentId}/values/${encodeURIComponent(tabName)}!A1:Z:clear`;
+    const clearRes = await this.client.fetch(clearUrl, {
+      method: 'POST',
+      headers: authHeaders
+    });
+    await this.handleResponseErrors(clearRes, `clearing table "${tabName}" in document ${documentId}`);
+
+    // 2. Write new data
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${documentId}/values:batchUpdate`;
 
     // Flatten headers + all rows into 2D array
