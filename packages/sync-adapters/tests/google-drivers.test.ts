@@ -101,14 +101,31 @@ describe('GoogleSheetsTabularDriver', () => {
           return new Response(JSON.stringify({ files: [] }), { status: 200 });
         }
         // Create Sheet
-        if (url.includes('/v4/spreadsheets') && init?.method === 'POST') {
+        if (url.includes('/v4/spreadsheets') && init?.method === 'POST' && !url.includes(':batchUpdate')) {
+          const body = JSON.parse(String(init?.body));
           return new Response(
             JSON.stringify({
               spreadsheetId: 'sheet_created_999',
-              properties: { title: 'Quomida Daily Logs' }
+              properties: { title: 'Quomida Daily Logs' },
+              sheets: body.sheets.map((s: any, idx: number) => ({ properties: { title: s.properties.title, sheetId: idx } }))
             }),
             { status: 200 }
           );
+        }
+        
+        // Patch Drive metadata
+        if (url.includes('/drive/v3/files/') && init?.method === 'PATCH') {
+           return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // Batch update spreadsheet protection
+        if (url.includes(':batchUpdate') && !url.includes('values:batchUpdate') && init?.method === 'POST') {
+           return new Response(JSON.stringify({}), { status: 200 });
+        }
+        
+        // Batch update spreadsheet values
+        if (url.includes('values:batchUpdate') && init?.method === 'POST') {
+           return new Response(JSON.stringify({ totalUpdatedRows: 1 }), { status: 200 });
         }
         return new Response('Not Found', { status: 404 });
       })
@@ -122,11 +139,20 @@ describe('GoogleSheetsTabularDriver', () => {
     const docId = await driver.ensureDocument('Quomida Daily Logs', ['daily_logs']);
     expect(docId).toBe('sheet_created_999');
 
-    const createCall = mockCalls.find(c => c.method === 'POST');
+    const createCall = mockCalls.find(c => c.url.includes('/v4/spreadsheets') && c.method === 'POST' && !c.url.includes(':batchUpdate'));
     expect(createCall).toBeDefined();
     const payload = JSON.parse(createCall!.body);
     expect(payload.properties.title).toBe('Quomida Daily Logs');
     expect(payload.sheets[0].properties.title).toBe('daily_logs');
+    
+    // Verify meta sheet is included in creation
+    expect(payload.sheets.find((s: any) => s.properties.title === '_quomida_meta')).toBeDefined();
+    
+    // Verify PATCH was called
+    const patchCall = mockCalls.find(c => c.method === 'PATCH');
+    expect(patchCall).toBeDefined();
+    expect(patchCall!.url).toContain('sheet_created_999');
+    expect(JSON.parse(patchCall!.body).appProperties.quomida_doc_type).toBe('daily_logs');
   });
 
   it('writes rows using values:batchUpdate and reads table', async () => {

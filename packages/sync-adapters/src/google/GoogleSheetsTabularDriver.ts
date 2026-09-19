@@ -100,29 +100,28 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
   async ensureDocument(title: string, tabs: string[]): Promise<string> {
     const headers = this.getAuthHeaders();
 
-    // 1. Search for existing spreadsheet in Drive
-    const query = encodeURIComponent(`name = '${title}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+    const docType = tabs.includes('daily_logs') || title.includes('Daily Logs') ? 'daily_logs' : 'food_catalog';
+
+    // 1. Search for existing spreadsheet in Drive by metadata
+    const query = encodeURIComponent(`appProperties has { key='quomida_doc_type' and value='${docType}' } and trashed = false`);
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
 
     const searchRes = await this.client.fetch(searchUrl, { method: 'GET', headers });
-    await this.handleResponseErrors(searchRes, `searching spreadsheet "${title}"`);
+    await this.handleResponseErrors(searchRes, `searching spreadsheet metadata "${docType}"`);
 
     const searchJson = await searchRes.json();
     if (searchJson.files && searchJson.files.length > 0) {
       const docId = searchJson.files[0].id;
-      if (tabs.includes('daily_logs') || title.includes('Daily Logs')) {
-        this.documentSchemas.set(docId, QuomidaDailyLogsSpreadsheetSchema);
-      } else {
-        this.documentSchemas.set(docId, QuomidaFoodCatalogSpreadsheetSchema);
-      }
+      this.documentSchemas.set(docId, docType === 'daily_logs' ? QuomidaDailyLogsSpreadsheetSchema : QuomidaFoodCatalogSpreadsheetSchema);
       return docId;
     }
 
-    // 2. Create new spreadsheet with required tabs
+    // 2. Create new spreadsheet with required tabs and _quomida_meta
     const createUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+    const allTabs = [...tabs, '_quomida_meta'];
     const createBody = {
       properties: { title },
-      sheets: tabs.map(tabName => ({
+      sheets: allTabs.map(tabName => ({
         properties: { title: tabName }
       }))
     };
@@ -137,10 +136,66 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     const createJson = await createRes.json();
     const docId = createJson.spreadsheetId;
 
-    if (tabs.includes('daily_logs') || title.includes('Daily Logs')) {
-      this.documentSchemas.set(docId, QuomidaDailyLogsSpreadsheetSchema);
-    } else {
-      this.documentSchemas.set(docId, QuomidaFoodCatalogSpreadsheetSchema);
+    this.documentSchemas.set(docId, docType === 'daily_logs' ? QuomidaDailyLogsSpreadsheetSchema : QuomidaFoodCatalogSpreadsheetSchema);
+
+    // 3. Attach metadata to the file in Google Drive
+    const patchUrl = `https://www.googleapis.com/drive/v3/files/${docId}`;
+    const patchBody = {
+      appProperties: {
+        quomida_doc_type: docType
+      }
+    };
+    const patchRes = await this.client.fetch(patchUrl, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(patchBody)
+    });
+    await this.handleResponseErrors(patchRes, `attaching metadata to spreadsheet "${title}"`);
+
+    // 4. Populate _quomida_meta and protect it
+    const schemaVersion = this.documentSchemas.get(docId)?.version || 1;
+    
+    // Write text
+    const valuesUrl = `https://sheets.googleapis.com/v4/spreadsheets/${docId}/values:batchUpdate`;
+    const valuesBody = {
+      valueInputOption: 'USER_ENTERED',
+      data: [{
+        range: `_quomida_meta!A1:B2`,
+        majorDimension: 'ROWS',
+        values: [
+          ['QUOMIDA SYSTEM FILE - DO NOT DELETE', ''],
+          ['Schema Version:', schemaVersion]
+        ]
+      }]
+    };
+    const valuesRes = await this.client.fetch(valuesUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(valuesBody)
+    });
+    await this.handleResponseErrors(valuesRes, `populating _quomida_meta in spreadsheet "${title}"`);
+
+    // Protect sheet
+    const metaSheetId = createJson.sheets?.find((s: any) => s.properties?.title === '_quomida_meta')?.properties?.sheetId;
+    if (metaSheetId !== undefined) {
+      const protectUrl = `https://sheets.googleapis.com/v4/spreadsheets/${docId}:batchUpdate`;
+      const protectBody = {
+        requests: [{
+          addProtectedRange: {
+            protectedRange: {
+              range: { sheetId: metaSheetId },
+              description: 'Quomida System Metadata',
+              warningOnly: true
+            }
+          }
+        }]
+      };
+      const protectRes = await this.client.fetch(protectUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(protectBody)
+      });
+      await this.handleResponseErrors(protectRes, `protecting _quomida_meta in spreadsheet "${title}"`);
     }
 
     return docId;
