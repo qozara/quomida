@@ -6,6 +6,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AppProvider, useApp } from '../src/context/AppContext.js';
 import { LocalDBService } from '../src/db/rxdb.js';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Mock window to simulate online status
 global.window = {
@@ -30,7 +31,9 @@ describe('AppContext auto-connect logic (Issue 1)', () => {
     };
 
     const { container } = render(
-      React.createElement(AppProvider, null, React.createElement(TestComponent))
+      React.createElement(GoogleOAuthProvider as any, { clientId: 'test-client-id' },
+        React.createElement(AppProvider, null, React.createElement(TestComponent))
+      )
     );
 
     // Initial adapter is mock, but it should quickly change to google-drive-sheets
