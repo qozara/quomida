@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { LocalDBService, type QuomidaDatabase } from '../db/rxdb.js';
+import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db/rxdb.js';
+import { syncDatabaseWithRemote } from '../db/replication.js';
 import {
   type BaseIngredient,
   type Portion,
@@ -8,7 +9,8 @@ import {
   type MealType,
   calculateItemMacros,
   convertPortionToGrams,
-  createMacroSnapshot
+  createMacroSnapshot,
+  dailyLogsSchema
 } from '@quomida/domain-core';
 import {
   MockSyncAdapter,
@@ -44,7 +46,7 @@ interface AppContextType {
   forceSync: () => Promise<void>;
   reconnectAdapter: () => Promise<void>;
   disconnectAdapter: () => Promise<void>;
-  connectAdapter: (adapterId: string) => Promise<void>;
+  connectAdapter: (adapterId: string, token?: string) => Promise<void>;
   logFoodItem: (
     ingredient: BaseIngredient,
     mealType: MealType,
@@ -59,6 +61,11 @@ interface AppContextType {
   setIsCatalogOpen: (open: boolean) => void;
   isStorageSettingsOpen: boolean;
   setIsStorageSettingsOpen: (open: boolean) => void;
+  dbInitError: QuomidaDBError | null;
+  dbVersion: number;
+  clearLocalDatabase: () => Promise<void>;
+  repairSync: () => Promise<void>;
+  migrateSync: () => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -72,9 +79,9 @@ const defaultSettings: UserSettings = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [initialAdapter] = useState<SyncAdapter>(() => new MockSyncAdapter());
-  const [dbService] = useState<LocalDBService>(() => new LocalDBService(undefined, initialAdapter));
-  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(initialAdapter);
+  const [initialAdapter] = useState<SyncAdapter | null>(null);
+  const [dbService] = useState<LocalDBService>(() => new LocalDBService());
+  const [activeAdapter, setActiveAdapter] = useState<SyncAdapter | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
@@ -94,6 +101,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
+  const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
+  const syncLock = React.useRef(false);
+
+  const clearDatabase = useCallback(async () => {
+    try {
+      await dbService.resetDatabase();
+      setDbInitError(null);
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('[AppContext] Failed to reset database:', err);
+      if (typeof window !== 'undefined' && 'indexedDB' in window) {
+        try {
+          window.indexedDB.deleteDatabase('quomidadb_v1');
+        } catch {
+          // ignore
+        }
+        window.location.reload();
+      }
+    }
+  }, [dbService]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).quomidaResetDatabase = clearDatabase;
+    }
+  }, [clearDatabase]);
 
 
   // Initialize LocalDBService & RxDB Adapters
@@ -175,6 +210,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.locale?.startsWith('en')) setLocaleState('en');
       if (settings.theme) setThemeState(settings.theme as any);
 
+      // Check if we need to auto-connect to Google
+      const isInitialOrNone = !adapter || adapter.id === 'mock-sync-adapter';
+      if (isInitialOrNone && settings.cloud_providers?.google?.accessToken) {
+        const expiresAt = settings.cloud_providers.google.expiresAt;
+        if (Date.now() < expiresAt) {
+          const newAdapter = new GoogleDriveSheetsSyncAdapter();
+          await newAdapter.initialize(settings.cloud_providers.google.accessToken);
+          dbService.setSyncAdapter(newAdapter);
+          setActiveAdapter(newAdapter);
+          if (navigator.onLine) {
+            setSyncStatus(newAdapter.getStatus());
+          }
+        }
+      }
+
       // Load Portions
       const pDocs = await rxdb.portions.find().exec();
       setPortions(pDocs.map((d: any) => d.toJSON()));
@@ -188,6 +238,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subLogs = dbService.observeLogsByDate(selectedDate).subscribe((docs: any[]) => {
         setDailyLogs(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
       });
+    }).catch((err: any) => {
+      console.error('[AppContext] Failed to initialize local database:', err);
+      // Ensure the error is cast to QuomidaDBError if it isn't already
+      const customError = err as QuomidaDBError;
+      if (!customError.type) {
+        customError.type = 'UNKNOWN';
+      }
+      setDbInitError(customError);
     });
 
     return () => {
@@ -236,24 +294,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await dbService.saveSettings(newSettings);
     const updated = await dbService.getSettings();
     setUserSettings(updated);
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    
+    // Background sync - do not await to keep UI responsive
+    forceSync().catch(console.error);
   };
 
-  const forceSync = async () => {
-    if (!activeAdapter || !isOnline || syncStatus === 'syncing') return;
+  const forceSync = useCallback(async () => {
+    if (!activeAdapter || !isOnline || syncLock.current) return;
+    syncLock.current = true;
     setSyncStatus('syncing');
-    if (activeAdapter.forceSync) {
-      await activeAdapter.forceSync();
+    try {
+      if (db) {
+        await syncDatabaseWithRemote(db, activeAdapter);
+      }
+    } finally {
+      setSyncStatus(activeAdapter.getStatus());
+      setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+      syncLock.current = false;
     }
-    setSyncStatus(activeAdapter.getStatus());
-    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
-  };
+  }, [activeAdapter, isOnline, db]);
+
+  // Transparent Background Sync: Polling and Visibility focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        forceSync().catch(console.error);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Poll for remote changes every 1 minute
+    const syncInterval = setInterval(() => {
+      forceSync().catch(console.error);
+    }, 60000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(syncInterval);
+    };
+  }, [forceSync]);
 
   const reconnectAdapter = async () => {
     if (!activeAdapter) return;
     if (activeAdapter.reauthenticate) {
       await activeAdapter.reauthenticate();
     }
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const repairSync = async () => {
+    if (!activeAdapter || !activeAdapter.repair) return;
+    await activeAdapter.repair();
+    setSyncStatus(activeAdapter.getStatus());
+    setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+  };
+
+  const migrateSync = async () => {
+    if (!activeAdapter || !activeAdapter.migrate) return;
+    await activeAdapter.migrate();
     setSyncStatus(activeAdapter.getStatus());
     setLastSyncedTime(activeAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
   };
@@ -265,13 +365,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dbService.setSyncAdapter(undefined);
     setActiveAdapter(null);
     setSyncStatus('disconnected');
+    
+    // Clear cloud tokens
+    if (userSettings) {
+      await updateUserSettings({
+        cloud_providers: undefined
+      });
+    }
   };
 
-  const connectAdapter = async (adapterId: string) => {
+  const connectAdapter = async (adapterId: string, token?: string) => {
     let newAdapter: SyncAdapter;
     if (adapterId === 'google-drive-sheets') {
       newAdapter = new GoogleDriveSheetsSyncAdapter();
-      await newAdapter.initialize('mock-google-token-456');
+      // Store token if provided
+      if (token) {
+        await updateUserSettings({
+          cloud_providers: {
+            ...userSettings?.cloud_providers,
+            google: { accessToken: token, expiresAt: Date.now() + 3500000 }
+          }
+        });
+      }
+      const activeToken = token || userSettings?.cloud_providers?.google?.accessToken || '';
+      await newAdapter.initialize(activeToken);
     } else {
       newAdapter = new MockSyncAdapter();
       await newAdapter.initialize();
@@ -296,21 +413,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date: selectedDate,
       meal_type: mealType,
       food_reference_id: ingredient.id,
+      food_name: ingredient.name,
       quantity,
       portion_name: portionName,
       macros: macrosSnapshot
     });
 
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    // Background sync - do not await
+    forceSync().catch(console.error);
   };
 
   const deleteLogItem = async (id: string) => {
     await dbService.deleteLogItem(id);
-    setLastSyncedTime(activeAdapter?.getLastSyncedTime() || new Date().toLocaleTimeString());
+    forceSync().catch(console.error);
   };
 
   const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>) => {
     await dbService.saveCustomFood(ingData);
+    forceSync().catch(console.error);
   };
 
   const hasActiveAdapter = Boolean(
@@ -354,6 +474,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reconnectAdapter,
         disconnectAdapter,
         connectAdapter,
+        repairSync,
+        migrateSync,
         logFoodItem,
         deleteLogItem,
         addCustomIngredient,
@@ -362,7 +484,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCatalogOpen,
         setIsCatalogOpen,
         isStorageSettingsOpen,
-        setIsStorageSettingsOpen
+        setIsStorageSettingsOpen,
+        dbInitError,
+        dbVersion: dailyLogsSchema.version,
+        clearLocalDatabase: clearDatabase
       }}
     >
       {children}

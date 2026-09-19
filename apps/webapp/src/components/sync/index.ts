@@ -7,3 +7,5 @@ export * from './HeaderSyncTrigger.js';
 export * from './SyncInspectorPopover.js';
 export * from './CloudAdapterList.js';
 export * from './StorageSettingsPanel.js';
+export * from './SchemaRemediationModal.js';
+

@@ -14,3 +14,8 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0007: LocalDBService Repository Pattern and Unified BYOS Sync Boundary](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0007-local-repository-service-and-sync-boundary.md)
 * [ADR 0008: Service Worker PWA Application Shell & Heartbeat Connectivity Monitoring](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0008-service-worker-pwa-app-shell-and-heartbeat-connectivity.md)
 * [ADR 0009: State Evaluator, Sync Inspector Popover, and Modular Storage Settings](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0009-state-evaluator-sync-inspector-and-storage-settings.md)
+* [ADR 0010: Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
+* [ADR 0011: Build-Time Schema Validation & Database Recovery UX](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0011-build-time-schema-validation-and-recovery.md)
+* [ADR 0012: Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
+* [ADR 0013: Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)
+

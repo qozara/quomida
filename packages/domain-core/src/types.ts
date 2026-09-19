@@ -48,6 +48,7 @@ export interface DailyLog {
   date: string; // YYYY-MM-DD
   meal_type: MealType;
   food_reference_id: string;
+  food_name?: string;
   quantity: number;
   portion_name: string;
   macros: MacroSnapshot;
@@ -63,6 +64,12 @@ export interface UserSettings {
     protein: number; // target grams or %
     carbs: number;
     fats: number;
+  };
+  cloud_providers?: {
+    google?: {
+      accessToken: string;
+      expiresAt: number;
+    };
   };
   updatedAt?: number;
 }

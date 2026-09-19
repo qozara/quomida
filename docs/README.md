@@ -9,10 +9,13 @@ Welcome to the Quomida developer and architectural documentation repository. Thi
 | Document | Description |
 | :--- | :--- |
 | 🏗️ [Architecture Blueprint](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/ARCHITECTURE.md) | High-level system architecture, monorepo package graph, RxDB schemas, BYOS flow, and reactivity model. |
+| 💾 [Persistence, Versioning & Migrations](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/persistence-and-migrations.md) | **Essential Guide**: The 3-Tier versioning model, dual migration engines (RxDB vs `@qozara/gdocs-schema`), safety backups, and developer playbook. |
 | 📋 [Product Specification](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/PRODUCT_SPEC.md) | Functional spec, wireframes, Latin American food catalog design, WCAG 2.2 accessibility, and non-functional requirements. |
+| ☁️ [Google Drive & Sheets Connector](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/connectors/google-drive-sheets.md) | Google OAuth configuration, dual spreadsheet model, dynamic mapping, and live E2E testing. |
+| 🛠️ [Developer CLI Harness](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/apps/cli/README.md) | Terminal CLI for OAuth login/logout, domain catalog calculations, and live E2E testing. |
 | 👩‍💻 [Contributing & TDD Guide](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/CONTRIBUTING.md) | Development setup, Test-Driven Development (TDD) cycle, schema migrations, and sync adapter guidelines. |
 | 🤖 [AI Agent Guidelines](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/AGENTS.md) | Operational invariants, schema rules, and instructions optimized for autonomous AI coding agents. |
-| 📜 [Architectural Decision Records (ADRs)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/README.md) | Formal records of key technical and architectural decisions (RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback). |
+| 📜 [Architectural Decision Records (ADRs)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/README.md) | Formal records of key technical and architectural decisions (0000 through 0013). |
 | 📦 [Archived Initial Drafts](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/archive/) | Original raw product spec, product idea, and initial implementation draft files. |
 
 ---
@@ -28,3 +31,10 @@ All architectural decisions in Quomida are recorded using the [MADR (Markdown Ar
 - [ADR 0004: Compound Recipe Yield & Retention Factors (FAO/INFOODS Standard)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0004-compound-recipe-fao-infoods-yield-factors.md)
 - [ADR 0005: Decoupled Build-Time ETL Ingestion Pipeline](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0005-build-time-etl-regional-food-ingestion.md)
 - [ADR 0006: LLM Natural Language Meal Parser with Graceful Fallback](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0006-natural-language-llm-fallback-degradation.md)
+- [ADR 0007: LocalDBService Repository Pattern and Unified BYOS Sync Boundary](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0007-local-repository-service-and-sync-boundary.md)
+- [ADR 0008: Service Worker PWA Application Shell & Heartbeat Connectivity Monitoring](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0008-service-worker-pwa-app-shell-and-heartbeat-connectivity.md)
+- [ADR 0009: State Evaluator, Sync Inspector Popover, and Modular Storage Settings](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0009-state-evaluator-sync-inspector-and-storage-settings.md)
+- [ADR 0010: Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
+- [ADR 0011: Build-Time Schema Validation & Database Recovery UX](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0011-build-time-schema-validation-and-recovery.md)
+- [ADR 0012: Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
+- [ADR 0013: Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)

@@ -5,6 +5,8 @@ export type SyncStatus =
   | 'auth_failed'
   | 'disconnected'
   | 'synced'
+  | 'corrupted'
+  | 'upgrade_required'
   | 'error';
 
 export type UXSyncState =
@@ -40,8 +42,17 @@ export interface SyncAdapter {
   disconnect?(): Promise<void>;
   reauthenticate?(): Promise<void>;
   forceSync?(): Promise<void>;
+  getRemoteLinks?(): Promise<string[]>;
+  repair?(): Promise<void>;
+  migrate?(): Promise<void>;
+  getSchemaDiagnostic?(): Promise<{
+    status: SyncStatus;
+    missingColumns?: Record<string, string[]>;
+    missingTabs?: string[];
+  } | null>;
   pull(): Promise<SyncDeltaPayload[]>;
   push(payload: SyncDeltaPayload): Promise<void>;
   onStatusChange?(listener: (status: SyncStatus) => void): () => void;
 }
+
 

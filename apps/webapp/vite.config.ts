@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import sri from 'vite-plugin-sri';
 import path from 'path';
 import { execSync } from 'child_process';
 
@@ -21,8 +22,10 @@ function getGitCommitHash(): string {
 export default defineConfig({
   plugins: [
     react(),
+    sri(),
     VitePWA({
       registerType: 'autoUpdate',
+      useCredentials: true,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Quomida',
