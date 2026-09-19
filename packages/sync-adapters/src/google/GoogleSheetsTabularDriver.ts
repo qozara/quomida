@@ -26,15 +26,31 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     };
   }
 
-  private handleResponseErrors(res: Response, context: string): void {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(`Google Auth Failed (${res.status}) during ${context}`);
-    }
-    if (res.status === 429) {
-      throw new Error(`Google Sheets API Rate Limit / Quota Exceeded (429) during ${context}`);
-    }
+  private async handleResponseErrors(res: Response, context: string): Promise<void> {
     if (!res.ok) {
-      throw new Error(`Google Sheets API Error (${res.status}) during ${context}`);
+      let errText = '';
+      try {
+        errText = await res.text();
+      } catch (e) {}
+
+      if (res.status === 401 || res.status === 403) {
+        let isQuotaExceeded = false;
+        try {
+          const json = JSON.parse(errText);
+          if (json.error?.errors?.[0]?.reason === 'storageQuotaExceeded') {
+            isQuotaExceeded = true;
+          }
+        } catch (e) {}
+
+        if (isQuotaExceeded) {
+          throw new Error(`Google Drive Storage Quota Exceeded (403) during ${context}. Please free up space in your Google account.`);
+        }
+        throw new Error(`Google Auth Failed (${res.status}) during ${context}. Details: ${errText}`);
+      }
+      if (res.status === 429) {
+        throw new Error(`Google Sheets API Rate Limit / Quota Exceeded (429) during ${context}`);
+      }
+      throw new Error(`Google Sheets API Error (${res.status}) during ${context}. Details: ${errText}`);
     }
   }
 
@@ -46,7 +62,7 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
 
     const searchRes = await this.client.fetch(searchUrl, { method: 'GET', headers });
-    this.handleResponseErrors(searchRes, `searching spreadsheet "${title}"`);
+    await this.handleResponseErrors(searchRes, `searching spreadsheet "${title}"`);
 
     const searchJson = await searchRes.json();
     if (searchJson.files && searchJson.files.length > 0) {
@@ -67,7 +83,7 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
       headers,
       body: JSON.stringify(createBody)
     });
-    this.handleResponseErrors(createRes, `creating spreadsheet "${title}"`);
+    await this.handleResponseErrors(createRes, `creating spreadsheet "${title}"`);
 
     const createJson = await createRes.json();
     return createJson.spreadsheetId;
@@ -78,7 +94,7 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${documentId}/values/${encodeURIComponent(tabName)}!A1:Z`;
 
     const res = await this.client.fetch(url, { method: 'GET', headers });
-    this.handleResponseErrors(res, `reading table "${tabName}" from document ${documentId}`);
+    await this.handleResponseErrors(res, `reading table "${tabName}" from document ${documentId}`);
 
     const json = await res.json();
     const values: any[][] = json.values || [];
@@ -123,6 +139,6 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
       body: JSON.stringify(body)
     });
 
-    this.handleResponseErrors(res, `writing table "${tabName}" in document ${documentId}`);
+    await this.handleResponseErrors(res, `writing table "${tabName}" in document ${documentId}`);
   }
 }

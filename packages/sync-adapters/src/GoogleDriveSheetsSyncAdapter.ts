@@ -30,13 +30,41 @@ export class GoogleDriveSheetsSyncAdapter extends CompositeSyncAdapter {
       httpClient
     });
 
+    const defaultRoutes: Record<string, CollectionRoute> = {
+      daily_logs: { 
+        target: 'tabular', 
+        documentKey: 'quomida_daily_logs', 
+        documentTitle: 'Quomida Daily Logs', 
+        tabName: 'daily_logs' 
+      },
+      base_ingredients: { 
+        target: 'tabular', 
+        documentKey: 'quomida_food_catalog', 
+        documentTitle: 'Quomida Food Catalog', 
+        tabName: 'base_ingredients' 
+      },
+      recipes: { 
+        target: 'tabular', 
+        documentKey: 'quomida_food_catalog', 
+        documentTitle: 'Quomida Food Catalog', 
+        tabName: 'recipes' 
+      },
+      portions: { 
+        target: 'tabular', 
+        documentKey: 'quomida_food_catalog', 
+        documentTitle: 'Quomida Food Catalog', 
+        tabName: 'portions' 
+      },
+      user_settings: { target: 'blob', filename: 'settings.json' }
+    };
+
     super({
       id: 'google-drive-sheets',
       name: 'Google Drive / Sheets BYOS Adapter',
       description: 'Direct synchronization to personal Google Drive spreadsheets',
       blobDriver,
       tabularDriver,
-      routes: options?.routes
+      routes: options?.routes || defaultRoutes
     });
 
     this.httpClient = httpClient;

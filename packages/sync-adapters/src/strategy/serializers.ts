@@ -54,6 +54,10 @@ export const dailyLogsSerializer: CollectionSerializer = {
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const v = row.values;
+    const parseBool = (val: any) => {
+      if (typeof val === 'string') return val.toLowerCase() === 'true';
+      return Boolean(val);
+    };
     const doc: Record<string, any> = {
       id: String(v[0] || row.id),
       timestamp: String(v[1] || ''),
@@ -78,7 +82,7 @@ export const dailyLogsSerializer: CollectionSerializer = {
       doc.updatedAt = row.updatedAt;
     }
     if (v[14] !== undefined) {
-      doc._deleted = Boolean(v[14]);
+      doc._deleted = parseBool(v[14]);
     }
     return doc;
   }
@@ -118,6 +122,10 @@ export const baseIngredientsSerializer: CollectionSerializer = {
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const v = row.values;
+    const parseBool = (val: any) => {
+      if (typeof val === 'string') return val.toLowerCase() === 'true';
+      return Boolean(val);
+    };
     return {
       id: String(v[0] || row.id),
       name: String(v[1] || ''),
@@ -128,7 +136,7 @@ export const baseIngredientsSerializer: CollectionSerializer = {
       carbs_100g: Number(v[6] || 0),
       fats_100g: Number(v[7] || 0),
       updatedAt: v[8] ? Number(v[8]) : row.updatedAt,
-      _deleted: Boolean(v[9] ?? row._deleted)
+      _deleted: parseBool(v[9] ?? row._deleted)
     };
   }
 };
@@ -158,13 +166,17 @@ export const recipesSerializer: CollectionSerializer = {
     } catch {
       ingredients = [];
     }
+    const parseBool = (val: any) => {
+      if (typeof val === 'string') return val.toLowerCase() === 'true';
+      return Boolean(val);
+    };
     return {
       id: String(v[0] || row.id),
       name: String(v[1] || ''),
       ingredients,
       yield_factor: Number(v[3] || 1.0),
       updatedAt: v[4] ? Number(v[4]) : row.updatedAt,
-      _deleted: Boolean(v[5] ?? row._deleted)
+      _deleted: parseBool(v[5] ?? row._deleted)
     };
   }
 };
@@ -188,13 +200,17 @@ export const portionsSerializer: CollectionSerializer = {
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const v = row.values;
+    const parseBool = (val: any) => {
+      if (typeof val === 'string') return val.toLowerCase() === 'true';
+      return Boolean(val);
+    };
     return {
       id: String(v[0] || row.id),
       base_food_id: String(v[1] || ''),
       name: String(v[2] || ''),
       equivalent_weight_g: Number(v[3] || 0),
       updatedAt: v[4] ? Number(v[4]) : row.updatedAt,
-      _deleted: Boolean(v[5] ?? row._deleted)
+      _deleted: parseBool(v[5] ?? row._deleted)
     };
   }
 };

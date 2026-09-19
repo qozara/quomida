@@ -25,15 +25,31 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
     };
   }
 
-  private handleResponseErrors(res: Response, context: string): void {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(`Google Auth Failed (${res.status}) during ${context}`);
-    }
-    if (res.status === 429) {
-      throw new Error(`Google Drive API Rate Limit / Quota Exceeded (429) during ${context}`);
-    }
+  private async handleResponseErrors(res: Response, context: string): Promise<void> {
     if (!res.ok) {
-      throw new Error(`Google Drive API Error (${res.status}) during ${context}`);
+      let errText = '';
+      try {
+        errText = await res.text();
+      } catch (e) {}
+
+      if (res.status === 401 || res.status === 403) {
+        let isQuotaExceeded = false;
+        try {
+          const json = JSON.parse(errText);
+          if (json.error?.errors?.[0]?.reason === 'storageQuotaExceeded') {
+            isQuotaExceeded = true;
+          }
+        } catch (e) {}
+
+        if (isQuotaExceeded) {
+          throw new Error(`Google Drive Storage Quota Exceeded (403) during ${context}. Please free up space in your Google account.`);
+        }
+        throw new Error(`Google Auth Failed (${res.status}) during ${context}. Details: ${errText}`);
+      }
+      if (res.status === 429) {
+        throw new Error(`Google Drive API Rate Limit / Quota Exceeded (429) during ${context}`);
+      }
+      throw new Error(`Google Drive API Error (${res.status}) during ${context}. Details: ${errText}`);
     }
   }
 
@@ -43,7 +59,7 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
     const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`;
 
     const res = await this.client.fetch(url, { method: 'GET', headers });
-    this.handleResponseErrors(res, 'searching appDataFolder');
+    await this.handleResponseErrors(res, 'searching appDataFolder');
 
     const json = await res.json();
     if (json.files && json.files.length > 0) {
@@ -60,7 +76,7 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
 
     const res = await this.client.fetch(url, { method: 'GET', headers });
-    this.handleResponseErrors(res, 'reading blob from appDataFolder');
+    await this.handleResponseErrors(res, 'reading blob from appDataFolder');
 
     return (await res.json()) as T;
   }
@@ -100,7 +116,7 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
       body: multipartRequestBody
     });
 
-    this.handleResponseErrors(res, 'writing blob to appDataFolder');
+    await this.handleResponseErrors(res, 'writing blob to appDataFolder');
   }
 
   async deleteBlob(filename: string): Promise<void> {
@@ -110,6 +126,6 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
     const headers = this.getAuthHeaders();
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
     const res = await this.client.fetch(url, { method: 'DELETE', headers });
-    this.handleResponseErrors(res, 'deleting blob from appDataFolder');
+    await this.handleResponseErrors(res, 'deleting blob from appDataFolder');
   }
 }
