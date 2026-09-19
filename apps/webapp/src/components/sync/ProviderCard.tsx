@@ -120,9 +120,9 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                 {t.sync?.panel?.disconnect || 'Disconnect'}
               </button>
               <span
-                onClick={() => {
+                onClick={async () => {
                   if (activeAdapter?.getRemoteLinks) {
-                    const links = activeAdapter.getRemoteLinks();
+                    const links = await activeAdapter.getRemoteLinks();
                     links.forEach(link => window.open(link, '_blank'));
                   }
                 }}

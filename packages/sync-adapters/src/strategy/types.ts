@@ -4,7 +4,7 @@ export interface BlobStorageDriver {
   readBlob<T = any>(filename: string): Promise<T | null>;
   writeBlob<T = any>(filename: string, data: T): Promise<void>;
   deleteBlob?(filename: string): Promise<void>;
-  getRemoteLinks?(): string[];
+  getRemoteLinks?(): Promise<string[]>;
 }
 
 export interface TabularRow {
@@ -24,7 +24,7 @@ export interface TabularStorageDriver {
   repairTable?(documentId: string, tabName?: string, expectedLastModified?: string): Promise<void>;
   migrateTable?(documentId: string, expectedLastModified?: string): Promise<void>;
   checkHealth?(documentId: string): Promise<any>;
-  getRemoteLinks?(): string[];
+  getRemoteLinks?(): Promise<string[]>;
 }
 
 export type CollectionRoute =

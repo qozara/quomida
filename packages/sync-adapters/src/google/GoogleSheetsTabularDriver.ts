@@ -26,10 +26,32 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
     this.validationService = new ValidationService(this.getAccessToken, this.client);
   }
 
-  getRemoteLinks(): string[] {
+  async getRemoteLinks(): Promise<string[]> {
     const links: string[] = [];
-    for (const docId of this.documentSchemas.keys()) {
-      links.push(`https://docs.google.com/spreadsheets/d/${docId}/edit`);
+    if (this.documentSchemas.size > 0) {
+      for (const docId of this.documentSchemas.keys()) {
+        links.push(`https://docs.google.com/spreadsheets/d/${docId}/edit`);
+      }
+      return links;
+    }
+
+    try {
+      const headers = this.getAuthHeaders();
+      const docTypes = ['daily_logs', 'food_catalog'];
+      
+      for (const docType of docTypes) {
+        const query = encodeURIComponent(`appProperties has { key='quomida_doc_type' and value='${docType}' } and trashed = false`);
+        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id)`;
+        const res = await this.client.fetch(searchUrl, { method: 'GET', headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.files && json.files.length > 0) {
+             links.push(`https://docs.google.com/spreadsheets/d/${json.files[0].id}/edit`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to resolve remote links via Google Drive API:', e);
     }
     return links;
   }

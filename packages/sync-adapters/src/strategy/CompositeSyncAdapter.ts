@@ -104,13 +104,13 @@ export class CompositeSyncAdapter implements SyncAdapter {
     this.setStatus('upgrade_required');
   }
 
-  getRemoteLinks(): string[] {
+  async getRemoteLinks(): Promise<string[]> {
     const links: string[] = [];
     if (this.blobDriver?.getRemoteLinks) {
-      links.push(...this.blobDriver.getRemoteLinks());
+      links.push(...(await this.blobDriver.getRemoteLinks()));
     }
     if (this.tabularDriver?.getRemoteLinks) {
-      links.push(...this.tabularDriver.getRemoteLinks());
+      links.push(...(await this.tabularDriver.getRemoteLinks()));
     }
     return links;
   }
