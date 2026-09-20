@@ -21,7 +21,6 @@ import {
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
 import { Observable } from 'rxjs';
-import seedData from '../assets/seed_v1.json' with { type: 'json' };
 
 export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
 
@@ -206,11 +205,26 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   const existingCount = await db.base_ingredients.find().exec();
   const now = Date.now();
   if (existingCount.length === 0) {
-    const seededIngredients = seedData.base_ingredients.map((ing) => ({
+    let seedData: any = { base_ingredients: [], portions: [] };
+    if (typeof fetch !== 'undefined') {
+      try {
+        const seedUrl = (import.meta.env.BASE_URL || '/') + 'seed_v1.json';
+        const res = await fetch(seedUrl);
+        if (res.ok) {
+          seedData = await res.json();
+        } else {
+          console.warn('[RxDB] Seed file not found or failed to load. Booting with empty catalog.');
+        }
+      } catch (err) {
+        console.warn('[RxDB] Failed to fetch seed_v1.json:', err);
+      }
+    }
+    
+    const seededIngredients = (seedData.base_ingredients || []).map((ing: any) => ({
       ...ing,
       updatedAt: now
     }));
-    const seededPortions = seedData.portions.map((p) => ({
+    const seededPortions = (seedData.portions || []).map((p: any) => ({
       ...p,
       updatedAt: now
     }));

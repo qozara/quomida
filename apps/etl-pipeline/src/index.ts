@@ -166,10 +166,7 @@ export function runETL(options?: RunETLOptions) {
   console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
   console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
 
-  // 2. Output legacy seed_v1.json to assets for offline bundle
-  if (!fs.existsSync(assetsDir)) {
-    fs.mkdirSync(assetsDir, { recursive: true });
-  }
+  // 2. Output legacy seed_v1.json to public for offline bundle fallback
   const seedPayload = {
     version: 'seed_v1.0.0',
     catalogVersion: catalog.catalogVersion,
@@ -177,7 +174,7 @@ export function runETL(options?: RunETLOptions) {
     base_ingredients: catalog.items,
     portions: seedPortions
   };
-  const seedPath = path.join(assetsDir, 'seed_v1.json');
+  const seedPath = path.join(publicDir, 'seed_v1.json');
   fs.writeFileSync(seedPath, JSON.stringify(seedPayload, null, 2), 'utf-8');
   console.log(`[ETL Pipeline] Generated offline seed bundle at ${seedPath}`);
 }

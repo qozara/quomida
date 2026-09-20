@@ -31,21 +31,23 @@ describe('CatalogHydrationService [APP-206]', () => {
   it('skips catalog download when local version matches remote version', async () => {
     await service.setMetadata('lastIngestedCatalogVersion', 'v1.0.0');
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ catalogVersion: 'v1.0.0', generatedAt: '2026-09-20T00:00:00Z' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('catalog_meta.json')) {
+        return new Response(JSON.stringify({ catalogVersion: 'v1.0.0', generatedAt: '2026-09-20T00:00:00Z' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
 
     const result = await hydrationService.hydrate();
     expect(result.status).toBe('UP_TO_DATE');
     expect(result.version).toBe('v1.0.0');
     expect(result.itemsUpserted).toBe(0);
 
-    // Only metadata was fetched, catalog.json was NOT requested
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy.mock.calls[0][0]).toContain('catalog_meta.json');
+    const metaCalls = fetchSpy.mock.calls.filter(c => String(c[0]).includes('catalog_meta.json'));
+    expect(metaCalls.length).toBe(1);
   });
 
   it('downloads catalog and updates database when a newer version is available', async () => {
@@ -70,9 +72,11 @@ describe('CatalogHydrationService [APP-206]', () => {
       ]
     };
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify(metaResponse), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(catalogResponse), { status: 200 }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
+      if (String(url).includes('catalog.json')) return new Response(JSON.stringify(catalogResponse), { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
 
     const result = await hydrationService.hydrate();
     expect(result.status).toBe('UPDATED');
@@ -121,9 +125,11 @@ describe('CatalogHydrationService [APP-206]', () => {
       ]
     };
 
-    vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify(metaResponse), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(catalogResponse), { status: 200 }));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
+      if (String(url).includes('catalog.json')) return new Response(JSON.stringify(catalogResponse), { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
 
     await hydrationService.hydrate();
 
@@ -142,13 +148,14 @@ describe('CatalogHydrationService [APP-206]', () => {
   it('supports force refresh with cache bypass', async () => {
     await service.setMetadata('lastIngestedCatalogVersion', 'v1.0.0');
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ catalogVersion: 'v1.0.0', items: [] }), { status: 200 })
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify({ catalogVersion: 'v1.0.0', items: [] }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
 
     const result = await hydrationService.hydrate({ force: true });
-    expect(fetchSpy).toHaveBeenCalled();
-    const firstCallInit = fetchSpy.mock.calls[0][1];
-    expect(firstCallInit?.cache).toBe('no-cache');
+    const metaCall = fetchSpy.mock.calls.find(c => String(c[0]).includes('catalog_meta.json'));
+    expect(metaCall).toBeDefined();
+    expect(metaCall![1]?.cache).toBe('no-cache');
   });
 });

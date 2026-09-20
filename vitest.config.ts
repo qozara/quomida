@@ -4,7 +4,8 @@ import path from 'path';
 export default defineConfig({
   test: {
     include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
-    exclude: ['**/node_modules/**', 'apps/webapp/tests/e2e/**/*']
+    exclude: ['**/node_modules/**', 'apps/webapp/tests/e2e/**/*'],
+    setupFiles: ['apps/webapp/tests/setup.ts']
   },
   resolve: {
     alias: {
