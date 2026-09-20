@@ -95,7 +95,7 @@ For the official Qozara deployment, we use **GitHub Actions** to build the ETL p
 
 **GitHub Actions Integration (`.github/workflows/etl.yml`):**
 - Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
-- Uses `cloudflare/pages-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
+- Uses `cloudflare/wrangler-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
 
 **Required GitHub Secrets:**
 - `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with "Cloudflare Pages" edit permissions.

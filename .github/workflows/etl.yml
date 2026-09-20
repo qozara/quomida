@@ -36,12 +36,8 @@ jobs:
         run: npm run etl
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: quomida-etl
-          directory: apps/webapp/public
-          # Explicitly pass the branch so Cloudflare knows if this is a PR (Preview) or main (Production)
-          branch: ${{ github.head_ref || github.ref_name }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy apps/webapp/public --project-name=quomida-etl --branch=${{ github.head_ref || github.ref_name }}
