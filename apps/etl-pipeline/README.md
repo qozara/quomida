@@ -81,14 +81,28 @@ The webapp consumes catalog updates via the `VITE_CATALOG_BASE_URL` environment 
 
 ### 2. Production (Any Static CDN / Object Storage)
 Because the pipeline is decoupled, you can host the catalog on any static file provider:
-- **GitHub Pages**: A scheduled GitHub Action runs `npm run etl` and deploys to a static branch (e.g., `https://data.quomida.com`).
+- **GitHub Pages**: A scheduled GitHub Action runs `npm run etl` and deploys to a static branch.
 - **AWS S3 / Cloudflare R2**: Upload `catalog.json` and `catalog_meta.json` to an S3 bucket with public read access.
 - **Vercel Blob / Static Storage**: Upload to Vercel Blob and set `VITE_CATALOG_BASE_URL=https://blob.vercel-storage.com/...`.
 
-Configure the client webapp `.env.production`:
+Configure the client webapp `.env.production` to point to your provider:
 ```env
-VITE_CATALOG_BASE_URL=https://data.quomida.com
+VITE_CATALOG_BASE_URL=https://data.yourdomain.com
 ```
+
+### 3. Qozara Official Infrastructure (Cloudflare Pages)
+For the official Qozara deployment, we host the ETL data on **Cloudflare Pages** to keep it completely isolated from the Vercel WebApp. This split infrastructure provides free unlimited preview environments for both apps without coupling their build processes.
+
+**Cloudflare Pages Configuration:**
+- **Build Command**: `npm run etl`
+- **Build Output Directory**: `apps/webapp/public`
+- **Build Watch Paths**: Configured in Cloudflare to only build when files in `apps/etl-pipeline/` change (saving build minutes).
+
+**GitHub Actions Integration:**
+Because Cloudflare automatically builds on pushes and PRs, the GitHub Action (`.github/workflows/etl.yml`) is strictly retained for two purposes:
+1. **Manual Data Refresh**: Clicking "Run Workflow" in GitHub UI.
+2. **Scheduled Refresh**: A cron job that runs every 6 months to pull fresh data.
+The GitHub Action simply sends a POST request to a Cloudflare **Deploy Hook** (configured in GitHub Secrets as `CLOUDFLARE_DEPLOY_HOOK_URL`) to trigger the build on Cloudflare's servers.
 
 ---
 
