@@ -28,8 +28,8 @@ We have decided to split our CDN infrastructure:
 - **Decoupling**: The WebApp and ETL data build processes remain completely isolated.
 
 **Workflow Integration (Direct Upload):**
-- **Pushes, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It is responsible for building the pipeline (`npm run etl`) directly in the GitHub Actions Ubuntu runner.
-- **Deployment**: After a successful build, the Action uses `cloudflare/pages-action` to directly upload the generated `apps/webapp/public` folder to Cloudflare's edge network. Cloudflare is not responsible for installing dependencies or running the build script.
+- **Pull Requests, Pushes to Main, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It is responsible for building the pipeline (`npm run etl`) directly in the GitHub Actions Ubuntu runner.
+- **Deployment**: After a successful build, the Action uses `cloudflare/pages-action` to directly upload the generated `apps/webapp/public` folder to Cloudflare's edge network. The Action automatically routes deployments from PRs to Preview environments, and pushes to `main` to the Production environment.
 
 ## Consequences
 

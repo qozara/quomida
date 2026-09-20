@@ -7,6 +7,11 @@ on:
       - 'apps/etl-pipeline/**'
       - 'packages/**'
       - '.github/workflows/etl.yml'
+  pull_request:
+    paths:
+      - 'apps/etl-pipeline/**'
+      - 'packages/**'
+      - '.github/workflows/etl.yml'
   schedule:
     # Run every 6 months (Jan 1st and Jul 1st at midnight)
     - cron: '0 0 1 1,7 *'

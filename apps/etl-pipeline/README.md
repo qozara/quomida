@@ -94,8 +94,8 @@ VITE_CATALOG_BASE_URL=https://data.yourdomain.com
 For the official Qozara deployment, we use **GitHub Actions** to build the ETL pipeline and **Cloudflare Pages** strictly as the CDN. This is known as "Direct Upload" and prevents Cloudflare from needing to run build environments, while giving us full CI/CD control inside GitHub.
 
 **GitHub Actions Integration (`.github/workflows/etl.yml`):**
-- Runs `npm run etl` on pushes to `apps/etl-pipeline/`, manually, or via a 6-month cron job.
-- Uses `cloudflare/pages-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages.
+- Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
+- Uses `cloudflare/pages-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
 
 **Required GitHub Secrets:**
 - `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with "Cloudflare Pages" edit permissions.
