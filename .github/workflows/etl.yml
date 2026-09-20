@@ -42,5 +42,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: quomida-etl
           directory: apps/webapp/public
-          # Optional: Enable this if you want GitHub deployments to show up in PRs
+          # Explicitly pass the branch so Cloudflare knows if this is a PR (Preview) or main (Production)
+          branch: ${{ github.head_ref || github.ref_name }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
