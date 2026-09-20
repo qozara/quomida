@@ -5,7 +5,7 @@ import { StatusDot } from './StatusDot.js';
 import { DiagnosticRow } from './DiagnosticRow.js';
 import { SyncTimestamp } from './SyncTimestamp.js';
 import { Wifi, Cloud, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
-import { resolveProviderDiagnostic } from '@quomida/sync-adapters';
+import { resolveProviderDiagnostic } from '@quomida/cloud-providers';
 
 export interface SyncInspectorPopoverProps {
 
@@ -22,11 +22,11 @@ export const SyncInspectorPopover: React.FC<SyncInspectorPopoverProps> = ({
   const {
     uxSyncState,
     syncStatus,
-    activeAdapter,
+    activeProvider,
     isOnline,
     lastSyncedTime,
     forceSync,
-    reconnectAdapter,
+    reconnectProvider,
     setIsStorageSettingsOpen,
     t
   } = useApp();
@@ -104,12 +104,12 @@ export const SyncInspectorPopover: React.FC<SyncInspectorPopoverProps> = ({
   if (!isOpen) return null;
 
   const hasActiveAdapter = Boolean(
-    activeAdapter &&
-    activeAdapter.isInitialized() &&
-    activeAdapter.getStatus() !== 'disconnected'
+    activeProvider &&
+    activeProvider.isInitialized() &&
+    activeProvider.getStatus() !== 'disconnected'
   );
 
-  const providerName = hasActiveAdapter ? activeAdapter!.name : 'BYOS Cloud';
+  const providerName = hasActiveAdapter ? activeProvider!.name : 'BYOS Cloud';
 
   // Headings and assurances based on UX state
   const title = t.sync?.header?.[uxSyncState] || 'Sync Status';
@@ -181,7 +181,7 @@ export const SyncInspectorPopover: React.FC<SyncInspectorPopoverProps> = ({
           return (
             <DiagnosticRow
               icon={<Cloud className="w-4 h-4" />}
-              label={hasActiveAdapter ? activeAdapter!.name : (t.sync?.diagnostics?.cloudProvider || 'Cloud Provider')}
+              label={hasActiveAdapter ? activeProvider!.name : (t.sync?.diagnostics?.cloudProvider || 'Cloud Provider')}
               value={getDiagnosticText()}
               statusBadge={
                 <StatusDot
@@ -216,7 +216,7 @@ export const SyncInspectorPopover: React.FC<SyncInspectorPopoverProps> = ({
           </div>
           <button
             ref={reconnectBtnRef}
-            onClick={reconnectAdapter}
+            onClick={reconnectProvider}
             className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow-sm active:scale-[0.98]"
           >
             {(t.sync?.banner?.reconnect || 'Reconnect {{provider}}').replace('{{provider}}', providerName)}

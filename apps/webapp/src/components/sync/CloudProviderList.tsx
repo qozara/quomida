@@ -2,30 +2,23 @@ import React from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { ProviderCard, type ProviderInfo } from './ProviderCard.js';
 
-export interface CloudAdapterListProps {
+export interface CloudProviderListProps {
   onDisconnectRequest: (id: string, name: string) => void;
 }
 
-const AVAILABLE_PROVIDERS: ProviderInfo[] = [
-  {
-    id: 'mock-sync-adapter',
-    name: 'Mock Cloud Sync',
-    description: 'Local test adapter simulating BYOS synchronization and offline resilience.',
-    iconType: 'mock'
-  },
-  {
-    id: 'google-drive-sheets',
-    name: 'Google Drive / Sheets (BYOS)',
-    description: 'Connect personal Google Drive spreadsheet for cross-device cloud backups.',
-    iconType: 'gdrive'
-  }
-];
+import { useCloudProviderRegistry } from '../../cloud-providers/index.js';
 
-export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnectRequest }) => {
-  const { activeAdapter, connectAdapter, reconnectAdapter, t } = useApp();
+export const CloudProviderList: React.FC<CloudProviderListProps> = ({ onDisconnectRequest }) => {
+  const { activeProvider, connectProvider, reconnectProvider, t } = useApp();
+
+  const registry = useCloudProviderRegistry();
 
   const handleConnect = async (providerId: string) => {
-    await connectAdapter(providerId);
+    await connectProvider(providerId);
+  };
+
+  const handleReconnect = async () => {
+    await reconnectProvider();
   };
 
   return (
@@ -41,12 +34,12 @@ export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnect
       </div>
 
       <div className="space-y-3">
-        {AVAILABLE_PROVIDERS.map((provider) => {
+        {registry.map((provider: any) => {
           const isActive = Boolean(
-            activeAdapter &&
-            activeAdapter.id === provider.id &&
-            activeAdapter.isInitialized() &&
-            activeAdapter.getStatus() !== 'disconnected'
+            activeProvider &&
+            activeProvider.id === provider.id &&
+            activeProvider.isInitialized() &&
+            activeProvider.getStatus() !== 'disconnected'
           );
           return (
             <ProviderCard
@@ -55,7 +48,7 @@ export const CloudAdapterList: React.FC<CloudAdapterListProps> = ({ onDisconnect
               isActive={isActive}
               onConnect={handleConnect}
               onDisconnectClick={onDisconnectRequest}
-              onReconnect={reconnectAdapter}
+              onReconnect={handleReconnect}
             />
           );
         })}

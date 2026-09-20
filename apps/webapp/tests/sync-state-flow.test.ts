@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MockSyncAdapter, resolveUXStatus, resolveProviderDiagnostic, type UXSyncState } from '@quomida/sync-adapters';
+import { MockCloudSyncProvider, resolveUXStatus, resolveProviderDiagnostic, type UXSyncState } from '@quomida/cloud-providers';
 import { LocalDBService, destroyDatabase } from '../src/db/rxdb.js';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 
 describe('Sync State Flow & Storage Management (TDD)', () => {
-  let adapter: MockSyncAdapter;
+  let adapter: MockCloudSyncProvider;
   let dbService: LocalDBService;
 
   beforeEach(async () => {
     await destroyDatabase();
-    adapter = new MockSyncAdapter();
+    adapter = new MockCloudSyncProvider();
     await adapter.initialize();
     dbService = new LocalDBService(
       { storage: getRxStorageMemory(), name: `sync_test_db_${Date.now()}` },
@@ -108,10 +108,10 @@ describe('Sync State Flow & Storage Management (TDD)', () => {
 
     // 2. Click on connector settings and click on disconnect
     await adapter.disconnect();
-    dbService.setSyncAdapter(undefined);
+    dbService.setCloudSyncProvider(undefined);
     expect(adapter.isInitialized()).toBe(false);
     expect(adapter.getStatus()).toBe('disconnected');
-    expect(dbService.getSyncAdapter()).toBeUndefined();
+    expect(dbService.getCloudSyncProvider()).toBeUndefined();
 
     // With disconnected adapter, state evaluates to local even if still offline
     const disconnectedOfflineUX = resolveUXStatus({ isOnline: false, adapter });

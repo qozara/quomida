@@ -23,7 +23,12 @@
       "snack": "Snacks"
     },
     "noEntries": "No foods logged yet for this meal.",
-    "addFood": "Log Food"
+    "addFood": "Log Food",
+    "onboarding": {
+      "title": "Returning User?",
+      "description": "Connect a cloud storage provider to restore your data and sync seamlessly across devices.",
+      "connect": "Connect Cloud Storage"
+    }
   },
   "search": {
     "placeholder": "Search food or cuts (e.g. Peceto, Aguacate, Milanesa)...",
@@ -122,7 +127,11 @@
       "confirmTitle": "Disconnect {{provider}}?",
       "confirmMessage": "Your local data remains intact, but changes will no longer back up remotely.",
       "confirmAction": "Disconnect",
-      "cancelAction": "Cancel"
+      "cancelAction": "Cancel",
+      "emptyDatabase": "Empty Local Database (v0)",
+      "emptyDatabaseConfirmTitle": "Empty local database?",
+      "emptyDatabaseConfirmMessage": "All local daily logs and custom ingredients will be permanently removed, and initial foods will be re-seeded fresh for version 0.",
+      "emptyDatabaseAction": "Empty Database"
     },
     "a11y": {
       "syncing": "Syncing data to remote storage.",
@@ -130,6 +139,20 @@
       "error": "Cloud sync error. Action required to resume backup.",
       "synced": "All changes saved to device and cloud.",
       "local": "Local storage only mode. Changes saved locally."
+    },
+    "remediation": {
+      "corruptedTitle": "Spreadsheet Structure Mismatch",
+      "corruptedDesc": "Columns or tabs have been altered in your linked cloud spreadsheet. Quomida can safely repair the structure by appending missing columns without deleting your existing data.",
+      "upgradeTitle": "Spreadsheet Schema Upgrade Required",
+      "upgradeDesc": "Your linked cloud spreadsheet was created with an older schema version. An automatic migration is required to continue syncing.",
+      "backupNote": "A backup copy of your spreadsheet will be created in your cloud drive before applying changes.",
+      "repairButton": "Repair Spreadsheet",
+      "upgradeButton": "Upgrade Spreadsheet",
+      "repairing": "Repairing spreadsheet...",
+      "upgrading": "Upgrading spreadsheet...",
+      "repairSuccess": "Spreadsheet repaired successfully. Sync has resumed.",
+      "upgradeSuccess": "Spreadsheet upgraded successfully. Sync has resumed.",
+      "dismiss": "Dismiss for now"
     }
   }
 }

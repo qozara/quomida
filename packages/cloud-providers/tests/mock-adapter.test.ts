@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MockSyncAdapter } from '../src/MockSyncAdapter.js';
+import { MockCloudSyncProvider } from '../src/MockCloudSyncProvider.js';
 
-describe('MockSyncAdapter', () => {
-  let adapter: MockSyncAdapter;
+describe('MockCloudSyncProvider', () => {
+  let adapter: MockCloudSyncProvider;
 
   beforeEach(() => {
-    adapter = new MockSyncAdapter();
+    adapter = new MockCloudSyncProvider();
   });
 
   it('starts uninitialized', () => {

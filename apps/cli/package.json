@@ -4,14 +4,22 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "start": "npx tsx src/index.ts"
+    "start": "npx tsx src/index.ts",
+    "login": "tsx src/commands/login.ts",
+    "logout": "tsx src/commands/logout.ts",
+    "test:e2e": "tsx src/e2e/google.ts"
   },
   "dependencies": {
     "@quomida/domain-core": "*",
-    "@quomida/sync-adapters": "*",
+    "@quomida/cloud-providers": "*",
+    "dotenv": "^18.0.0",
+    "express": "^5.2.1",
+    "open": "^11.0.4",
     "tsx": "^4.19.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.1",
     "typescript": "^5.6.3"
   }
 }

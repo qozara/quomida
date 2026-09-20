@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, CloudOff, AlertCircle, CheckCircle2, HardDrive, Pause } from 'lucide-react';
-import type { UXSyncState } from '@quomida/sync-adapters';
+import type { UXSyncState } from '@quomida/cloud-providers';
 
 export interface SyncGlyphProps {
   state: UXSyncState;

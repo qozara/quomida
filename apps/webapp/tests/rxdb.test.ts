@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getDatabase, destroyDatabase, LocalDBService } from '../src/db/rxdb.js';
-import { MockSyncAdapter } from '@quomida/sync-adapters';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { firstValueFrom } from 'rxjs';
 
@@ -34,16 +34,21 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     expect(settings?.toJSON().updatedAt).toBeDefined();
   });
 
-  it('[APP-103] initializes with MockSyncAdapter decoupling UI thread from background sync lifecycle', async () => {
+  it('[APP-103] initializes with MockCloudSyncProvider decoupling UI thread from background sync lifecycle', async () => {
     const dbName = `test_db_${Date.now()}`;
-    const mockAdapter = new MockSyncAdapter();
+    const mockAdapter = new MockCloudSyncProvider();
     const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName }, mockAdapter);
     
     await service.init();
-    expect(service.getSyncAdapter()?.isInitialized()).toBe(true);
+    expect(service.getCloudSyncProvider()?.isInitialized()).toBe(true);
 
     // Save a setting and verify sync push occurs asynchronously
     await service.saveSettings({ daily_calorie_target: 2500 });
+    
+    // In production, AppContext calls syncDatabaseWithRemote in the background
+    const { syncDatabaseWithRemote } = await import('../src/db/replication.js');
+    await syncDatabaseWithRemote(service.getDatabaseInstance()!, mockAdapter);
+
     const pulled = await mockAdapter.pull();
     expect(pulled.some((p) => p.collection === 'user_settings')).toBe(true);
   });
@@ -84,5 +89,44 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     const logs = await firstValueFrom(service.observeLogsByDate(logDate));
     expect(logs.length).toBe(1);
     expect(logs[0].food_reference_id).toBe(customId);
+  });
+
+  it('empties and resets local database cleanly via clearLocalDatabase and resetDatabase', async () => {
+    const dbName = `reset_test_db_${Date.now()}`;
+    const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName });
+    await service.init();
+
+    // Log a custom food and a daily log
+    const customId = await service.saveCustomFood({
+      name: 'Temp Food',
+      lang: 'es',
+      calories_100g: 100,
+      protein_100g: 10,
+      carbs_100g: 10,
+      fats_100g: 2
+    });
+    await service.logFood({
+      date: '2026-09-17',
+      meal_type: 'meal_snack',
+      food_reference_id: customId,
+      quantity: 1,
+      portion_name: '100g',
+      macros: { calories: 100, protein: 10, carbs: 10, fats: 2 }
+    });
+
+    const beforeReset = await service.getItemCounts();
+    expect(beforeReset.logs).toBe(1);
+    expect(beforeReset.customFoods).toBe(1);
+
+    // Empty and reset the database
+    await service.resetDatabase();
+
+    // Verify it re-initialized fresh with 0 logs and 0 custom foods (seed catalog re-hydrated)
+    const afterReset = await service.getItemCounts();
+    expect(afterReset.logs).toBe(0);
+    expect(afterReset.customFoods).toBe(0);
+
+    const baseFoods = await service.getDatabaseInstance()!.base_ingredients.find().exec();
+    expect(baseFoods.length).toBeGreaterThan(0);
   });
 });

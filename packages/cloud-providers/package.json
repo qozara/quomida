@@ -1,5 +1,5 @@
 {
-  "name": "@quomida/sync-adapters",
+  "name": "@quomida/cloud-providers",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@qozara/gdocs-schema": "^1.0.4",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {

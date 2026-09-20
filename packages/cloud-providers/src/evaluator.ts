@@ -1,8 +1,8 @@
-import type { SyncAdapter, SyncStatus, UXSyncState } from './types.js';
+import type { CloudSyncProvider, SyncStatus, UXSyncState } from './types.js';
 
 export interface ResolveUXStatusParams {
   isOnline: boolean;
-  adapter?: SyncAdapter | { getStatus(): SyncStatus } | null;
+  adapter?: CloudSyncProvider | { getStatus(): SyncStatus } | null;
   adapterStatus?: SyncStatus;
 }
 
@@ -46,8 +46,8 @@ export function resolveUXStatus(params: ResolveUXStatusParams): UXSyncState {
     return 'waiting';
   }
 
-  // Auth Revoked / Persistent Error
-  if (status === 'auth_failed' || status === 'error') {
+  // Auth Revoked / Persistent Error / Schema Remediation Needed
+  if (status === 'auth_failed' || status === 'error' || status === 'corrupted' || status === 'upgrade_required') {
     return 'error';
   }
 

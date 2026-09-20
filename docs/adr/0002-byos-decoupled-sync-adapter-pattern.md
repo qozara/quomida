@@ -16,16 +16,16 @@ Users value data ownership and total privacy for sensitive health and habit data
 
 ## Decision Outcome
 
-Chosen option: **Decoupled SyncAdapter Interface with Swappable Implementations**.
+Chosen option: **Decoupled CloudSyncProvider Interface with Swappable Implementations**.
 
 ```
-SyncAdapter Interface (packages/sync-adapters)
- ├── MockSyncAdapter (In-Memory for local dev & unit tests)
- └── GoogleDriveSheetsSyncAdapter (BYOS Production)
+CloudSyncProvider Interface (packages/sync-adapters)
+ ├── MockCloudSyncProvider (In-Memory for local dev & unit tests)
+ └── GoogleDriveSheetsCloudSyncProvider (BYOS Production)
 ```
 
 ### Positive Consequences
-- Developers can run `npm run dev` and test full offline logging locally out of the box using `MockSyncAdapter` without setup.
+- Developers can run `npm run dev` and test full offline logging locally out of the box using `MockCloudSyncProvider` without setup.
 - User data persists directly to user-owned Google Drive spreadsheets via OAuth 2.0 (`drive.file` / `spreadsheets` scopes).
 - Application domain core remains 100% agnostic of cloud storage APIs.
 

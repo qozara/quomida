@@ -11,7 +11,7 @@ export const SettingsModal: React.FC = () => {
     userSettings,
     updateUserSettings,
     syncStatus,
-    activeAdapter,
+    activeProvider,
     lastSyncedTime,
     isSettingsOpen,
     setIsSettingsOpen,
@@ -187,8 +187,8 @@ export const SettingsModal: React.FC = () => {
             <div className="text-xs text-slate-300 font-semibold flex items-center justify-between">
               <span>Storage Adapter</span>
               <span className="text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800/50">
-                {activeAdapter && activeAdapter.isInitialized() && activeAdapter.getStatus() !== 'disconnected'
-                  ? activeAdapter.name
+                {activeProvider && activeProvider.isInitialized() && activeProvider.getStatus() !== 'disconnected'
+                  ? activeProvider.name
                   : 'Local Only (No Adapter)'}
               </span>
             </div>

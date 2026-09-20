@@ -42,6 +42,12 @@ This document contains operational guidelines, architectural constraints, and st
    - It is NOT intended to be persisted or committed to the repository.
    - Its content may change completely as features evolve. Official documentation should go in `docs/`, ADRs in `docs/adr/`, and tasks in GitHub issues.
 
+9. **Local-First WebApp Security Posture**:
+   - Content Security Policy (CSP): `apps/webapp/index.html` MUST maintain a strict CSP preventing `unsafe-eval` and unauthorized domains.
+   - Subresource Integrity (SRI): Vite MUST build with `@small-tech/vite-plugin-sri` to generate script/style integrity hashes.
+   - XSS Prevention: NEVER use `dangerouslySetInnerHTML` or raw DOM injection in React.
+   - Cloud Credentials: Cloud provider tokens stored in IndexedDB (RxDB) MUST use minimal scopes (e.g., `drive.file`, `drive.appdata`) and short expirations to minimize local extraction blast radius.
+
 ---
 
 ## 📐 Mandatory Coding Principles & Feature Lifecycle Guidelines
@@ -95,6 +101,12 @@ npm run etl
 # Run CLI admin demo
 npm run cli
 
+# Run CLI Google OAuth login
+npm run login --workspace=@quomida/cli
+
+# Run live Google Drive & Sheets E2E sync test
+npm run test:e2e --workspace=@quomida/cli
+
 # Build all monorepo packages
 npm run build
 ```
@@ -105,12 +117,20 @@ npm run build
 
 | System Component | File Path |
 | :--- | :--- |
-| RxDB Schemas | `packages/domain-core/src/schemas/index.ts` |
-| Macro Calculations & Formulas | `packages/domain-core/src/calculations/index.ts` |
-| Sync Adapter Interface | `packages/sync-adapters/src/types.ts` |
+| RxDB Schemas (Local Tier 2) | `packages/domain-core/src/schemas/index.ts` |
+| Cloud Spreadsheet Schemas (Remote Tier 3) | `packages/sync-adapters/src/google/schemas.ts` |
+| Google Validation & Remediation Service | `packages/sync-adapters/src/google/ValidationService.ts` |
+| Serializers & Dynamic Header Mapping | `packages/sync-adapters/src/strategy/serializers.ts` |
+| Composite Sync Adapter Orchestrator | `packages/sync-adapters/src/strategy/CompositeSyncAdapter.ts` |
+| Sync Adapter Interface & Types | `packages/sync-adapters/src/types.ts` |
 | Mock Sync Adapter | `packages/sync-adapters/src/MockSyncAdapter.ts` |
+| Google Drive Sheets Sync Adapter | `packages/sync-adapters/src/GoogleDriveSheetsSyncAdapter.ts` |
+| Macro Calculations & Formulas | `packages/domain-core/src/calculations/index.ts` |
 | LLM Natural Log Parser | `packages/llm-engine/src/LLMParser.ts` |
 | React App Context & DB Provider | `apps/webapp/src/context/AppContext.tsx` |
-| RxDB Database Hydration | `apps/webapp/src/db/rxdb.ts` |
+| RxDB Database Hydration & DB6 Guard | `apps/webapp/src/db/rxdb.ts` |
+| Schema Remediation Modal | `apps/webapp/src/components/sync/SchemaRemediationModal.tsx` |
 | Portion Selection Bottom Sheet | `apps/webapp/src/components/PortionBottomSheet.tsx` |
 | Macro Progress Rings | `apps/webapp/src/components/MacroRings.tsx` |
+| Persistence & Migrations Guide | `docs/persistence-and-migrations.md` |
+

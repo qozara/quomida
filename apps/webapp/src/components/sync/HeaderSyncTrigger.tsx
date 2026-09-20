@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { SyncGlyph } from './SyncGlyph.js';
 import { SyncInspectorPopover } from './SyncInspectorPopover.js';
-import type { UXSyncState } from '@quomida/sync-adapters';
+import type { UXSyncState } from '@quomida/cloud-providers';
 
 export const HeaderSyncTrigger: React.FC = () => {
   const { uxSyncState, t } = useApp();

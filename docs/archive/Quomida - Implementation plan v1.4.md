@@ -17,4 +17,4 @@
 
 > 3. API CONTRACTS
 
-Internal package interfaces replace standard REST contracts (`SyncAdapter`, `LLMEngine`).
+Internal package interfaces replace standard REST contracts (`CloudSyncProvider`, `LLMEngine`).

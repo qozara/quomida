@@ -23,7 +23,12 @@
       "snack": "Snacks / Colaciones"
     },
     "noEntries": "Aún no registraste alimentos en esta comida.",
-    "addFood": "Registrar Alimento"
+    "addFood": "Registrar Alimento",
+    "onboarding": {
+      "title": "¿Usuario recurrente?",
+      "description": "Conecta un proveedor de almacenamiento en la nube para restaurar tus datos y sincronizar perfectamente entre dispositivos.",
+      "connect": "Conectar Almacenamiento en la Nube"
+    }
   },
   "search": {
     "placeholder": "Buscar alimento o corte (ej. Peceto, Palta, Milanesa)...",
@@ -122,7 +127,11 @@
       "confirmTitle": "¿Desconectar {{provider}}?",
       "confirmMessage": "Tus datos locales permanecerán intactos, pero los cambios ya no se respaldarán remotamente.",
       "confirmAction": "Desconectar",
-      "cancelAction": "Cancelar"
+      "cancelAction": "Cancelar",
+      "emptyDatabase": "Vaciar Base de Datos Local (v0)",
+      "emptyDatabaseConfirmTitle": "¿Vaciar base de datos local?",
+      "emptyDatabaseConfirmMessage": "Se eliminarán permanentemente todos los registros locales y alimentos personalizados, resembrando los datos iniciales para la versión 0.",
+      "emptyDatabaseAction": "Vaciar Base de Datos"
     },
     "a11y": {
       "syncing": "Sincronizando datos con el almacenamiento remoto.",
@@ -130,6 +139,20 @@
       "error": "Error de sincronización en la nube. Se requiere acción para reanudar el respaldo.",
       "synced": "Todos los cambios guardados en el dispositivo y la nube.",
       "local": "Modo de solo almacenamiento local. Cambios guardados localmente."
+    },
+    "remediation": {
+      "corruptedTitle": "Discrepancia en la estructura de la planilla",
+      "corruptedDesc": "Se modificaron columnas o pestañas en tu planilla en la nube vinculada. Quomida puede reparar la estructura de forma segura agregando las columnas faltantes sin borrar tus datos existentes.",
+      "upgradeTitle": "Actualización de esquema requerida",
+      "upgradeDesc": "Tu planilla en la nube vinculada fue creada con una versión anterior del esquema. Se requiere una migración automática para continuar la sincronización.",
+      "backupNote": "Se creará automáticamente una copia de respaldo en tu unidad en la nube antes de aplicar los cambios.",
+      "repairButton": "Reparar planilla",
+      "upgradeButton": "Actualizar planilla",
+      "repairing": "Reparando planilla...",
+      "upgrading": "Actualizando planilla...",
+      "repairSuccess": "Planilla reparada con éxito. Sincronización reanudada.",
+      "upgradeSuccess": "Planilla actualizada con éxito. Sincronización reanudada.",
+      "dismiss": "Descartar por ahora"
     }
   }
 }

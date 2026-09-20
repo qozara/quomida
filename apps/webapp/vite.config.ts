@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import sri from 'vite-plugin-sri';
 import path from 'path';
 import { execSync } from 'child_process';
 
@@ -21,8 +22,10 @@ function getGitCommitHash(): string {
 export default defineConfig({
   plugins: [
     react(),
+    sri(),
     VitePWA({
       registerType: 'autoUpdate',
+      useCredentials: true,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Quomida',
@@ -63,7 +66,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@quomida/domain-core': path.resolve(__dirname, '../../packages/domain-core/src/index.ts'),
-      '@quomida/sync-adapters': path.resolve(__dirname, '../../packages/sync-adapters/src/index.ts'),
+      '@quomida/cloud-providers': path.resolve(__dirname, '../../packages/cloud-providers/src/index.ts'),
       '@quomida/llm-engine': path.resolve(__dirname, '../../packages/llm-engine/src/index.ts'),
       '@quomida/i18n-locales': path.resolve(__dirname, '../../packages/i18n-locales/src/index.ts')
     }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.js';
-import { CloudAdapterList } from './CloudAdapterList.js';
-import { ChevronLeft, X, Database, ShieldCheck, AlertCircle } from 'lucide-react';
+import { CloudProviderList } from './CloudProviderList.js';
+import { ChevronLeft, X, Database, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
 
 export interface StorageSettingsPanelProps {
   isOpen: boolean;
@@ -14,14 +14,15 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
   onClose,
   onBack
 }) => {
-  const { itemCounts, disconnectAdapter, t } = useApp();
+  const { itemCounts, disconnectProvider, clearLocalDatabase, t, dbVersion } = useApp();
   const [disconnectTarget, setDisconnectTarget] = useState<{ id: string; name: string } | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   if (!isOpen) return null;
 
   const handleConfirmDisconnect = async () => {
     if (disconnectTarget) {
-      await disconnectAdapter();
+      await disconnectProvider();
       setDisconnectTarget(null);
     }
   };
@@ -78,10 +79,19 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
           <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80 text-[11px] font-mono text-slate-300">
             {metadataText}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            id="btn-empty-local-db"
+            className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-800/60 text-slate-400 hover:text-rose-300 text-xs font-semibold transition-all flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>{(t.sync?.panel?.emptyDatabase || `Empty Local Database (v${dbVersion})`).replace('(v0)', `(v${dbVersion})`)}</span>
+          </button>
         </div>
 
         {/* Remote Synchronization (BYOS) Section */}
-        <CloudAdapterList
+        <CloudProviderList
           onDisconnectRequest={(id, name) => setDisconnectTarget({ id, name })}
         />
 
@@ -124,6 +134,42 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                 className="flex-1 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
               >
                 {t.sync?.panel?.confirmAction || 'Disconnect'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Empty Local Database Confirmation Dialog */}
+        {showResetConfirm && (
+          <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-sm rounded-3xl p-6 flex flex-col justify-center items-center text-center z-20 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-3 bg-rose-950/50 text-rose-400 rounded-full mb-3 border border-rose-800/50">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-2">
+              {t.sync?.panel?.emptyDatabaseConfirmTitle || 'Empty local database?'}
+            </h3>
+            <p className="text-xs text-slate-400 max-w-xs mb-6 leading-relaxed">
+              {(t.sync?.panel?.emptyDatabaseConfirmMessage ||
+                `All local daily logs and custom ingredients will be permanently removed, and initial foods will be re-seeded fresh for version ${dbVersion}.`).replace('version 0', `version ${dbVersion}`)}
+            </p>
+            <div className="flex gap-3 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                {t.sync?.panel?.cancelAction || 'Cancel'}
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-empty-db"
+                onClick={async () => {
+                  setShowResetConfirm(false);
+                  await clearLocalDatabase();
+                }}
+                className="flex-1 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
+              >
+                {t.sync?.panel?.emptyDatabaseAction || 'Empty Database'}
               </button>
             </div>
           </div>
