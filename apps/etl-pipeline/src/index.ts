@@ -1,10 +1,23 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+export interface CatalogItem extends BaseIngredient {
+  contentHash: string;
+}
+
+export interface CatalogPayload {
+  catalogVersion: string;
+  generatedAt: string;
+  items: CatalogItem[];
+}
+
+export interface CatalogMetaPayload {
+  catalogVersion: string;
+  generatedAt: string;
+}
 
 const seedIngredients: BaseIngredient[] = [
   // Local cuts & preparations (ARGENFOODS / LATINFOODS)
@@ -36,24 +49,145 @@ const seedPortions: Portion[] = [
   { id: 'port-aceite-1', base_food_id: 'ing-aceite-oliva', name: '1 cucharada (15ml)', equivalent_weight_g: 14 }
 ];
 
-export function runETL() {
-  console.log('[ETL Pipeline] Transforming regional food datasets (ARGENFOODS/LATINFOODS/USDA)...');
-  
-  const seedPayload = {
-    version: 'seed_v1.0.0',
-    generatedAt: new Date().toISOString(),
-    base_ingredients: seedIngredients,
-    portions: seedPortions
+/**
+ * Sanitizes input food records to prevent XSS and malformed numerical entries.
+ */
+export function sanitizeIngredient(raw: BaseIngredient): BaseIngredient {
+  const sanitizedName = (raw.name || '')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<[^>]*>?/gm, '')
+    .trim();
+
+  const calories = Math.max(0, Number.isFinite(raw.calories_100g) ? raw.calories_100g : 0);
+  const protein = Math.max(0, Number.isFinite(raw.protein_100g) ? raw.protein_100g : 0);
+  const carbs = Math.max(0, Number.isFinite(raw.carbs_100g) ? raw.carbs_100g : 0);
+  const fats = Math.max(0, Number.isFinite(raw.fats_100g) ? raw.fats_100g : 0);
+
+  return {
+    ...raw,
+    id: String(raw.id).trim(),
+    name: sanitizedName,
+    source: 'system',
+    lang: raw.lang || 'es',
+    calories_100g: calories,
+    protein_100g: protein,
+    carbs_100g: carbs,
+    fats_100g: fats
   };
-
-  const outputDir = path.resolve(__dirname, '../../webapp/src/assets');
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  const outputPath = path.join(outputDir, 'seed_v1.json');
-  fs.writeFileSync(outputPath, JSON.stringify(seedPayload, null, 2), 'utf-8');
-  console.log(`[ETL Pipeline] Success! Generated versioned seed catalog at ${outputPath}`);
 }
 
-runETL();
+/**
+ * Computes an MD5 content hash for a single food item based on its nutritional profile and name.
+ */
+export function computeContentHash(ingredient: BaseIngredient): string {
+  const payload = [
+    ingredient.name,
+    ingredient.calories_100g,
+    ingredient.protein_100g,
+    ingredient.carbs_100g,
+    ingredient.fats_100g,
+    ingredient.lang
+  ].join('|');
+
+  return crypto.createHash('md5').update(payload, 'utf8').digest('hex');
+}
+
+/**
+ * Computes a deterministic catalog version hash across all ingredients.
+ */
+export function computeCatalogVersion(items: (BaseIngredient & { contentHash?: string })[]): string {
+  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
+  const composite = sorted
+    .map((item) => `${item.id}:${item.contentHash || computeContentHash(item)}`)
+    .join(';');
+
+  return crypto.createHash('md5').update(composite, 'utf8').digest('hex');
+}
+
+/**
+ * Builds the full versioned catalog payload.
+ */
+export function buildCatalogPayload(ingredients: BaseIngredient[] = seedIngredients): {
+  catalog: CatalogPayload;
+  meta: CatalogMetaPayload;
+} {
+  const sanitizedItems: CatalogItem[] = ingredients.map((raw) => {
+    const sanitized = sanitizeIngredient(raw);
+    const contentHash = computeContentHash(sanitized);
+    return {
+      ...sanitized,
+      contentHash
+    };
+  });
+
+  const catalogVersion = computeCatalogVersion(sanitizedItems);
+  const generatedAt = new Date().toISOString();
+
+  const catalog: CatalogPayload = {
+    catalogVersion,
+    generatedAt,
+    items: sanitizedItems
+  };
+
+  const meta: CatalogMetaPayload = {
+    catalogVersion,
+    generatedAt
+  };
+
+  return { catalog, meta };
+}
+
+export interface RunETLOptions {
+  publicDir?: string;
+  assetsDir?: string;
+}
+
+export function runETL(options?: RunETLOptions) {
+  const currentFile = fileURLToPath(import.meta.url);
+  const currentDir = path.dirname(currentFile);
+
+  const publicDir = options?.publicDir || path.resolve(currentDir, '../../webapp/public');
+  const assetsDir = options?.assetsDir || path.resolve(currentDir, '../../webapp/src/assets');
+
+  console.log('[ETL Pipeline] Transforming regional food datasets (ARGENFOODS/LATINFOODS/USDA)...');
+
+  const { catalog, meta } = buildCatalogPayload(seedIngredients);
+
+  // 1. Output catalog.json and catalog_meta.json to webapp/public/
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+  const catalogPath = path.join(publicDir, 'catalog.json');
+  const metaPath = path.join(publicDir, 'catalog_meta.json');
+
+  fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf-8');
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+  console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
+  console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
+
+  // 2. Output legacy seed_v1.json to assets for offline bundle
+  if (!fs.existsSync(assetsDir)) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+  }
+  const seedPayload = {
+    version: 'seed_v1.0.0',
+    catalogVersion: catalog.catalogVersion,
+    generatedAt: catalog.generatedAt,
+    base_ingredients: catalog.items,
+    portions: seedPortions
+  };
+  const seedPath = path.join(assetsDir, 'seed_v1.json');
+  fs.writeFileSync(seedPath, JSON.stringify(seedPayload, null, 2), 'utf-8');
+  console.log(`[ETL Pipeline] Generated offline seed bundle at ${seedPath}`);
+}
+
+// Auto-run if executed directly
+const isDirectExecution = process.argv[1] && (
+  process.argv[1].endsWith('index.ts') || 
+  process.argv[1].endsWith('index.js')
+);
+
+if (isDirectExecution) {
+  runETL();
+}

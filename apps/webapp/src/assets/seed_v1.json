@@ -1,6 +1,7 @@
 {
   "version": "seed_v1.0.0",
-  "generatedAt": "2026-09-16T02:27:24.497Z",
+  "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
+  "generatedAt": "2026-09-20T14:01:22.223Z",
   "base_ingredients": [
     {
       "id": "ing-vacambre",
@@ -10,7 +11,8 @@
       "calories_100g": 175,
       "protein_100g": 20.5,
       "carbs_100g": 0,
-      "fats_100g": 10.5
+      "fats_100g": 10.5,
+      "contentHash": "dfaf598234aec58636112ab3beac5d62"
     },
     {
       "id": "ing-asado-tira",
@@ -20,7 +22,8 @@
       "calories_100g": 250,
       "protein_100g": 18,
       "carbs_100g": 0,
-      "fats_100g": 19.5
+      "fats_100g": 19.5,
+      "contentHash": "6497fbc25f39d51ff902e8c857cba461"
     },
     {
       "id": "ing-peceto",
@@ -30,7 +33,8 @@
       "calories_100g": 120,
       "protein_100g": 22,
       "carbs_100g": 0,
-      "fats_100g": 3.5
+      "fats_100g": 3.5,
+      "contentHash": "d319056e98d2ca259abbda47b945ce9f"
     },
     {
       "id": "ing-matambre",
@@ -40,7 +44,8 @@
       "calories_100g": 210,
       "protein_100g": 19,
       "carbs_100g": 0,
-      "fats_100g": 14.8
+      "fats_100g": 14.8,
+      "contentHash": "b37e0e613ccc7fb8de8f048adcb5caa4"
     },
     {
       "id": "ing-entranha",
@@ -50,7 +55,8 @@
       "calories_100g": 190,
       "protein_100g": 21,
       "carbs_100g": 0,
-      "fats_100g": 11.5
+      "fats_100g": 11.5,
+      "contentHash": "9b1accb47d1191fcf27d4a73dca8e858"
     },
     {
       "id": "ing-milanesa-carne",
@@ -60,7 +66,8 @@
       "calories_100g": 215,
       "protein_100g": 23.5,
       "carbs_100g": 12,
-      "fats_100g": 8
+      "fats_100g": 8,
+      "contentHash": "5ed4ed27d47af59a9d9b6d77f6c570c6"
     },
     {
       "id": "ing-empanada-carne",
@@ -70,7 +77,8 @@
       "calories_100g": 260,
       "protein_100g": 11,
       "carbs_100g": 24,
-      "fats_100g": 13.5
+      "fats_100g": 13.5,
+      "contentHash": "1639cfd0fa8da00f062a636dae9b255d"
     },
     {
       "id": "ing-palta",
@@ -80,7 +88,8 @@
       "calories_100g": 160,
       "protein_100g": 2,
       "carbs_100g": 8.5,
-      "fats_100g": 14.7
+      "fats_100g": 14.7,
+      "contentHash": "695d09428d48e1595abb3fc5c010d4e2"
     },
     {
       "id": "ing-frutilla",
@@ -90,7 +99,8 @@
       "calories_100g": 32,
       "protein_100g": 0.7,
       "carbs_100g": 7.7,
-      "fats_100g": 0.3
+      "fats_100g": 0.3,
+      "contentHash": "4e3ec7b66a3f294136bf0ddbc08946f8"
     },
     {
       "id": "ing-choclo",
@@ -100,7 +110,8 @@
       "calories_100g": 86,
       "protein_100g": 3.2,
       "carbs_100g": 19,
-      "fats_100g": 1.2
+      "fats_100g": 1.2,
+      "contentHash": "60608965b2b2656cc088ca4c8ad4aca1"
     },
     {
       "id": "ing-aceite-oliva",
@@ -110,7 +121,8 @@
       "calories_100g": 884,
       "protein_100g": 0,
       "carbs_100g": 0,
-      "fats_100g": 100
+      "fats_100g": 100,
+      "contentHash": "ed34b628a1224f41bdecfe03b368e781"
     },
     {
       "id": "ing-pechuga-pollo",
@@ -120,7 +132,8 @@
       "calories_100g": 165,
       "protein_100g": 31,
       "carbs_100g": 0,
-      "fats_100g": 3.6
+      "fats_100g": 3.6,
+      "contentHash": "59994ca583fb64da754f90ab8999650f"
     },
     {
       "id": "ing-arroz-blanco",
@@ -130,7 +143,8 @@
       "calories_100g": 365,
       "protein_100g": 7.1,
       "carbs_100g": 80,
-      "fats_100g": 0.7
+      "fats_100g": 0.7,
+      "contentHash": "dfb375a677e6ecb88b697f0b2d197234"
     },
     {
       "id": "ing-huevo",
@@ -140,7 +154,8 @@
       "calories_100g": 155,
       "protein_100g": 12.6,
       "carbs_100g": 1.1,
-      "fats_100g": 10.6
+      "fats_100g": 10.6,
+      "contentHash": "96339cc8e3b45725131b2d8f2bb52286"
     },
     {
       "id": "ing-pan-masa-madre",
@@ -150,7 +165,8 @@
       "calories_100g": 245,
       "protein_100g": 9,
       "carbs_100g": 48,
-      "fats_100g": 1.5
+      "fats_100g": 1.5,
+      "contentHash": "8d32569a363cc3cb262a364c5a308654"
     }
   ],
   "portions": [

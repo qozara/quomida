@@ -57,7 +57,14 @@
     "syncTitle": "Persistencia de Datos y Sincronización BYOS",
     "syncStatusConnected": "Estado de Sync: Conectado",
     "syncStatusOffline": "Estado de Sync: Modo Local sin Conexión (Mock)",
-    "syncLastSynced": "Última sync: {{time}}"
+    "syncLastSynced": "Última sync: {{time}}",
+    "catalogTitle": "Catálogo de Alimentos e Ingredientes",
+    "catalogVersion": "Versión del catálogo: {{version}}",
+    "checkCatalogUpdates": "Buscar Actualizaciones de Catálogo",
+    "checkingCatalog": "Buscando actualizaciones...",
+    "catalogUpToDate": "El catálogo está actualizado",
+    "catalogUpdated": "Catálogo actualizado a {{version}} ({{count}} alimentos)",
+    "catalogCheckError": "Error al buscar actualizaciones"
   },
   "appStatus": {
     "offline": "Estado de la aplicación: Sin conexión. Los cambios se guardan localmente.",

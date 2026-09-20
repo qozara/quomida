@@ -15,7 +15,8 @@ All architectural decisions, product specifications, component blueprints, and p
 - ☁️ **[Google Drive & Sheets Connector](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/connectors/google-drive-sheets.md)** — Google OAuth configuration, dual spreadsheet model, dynamic mapping, and live E2E testing.
 - 🛠️ **[Developer CLI Harness](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/apps/cli/README.md)** — Terminal CLI for OAuth login/logout, domain calculations, and live E2E testing.
 - 📋 **[Product Specification](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/PRODUCT_SPEC.md)** — Functional requirements, wireframe specs, regional datasets, and WCAG 2.2 accessibility.
-- 📜 **[Architectural Decision Records (ADRs)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/README.md)** — MADR-standard records (0000 through 0013: RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback, Recovery UX, Dynamic Mapping, Dual Migrations).
+- 📜 **[Architectural Decision Records (ADRs)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/README.md)** — MADR-standard records (0000 through 0015: RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback, Recovery UX, Dynamic Mapping, Dual Migrations, Hook Registry, Catalog Hydration).
+- 🥗 **[ETL & Catalog Hydration Pipeline](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/apps/etl-pipeline/README.md)** — Decoupled static dataset compiler, two-file delta synchronization, shift-left data sanitization, and infrastructure-agnostic CDN deployment.
 - 👩‍💻 **[Contributing & TDD Guide](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/CONTRIBUTING.md)** — Developer workflow, running unit/E2E tests, and schema migrations.
 - 🤖 **[AI Coding Agent Invariants](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/AGENTS.md)** — Critical invariants, zero-vulnerability policy, and strict isolation rules.
 

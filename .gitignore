@@ -8,6 +8,8 @@ build/
 .output/
 dev-dist/
 *.tsbuildinfo
+apps/webapp/public/catalog.json
+apps/webapp/public/catalog_meta.json
 
 # Environment & local secrets
 .env

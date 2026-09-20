@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db/rxdb.js';
 import { syncDatabaseWithRemote } from '../db/replication.js';
+import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
 import {
   type BaseIngredient,
   type Portion,
@@ -65,6 +66,9 @@ interface AppContextType {
   clearLocalDatabase: () => Promise<void>;
   repairSync: () => Promise<void>;
   migrateSync: () => Promise<void>;
+  catalogVersion: string | null;
+  isHydratingCatalog: boolean;
+  refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
 }
 
 const defaultSettings: UserSettings = {
@@ -101,7 +105,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
+  const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
+  const [isHydratingCatalog, setIsHydratingCatalog] = useState(false);
+  const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
   const syncLock = React.useRef(false);
+
+  const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
+    setIsHydratingCatalog(true);
+    try {
+      const res = await hydrationService.hydrate(options);
+      if (res.version) {
+        setCatalogVersion(res.version);
+      }
+      return res;
+    } finally {
+      setIsHydratingCatalog(false);
+    }
+  }, [hydrationService]);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -239,6 +259,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Subscribe to Daily Logs for selected date
       subLogs = dbService.observeLogsByDate(selectedDate).subscribe((docs: any[]) => {
         setDailyLogs(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
+      });
+
+      // Background asynchronous catalog hydration on boot [APP-207]
+      dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
+        if (v) setCatalogVersion(v);
+      });
+      refreshCatalog().catch((err) => {
+        console.warn('[CatalogHydration] Background boot hydration notice:', err);
       });
     }).catch((err: any) => {
       console.error('[AppContext] Failed to initialize local database:', err);
@@ -480,7 +508,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsStorageSettingsOpen,
         dbInitError,
         dbVersion: dailyLogsSchema.version,
-        clearLocalDatabase: clearDatabase
+        clearLocalDatabase: clearDatabase,
+        catalogVersion,
+        isHydratingCatalog,
+        refreshCatalog
       }}
     >
       {children}

@@ -11,11 +11,13 @@ import {
   portionsSchema,
   dailyLogsSchema,
   userSettingsSchema,
+  systemMetadataSchema,
   type BaseIngredient,
   type Recipe,
   type Portion,
   type DailyLog,
-  type UserSettings
+  type UserSettings,
+  type SystemMetadata
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
 import { Observable } from 'rxjs';
@@ -76,6 +78,7 @@ export type QuomidaDatabaseCollections = {
   portions: any;
   daily_logs: any;
   user_settings: any;
+  system_metadata: any;
 };
 
 export type QuomidaDatabase = RxDatabase<QuomidaDatabaseCollections>;
@@ -159,7 +162,8 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       recipes: { schema: recipesSchema },
       portions: { schema: portionsSchema },
       daily_logs: { schema: dailyLogsSchema },
-      user_settings: { schema: userSettingsSchema }
+      user_settings: { schema: userSettingsSchema },
+      system_metadata: { schema: systemMetadataSchema }
     });
   } catch (err: any) {
     try {
@@ -364,5 +368,20 @@ export class LocalDBService {
       throw new Error('Database not initialized.');
     }
     return this.db.base_ingredients.find().$;
+  }
+
+  async getMetadata(key: string): Promise<string | null> {
+    if (!this.db) await this.init();
+    const doc = await this.db!.system_metadata.findOne(key).exec();
+    return doc ? doc.value : null;
+  }
+
+  async setMetadata(key: string, value: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.system_metadata.upsert({
+      key,
+      value,
+      updatedAt: Date.now()
+    });
   }
 }
