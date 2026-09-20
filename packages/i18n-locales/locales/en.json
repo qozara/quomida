@@ -57,7 +57,14 @@
     "syncTitle": "Data Persistence & BYOS Sync",
     "syncStatusConnected": "Sync Status: Connected",
     "syncStatusOffline": "Sync Status: Local Offline Mode (Mock)",
-    "syncLastSynced": "Last synced: {{time}}"
+    "syncLastSynced": "Last synced: {{time}}",
+    "catalogTitle": "Food Catalog & Ingredients",
+    "catalogVersion": "Catalog Version: {{version}}",
+    "checkCatalogUpdates": "Check for Catalog Updates",
+    "checkingCatalog": "Checking for updates...",
+    "catalogUpToDate": "Catalog is up to date",
+    "catalogUpdated": "Catalog updated to {{version}} ({{count}} items)",
+    "catalogCheckError": "Failed to check for updates"
   },
   "appStatus": {
     "offline": "Application status: Offline. Changes are saved locally.",

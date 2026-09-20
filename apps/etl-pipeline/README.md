@@ -1,0 +1,115 @@
+# 🥗 @quomida/etl-pipeline
+
+Decoupled static data compilation and normalization pipeline for Quomida's nutritional food catalogs.
+
+---
+
+## 📖 Overview
+
+`@quomida/etl-pipeline` is responsible for ingesting, sanitizing, and compiling nutritional datasets (such as ARGENFOODS, LATINFOODS, USDA FoodData Central) into a standardized format consumable by `@quomida/webapp`.
+
+The pipeline is completely decoupled from the web application runtime, allowing independent data updates without requiring web application rebuilds or redeployments.
+
+---
+
+## 🏗️ Architecture: Two-File Delta Distribution
+
+To optimize client bandwidth and avoid downloading megabytes of static JSON on every application load, the pipeline outputs two assets:
+
+1. **`catalog_meta.json`**: A lightweight manifest (~50 bytes) containing:
+   ```json
+   {
+     "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
+     "generatedAt": "2026-09-20T12:00:00.000Z"
+   }
+   ```
+2. **`catalog.json`**: The complete, versioned payload containing all validated food items with source-based deterministic IDs and `contentHash` properties:
+   ```json
+   {
+     "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
+     "generatedAt": "2026-09-20T12:00:00.000Z",
+     "items": [
+       {
+         "id": "ing-vacambre",
+         "name": "Vacío vacuno (crudo)",
+         "source": "system",
+         "lang": "es",
+         "calories_100g": 175,
+         "protein_100g": 20.5,
+         "carbs_100g": 0,
+         "fats_100g": 10.5,
+         "contentHash": "0745508c9096720df50feee0d1e34ff0"
+       }
+     ]
+   }
+   ```
+3. **`seed_v1.json`**: Also outputs an offline bundle fallback to `apps/webapp/src/assets/seed_v1.json` for first-time offline application boots.
+
+---
+
+## 🔒 Security Boundary: Shift-Left Data Hygiene
+
+Security is enforced at the compilation level to eliminate runtime overhead in client browsers:
+- **XSS Sanitization**: Strips HTML `<script>`, `<style>`, and markup tags from food names.
+- **Nutritional Validation**: Enforces finite, non-negative numbers for macro values (`calories_100g`, `protein_100g`, `carbs_100g`, `fats_100g`).
+- **Source Hardening**: Enforces `source: "system"` to ensure imported items never conflict with user-created custom recipes (`source: "custom"`).
+
+---
+
+## ⚙️ Running Locally
+
+```bash
+# Run the ETL compilation script
+npm run etl
+```
+
+Build outputs:
+- `apps/webapp/public/catalog.json` (gitignored)
+- `apps/webapp/public/catalog_meta.json` (gitignored)
+- `apps/webapp/src/assets/seed_v1.json`
+
+---
+
+## 🌐 Infrastructure-Agnostic Deployment
+
+The webapp consumes catalog updates via the `VITE_CATALOG_BASE_URL` environment variable.
+
+### 1. Local Development & CI
+- `VITE_CATALOG_BASE_URL=""` (relative root path).
+- Vite serves `catalog_meta.json` and `catalog.json` statically from `apps/webapp/public/`.
+- In CI test runs, if the files are not generated, the hydration service degrades gracefully without throwing.
+
+### 2. Production (Any Static CDN / Object Storage)
+Because the pipeline is decoupled, you can host the catalog on any static file provider:
+- **GitHub Pages**: A scheduled GitHub Action runs `npm run etl` and deploys to a static branch.
+- **AWS S3 / Cloudflare R2**: Upload `catalog.json` and `catalog_meta.json` to an S3 bucket with public read access.
+- **Vercel Blob / Static Storage**: Upload to Vercel Blob and set `VITE_CATALOG_BASE_URL=https://blob.vercel-storage.com/...`.
+
+Configure the client webapp `.env.production` to point to your provider:
+```env
+VITE_CATALOG_BASE_URL=https://data.yourdomain.com
+```
+
+### 3. Qozara Official Infrastructure (Cloudflare Pages)
+For the official Qozara deployment, we host the ETL data on **Cloudflare Pages** to keep it completely isolated from the Vercel WebApp. This split infrastructure provides free unlimited preview environments for both apps without coupling their build processes.
+
+**Cloudflare Pages Configuration:**
+- **Build Command**: `npm run etl`
+- **Build Output Directory**: `apps/webapp/public`
+- **Build Watch Paths**: Configured in Cloudflare to only build when files in `apps/etl-pipeline/` change (saving build minutes).
+
+**GitHub Actions Integration:**
+Because Cloudflare automatically builds on pushes and PRs, the GitHub Action (`.github/workflows/etl.yml`) is strictly retained for two purposes:
+1. **Manual Data Refresh**: Clicking "Run Workflow" in GitHub UI.
+2. **Scheduled Refresh**: A cron job that runs every 6 months to pull fresh data.
+The GitHub Action simply sends a POST request to a Cloudflare **Deploy Hook** (configured in GitHub Secrets as `CLOUDFLARE_DEPLOY_HOOK_URL`) to trigger the build on Cloudflare's servers.
+
+---
+
+## 🔮 Extending with New Data Sources
+
+When adding real API scrapers or new static CSV datasets (USDA, Latinfoots, BEDCA, etc.):
+1. Add parser modules under `src/sources/<source-name>.ts`.
+2. Map raw source records to the `BaseIngredient` interface.
+3. Pass raw items through `sanitizeIngredient()` and `computeContentHash()`.
+4. Run `npm test` to verify deterministic hashing and schema compliance.

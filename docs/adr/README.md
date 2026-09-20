@@ -18,4 +18,6 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0011: Build-Time Schema Validation & Database Recovery UX](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0011-build-time-schema-validation-and-recovery.md)
 * [ADR 0012: Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
 * [ADR 0013: Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)
+* [ADR 0014: UI Adapter Static Hook Registry](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0014-ui-adapter-static-hook-registry.md)
+* [ADR 0015: Decoupled Catalog Hydration & Two-File Delta Synchronization](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0015-decoupled-catalog-hydration-and-two-file-delta-sync.md)
 

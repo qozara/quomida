@@ -4,7 +4,8 @@ import type {
   Recipe,
   Portion,
   DailyLog,
-  UserSettings
+  UserSettings,
+  SystemMetadata
 } from '../types.js';
 
 export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
@@ -133,4 +134,18 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
     updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']
+};
+
+export const systemMetadataSchema: RxJsonSchema<SystemMetadata> = {
+  title: 'system_metadata',
+  version: 0,
+  description: 'Lightweight key-value store for application and catalog state',
+  primaryKey: 'key',
+  type: 'object',
+  properties: {
+    key: { type: 'string', maxLength: 50 },
+    value: { type: 'string' },
+    updatedAt: { type: 'number', minimum: 0 }
+  },
+  required: ['key', 'value', 'updatedAt']
 };

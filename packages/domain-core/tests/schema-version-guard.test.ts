@@ -4,7 +4,8 @@ import {
   recipesSchema,
   portionsSchema,
   dailyLogsSchema,
-  userSettingsSchema
+  userSettingsSchema,
+  systemMetadataSchema
 } from '../src/index.js';
 
 /**
@@ -61,6 +62,11 @@ const V0_BASELINE: Record<string, { version: number; properties: string[]; requi
       'updatedAt'
     ],
     required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']
+  },
+  system_metadata: {
+    version: 0,
+    properties: ['key', 'value', 'updatedAt'],
+    required: ['key', 'value', 'updatedAt']
   }
 };
 
@@ -70,7 +76,8 @@ describe('Schema Version & Evolution Guard (Prevents Un-bumped Schema Mutations 
     recipesSchema,
     portionsSchema,
     dailyLogsSchema,
-    userSettingsSchema
+    userSettingsSchema,
+    systemMetadataSchema
   ];
 
   it('verifies all schemas have a valid non-negative integer version', () => {

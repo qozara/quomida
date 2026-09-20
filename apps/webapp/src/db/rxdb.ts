@@ -11,15 +11,16 @@ import {
   portionsSchema,
   dailyLogsSchema,
   userSettingsSchema,
+  systemMetadataSchema,
   type BaseIngredient,
   type Recipe,
   type Portion,
   type DailyLog,
-  type UserSettings
+  type UserSettings,
+  type SystemMetadata
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
 import { Observable } from 'rxjs';
-import seedData from '../assets/seed_v1.json' with { type: 'json' };
 
 export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
 
@@ -76,6 +77,7 @@ export type QuomidaDatabaseCollections = {
   portions: any;
   daily_logs: any;
   user_settings: any;
+  system_metadata: any;
 };
 
 export type QuomidaDatabase = RxDatabase<QuomidaDatabaseCollections>;
@@ -159,7 +161,8 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       recipes: { schema: recipesSchema },
       portions: { schema: portionsSchema },
       daily_logs: { schema: dailyLogsSchema },
-      user_settings: { schema: userSettingsSchema }
+      user_settings: { schema: userSettingsSchema },
+      system_metadata: { schema: systemMetadataSchema }
     });
   } catch (err: any) {
     try {
@@ -202,11 +205,26 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   const existingCount = await db.base_ingredients.find().exec();
   const now = Date.now();
   if (existingCount.length === 0) {
-    const seededIngredients = seedData.base_ingredients.map((ing) => ({
+    let seedData: any = { base_ingredients: [], portions: [] };
+    if (typeof fetch !== 'undefined') {
+      try {
+        const seedUrl = (import.meta.env.BASE_URL || '/') + 'seed_v1.json';
+        const res = await fetch(seedUrl);
+        if (res.ok) {
+          seedData = await res.json();
+        } else {
+          console.warn('[RxDB] Seed file not found or failed to load. Booting with empty catalog.');
+        }
+      } catch (err) {
+        console.warn('[RxDB] Failed to fetch seed_v1.json:', err);
+      }
+    }
+    
+    const seededIngredients = (seedData.base_ingredients || []).map((ing: any) => ({
       ...ing,
       updatedAt: now
     }));
-    const seededPortions = seedData.portions.map((p) => ({
+    const seededPortions = (seedData.portions || []).map((p: any) => ({
       ...p,
       updatedAt: now
     }));
@@ -364,5 +382,20 @@ export class LocalDBService {
       throw new Error('Database not initialized.');
     }
     return this.db.base_ingredients.find().$;
+  }
+
+  async getMetadata(key: string): Promise<string | null> {
+    if (!this.db) await this.init();
+    const doc = await this.db!.system_metadata.findOne(key).exec();
+    return doc ? doc.value : null;
+  }
+
+  async setMetadata(key: string, value: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.system_metadata.upsert({
+      key,
+      value,
+      updatedAt: Date.now()
+    });
   }
 }

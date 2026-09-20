@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save } from 'lucide-react';
+import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw } from 'lucide-react';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -16,8 +16,13 @@ export const SettingsModal: React.FC = () => {
     isSettingsOpen,
     setIsSettingsOpen,
     setIsStorageSettingsOpen,
+    catalogVersion,
+    isHydratingCatalog,
+    refreshCatalog,
     t
   } = useApp();
+
+  const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
 
 
   const [calorieTarget, setCalorieTarget] = useState(userSettings.daily_calorie_target || 2000);
@@ -40,6 +45,29 @@ export const SettingsModal: React.FC = () => {
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const handleCheckCatalogUpdates = async () => {
+    setCatalogFeedback(null);
+    try {
+      const res = await refreshCatalog({ force: true });
+      if (res.status === 'UPDATED') {
+        setCatalogFeedback(
+          (t.settings as any).catalogUpdated
+            ?.replace('{{version}}', res.version || '')
+            .replace('{{count}}', String(res.itemsUpserted || 0)) ||
+            `Catalog updated to ${res.version} (${res.itemsUpserted} items)`
+        );
+      } else if (res.status === 'UP_TO_DATE') {
+        setCatalogFeedback((t.settings as any).catalogUpToDate || 'Catalog is up to date');
+      } else if (res.status === 'SKIPPED') {
+        setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Catalog update skipped');
+      } else {
+        setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Failed to check for updates');
+      }
+    } catch {
+      setCatalogFeedback((t.settings as any).catalogCheckError || 'Failed to check for updates');
+    }
   };
 
   return (
@@ -211,8 +239,50 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 4: Built-in Catalog Management [APP-208] */}
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>{(t.settings as any).catalogTitle || 'Food Catalog & Ingredients'}</span>
+          </div>
 
-        {/* Section 4: App Version */}
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>
+                {((t.settings as any).catalogVersion || 'Catalog Version: {{version}}').replace(
+                  '{{version}}',
+                  catalogVersion || 'seed_v1'
+                )}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCheckCatalogUpdates}
+              disabled={isHydratingCatalog}
+              className="w-full min-h-[44px] py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+              aria-label={(t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
+            >
+              <RefreshCw className={`w-4 h-4 ${isHydratingCatalog ? 'animate-spin' : ''}`} />
+              <span>
+                {isHydratingCatalog
+                  ? (t.settings as any).checkingCatalog || 'Checking for updates...'
+                  : (t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
+              </span>
+            </button>
+
+            {catalogFeedback && (
+              <div
+                aria-live="polite"
+                className="text-xs text-center p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-medium"
+              >
+                {catalogFeedback}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Section 5: App Version */}
         <div className="pt-2 border-t border-slate-800/80 text-center">
           <span className="text-xs text-slate-500 font-mono">
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}

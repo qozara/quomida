@@ -71,3 +71,9 @@ export interface UserSettings {
   };
   updatedAt?: number;
 }
+
+export interface SystemMetadata {
+  key: string;
+  value: string;
+  updatedAt: number;
+}

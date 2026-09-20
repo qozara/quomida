@@ -129,4 +129,21 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     const baseFoods = await service.getDatabaseInstance()!.base_ingredients.find().exec();
     expect(baseFoods.length).toBeGreaterThan(0);
   });
+
+  it('[APP-205] provides SystemMetadata repository methods: getMetadata and setMetadata', async () => {
+    const dbName = `test_db_meta_${Date.now()}`;
+    const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName });
+    await service.init();
+
+    const initialVal = await service.getMetadata('lastIngestedCatalogVersion');
+    expect(initialVal).toBeNull();
+
+    await service.setMetadata('lastIngestedCatalogVersion', '1.0.5');
+    const updatedVal = await service.getMetadata('lastIngestedCatalogVersion');
+    expect(updatedVal).toBe('1.0.5');
+
+    await service.setMetadata('lastIngestedCatalogVersion', '1.0.6');
+    const overwrittenVal = await service.getMetadata('lastIngestedCatalogVersion');
+    expect(overwrittenVal).toBe('1.0.6');
+  });
 });
