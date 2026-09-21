@@ -15,7 +15,7 @@ export interface CatalogHydrationOptions {
 }
 
 export class CatalogHydrationService {
-  constructor(private dbService: LocalDBService) {}
+  constructor(private dbService: LocalDBService) { }
 
   /**
    * Checks for remote catalog updates and idempotently hydrates the local database.
@@ -57,6 +57,15 @@ export class CatalogHydrationService {
       };
     }
 
+    const contentType = metaRes.headers.get('content-type');
+    if (contentType && contentType.includes('text/html')) {
+      return {
+        status: 'ERROR',
+        itemsUpserted: 0,
+        error: 'Error accessing catalog metadata, please try again later'
+      };
+    }
+
     let meta: any;
     try {
       meta = await metaRes.json();
@@ -70,7 +79,7 @@ export class CatalogHydrationService {
 
     const remoteVersion = meta?.catalogVersion;
     const remoteGeneratedAt = meta?.generatedAt;
-    
+
     if (!remoteVersion) {
       return {
         status: 'ERROR',
@@ -108,6 +117,15 @@ export class CatalogHydrationService {
         status: 'ERROR',
         itemsUpserted: 0,
         error: `Failed to fetch catalog payload (${catalogRes.status})`
+      };
+    }
+
+    const catalogContentType = catalogRes.headers.get('content-type');
+    if (catalogContentType && catalogContentType.includes('text/html')) {
+      return {
+        status: 'ERROR',
+        itemsUpserted: 0,
+        error: 'Catalog payload not found (Server returned HTML instead of JSON)'
       };
     }
 
