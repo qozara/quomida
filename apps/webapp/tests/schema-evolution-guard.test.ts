@@ -188,8 +188,8 @@ describe('Schema Evolution & Migration Integrity Guard (APP-DB6-GUARD)', () => {
     expect(freshDb.daily_logs).toBeDefined();
     expect(freshDb.base_ingredients).toBeDefined();
 
-    // Verify seeds are hydrated
+    // Verify DB starts empty
     const foods = await freshDb.base_ingredients.find().exec();
-    expect(foods.length).toBeGreaterThan(0);
+    expect(foods.length).toBe(0);
   });
 });

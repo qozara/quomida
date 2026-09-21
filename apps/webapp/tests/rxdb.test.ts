@@ -21,13 +21,12 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     expect(db.user_settings).toBeDefined();
   });
 
-  it('[APP-102] registers sync-ready schemas and hydrates initial seed catalog with updatedAt', async () => {
+  it('[APP-102] registers sync-ready schemas and hydrates initial global settings with updatedAt', async () => {
     const dbName = `test_db_${Date.now()}`;
     const db = await getDatabase({ storage: getRxStorageMemory(), name: dbName });
     
     const ingredients = await db.base_ingredients.find().exec();
-    expect(ingredients.length).toBeGreaterThan(0);
-    expect(ingredients[0].toJSON().updatedAt).toBeDefined();
+    expect(ingredients.length).toBe(0); // Catalog is now hydrated externally
 
     const settings = await db.user_settings.findOne('global_settings').exec();
     expect(settings).not.toBeNull();
@@ -127,7 +126,7 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
     expect(afterReset.customFoods).toBe(0);
 
     const baseFoods = await service.getDatabaseInstance()!.base_ingredients.find().exec();
-    expect(baseFoods.length).toBeGreaterThan(0);
+    expect(baseFoods.length).toBe(0);
   });
 
   it('[APP-205] provides SystemMetadata repository methods: getMetadata and setMetadata', async () => {

@@ -166,17 +166,7 @@ export function runETL(options?: RunETLOptions) {
   console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
   console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
 
-  // 2. Output legacy seed_v1.json to public for offline bundle fallback
-  const seedPayload = {
-    version: 'seed_v1.0.0',
-    catalogVersion: catalog.catalogVersion,
-    generatedAt: catalog.generatedAt,
-    base_ingredients: catalog.items,
-    portions: seedPortions
-  };
-  const seedPath = path.join(publicDir, 'seed_v1.json');
-  fs.writeFileSync(seedPath, JSON.stringify(seedPayload, null, 2), 'utf-8');
-  console.log(`[ETL Pipeline] Generated offline seed bundle at ${seedPath}`);
+
 }
 
 // Auto-run if executed directly
