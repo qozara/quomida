@@ -166,7 +166,11 @@ export function runETL(options?: RunETLOptions) {
   console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
   console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
 
-
+  // 2. Generate _headers file for Cloudflare Pages to allow CORS from WebApp
+  const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
+  const headersPath = path.join(publicDir, '_headers');
+  fs.writeFileSync(headersPath, headersContent, 'utf-8');
+  console.log(`[ETL Pipeline] Generated CORS _headers for Cloudflare Pages at ${headersPath}`);
 }
 
 // Auto-run if executed directly
