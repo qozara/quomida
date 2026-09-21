@@ -252,7 +252,7 @@ export const SettingsModal: React.FC = () => {
               <span>
                 {((t.settings as any).catalogVersion || 'Catalog Version: {{version}}').replace(
                   '{{version}}',
-                  catalogVersion || 'seed_v1'
+                  catalogVersion || 'None'
                 )}
               </span>
             </div>
@@ -289,7 +289,7 @@ export const SettingsModal: React.FC = () => {
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
           </span>
           <span className="text-[10px] text-slate-600 font-mono uppercase">
-            Catalog: {catalogVersion ? catalogVersion.substring(0, 8) : 'seed'} 
+            Catalog: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
             {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
           </span>
         </div>
