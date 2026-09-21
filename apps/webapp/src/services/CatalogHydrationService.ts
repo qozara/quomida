@@ -4,6 +4,7 @@ import type { LocalDBService } from '../db/rxdb.js';
 export interface HydrationResult {
   status: 'UP_TO_DATE' | 'UPDATED' | 'SKIPPED' | 'ERROR';
   version?: string;
+  generatedAt?: string;
   itemsUpserted: number;
   error?: string;
 }
@@ -68,6 +69,8 @@ export class CatalogHydrationService {
     }
 
     const remoteVersion = meta?.catalogVersion;
+    const remoteGeneratedAt = meta?.generatedAt;
+    
     if (!remoteVersion) {
       return {
         status: 'ERROR',
@@ -82,6 +85,7 @@ export class CatalogHydrationService {
       return {
         status: 'UP_TO_DATE',
         version: remoteVersion,
+        generatedAt: remoteGeneratedAt,
         itemsUpserted: 0
       };
     }
@@ -179,10 +183,14 @@ export class CatalogHydrationService {
 
     // 5. Update last ingested catalog version in system_metadata
     await this.dbService.setMetadata('lastIngestedCatalogVersion', remoteVersion);
+    if (remoteGeneratedAt) {
+      await this.dbService.setMetadata('lastIngestedCatalogGeneratedAt', remoteGeneratedAt);
+    }
 
     return {
       status: itemsToUpsert.length > 0 ? 'UPDATED' : 'UP_TO_DATE',
       version: remoteVersion,
+      generatedAt: remoteGeneratedAt,
       itemsUpserted: itemsToUpsert.length
     };
   }
