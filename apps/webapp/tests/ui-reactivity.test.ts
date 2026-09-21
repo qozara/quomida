@@ -68,7 +68,16 @@ describe('Frontend UI Wiring & Reactivity (APP-105 to APP-107)', () => {
     const initialCount = logs.length;
 
     // Simulate adding food item log
-    const ing = (await firstValueFrom(dbService.observeIngredients()))[0];
+    const testIngId = await dbService.saveCustomFood({
+      name: 'Test Log Food',
+      lang: 'es',
+      calories_100g: 100,
+      protein_100g: 10,
+      carbs_100g: 10,
+      fats_100g: 10
+    });
+    
+    const ing = (await firstValueFrom(dbService.observeIngredients())).find(i => i.id === testIngId)!;
     const macros = createMacroSnapshot(calculateItemMacros(ing, 150));
 
     await dbService.logFood({

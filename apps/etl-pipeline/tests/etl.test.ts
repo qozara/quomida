@@ -95,11 +95,9 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
 
     const catalogPath = path.join(publicDir, 'catalog.json');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
-    const seedPath = path.join(publicDir, 'seed_v1.json');
 
     expect(fs.existsSync(catalogPath)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
-    expect(fs.existsSync(seedPath)).toBe(true);
 
     const catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
     const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));

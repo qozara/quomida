@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import sri from 'vite-plugin-sri';
@@ -19,10 +19,20 @@ function getGitCommitHash(): string {
   }
 }
 
-export default defineConfig({
-  plugins: [
-    react(),
-    sri(),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const cspDomain = env.VITE_CATALOG_BASE_URL ? (new URL(env.VITE_CATALOG_BASE_URL).origin) : '';
+
+  return {
+    plugins: [
+      {
+        name: 'csp-injector',
+        transformIndexHtml(html) {
+          return html.replace('__VITE_CSP_CATALOG_DOMAIN__', cspDomain ? ` ${cspDomain}` : '');
+        }
+      },
+      react(),
+      sri(),
     VitePWA({
       registerType: 'autoUpdate',
       useCredentials: true,
@@ -77,4 +87,5 @@ export default defineConfig({
   preview: {
     port: 3000
   }
+  };
 });

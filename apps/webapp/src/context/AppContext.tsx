@@ -67,6 +67,7 @@ interface AppContextType {
   repairSync: () => Promise<void>;
   migrateSync: () => Promise<void>;
   catalogVersion: string | null;
+  catalogGeneratedAt: string | null;
   isHydratingCatalog: boolean;
   refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
 }
@@ -108,6 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
   const [isHydratingCatalog, setIsHydratingCatalog] = useState(false);
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
+  const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
   const syncLock = React.useRef(false);
 
   const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
@@ -116,6 +118,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await hydrationService.hydrate(options);
       if (res.version) {
         setCatalogVersion(res.version);
+      }
+      if (res.generatedAt) {
+        setCatalogGeneratedAt(res.generatedAt);
       }
       return res;
     } finally {
@@ -264,6 +269,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Background asynchronous catalog hydration on boot [APP-207]
       dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
         if (v) setCatalogVersion(v);
+      });
+      dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
+        if (v) setCatalogGeneratedAt(v);
       });
       refreshCatalog().catch((err) => {
         console.warn('[CatalogHydration] Background boot hydration notice:', err);
@@ -510,6 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dbVersion: dailyLogsSchema.version,
         clearLocalDatabase: clearDatabase,
         catalogVersion,
+        catalogGeneratedAt,
         isHydratingCatalog,
         refreshCatalog
       }}

@@ -66,10 +66,10 @@ describe('Application Boot Hydration [APP-207]', () => {
     // Verify app renders offline state without crashing
     expect(container.querySelector('[data-testid="online-status"]')?.textContent).toBe('false');
 
-    // Verify initial bundled seeds are available even when offline
+    // Verify no ingredients are available when offline and DB is fresh
     await vi.waitFor(() => {
       const count = Number(container.querySelector('[data-testid="ing-count"]')?.textContent || 0);
-      expect(count).toBeGreaterThan(0);
+      expect(count).toBe(0);
     }, { timeout: 1500 });
   });
 
@@ -93,10 +93,10 @@ describe('Application Boot Hydration [APP-207]', () => {
 
     expect(container.querySelector('[data-testid="online-status"]')?.textContent).toBe('true');
 
-    // Verify initial bundled seeds are available even when catalog is absent (404)
+    // Verify no ingredients are available when catalog is absent (404)
     await vi.waitFor(() => {
       const count = Number(container.querySelector('[data-testid="ing-count"]')?.textContent || 0);
-      expect(count).toBeGreaterThan(0);
+      expect(count).toBe(0);
     }, { timeout: 1500 });
   });
 });

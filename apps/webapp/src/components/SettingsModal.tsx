@@ -17,6 +17,7 @@ export const SettingsModal: React.FC = () => {
     setIsSettingsOpen,
     setIsStorageSettingsOpen,
     catalogVersion,
+    catalogGeneratedAt,
     isHydratingCatalog,
     refreshCatalog,
     t
@@ -251,7 +252,7 @@ export const SettingsModal: React.FC = () => {
               <span>
                 {((t.settings as any).catalogVersion || 'Catalog Version: {{version}}').replace(
                   '{{version}}',
-                  catalogVersion || 'seed_v1'
+                  catalogVersion || 'None'
                 )}
               </span>
             </div>
@@ -282,10 +283,14 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5: App Version */}
-        <div className="pt-2 border-t border-slate-800/80 text-center">
+        {/* Section 5: App Version & Catalog Info */}
+        <div className="pt-2 border-t border-slate-800/80 text-center flex flex-col gap-1">
           <span className="text-xs text-slate-500 font-mono">
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
+          </span>
+          <span className="text-[10px] text-slate-600 font-mono uppercase">
+            Catalog: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
+            {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
           </span>
         </div>
 

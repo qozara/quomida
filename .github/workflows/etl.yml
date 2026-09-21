@@ -1,33 +1,43 @@
-name: ETL Pipeline (Cloudflare Trigger)
-
-# Note: Cloudflare Pages automatically builds on code push.
-# This workflow is ONLY used for manual triggers and scheduled cron jobs
-# to ping the Cloudflare Deploy Hook, forcing a data refresh.
+name: ETL Pipeline
 
 on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'apps/etl-pipeline/**'
+      - 'packages/**'
+      - '.github/workflows/etl.yml'
+  pull_request:
+    paths:
+      - 'apps/etl-pipeline/**'
+      - 'packages/**'
+      - '.github/workflows/etl.yml'
   schedule:
     # Run every 6 months (Jan 1st and Jul 1st at midnight)
     - cron: '0 0 1 1,7 *'
-  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
-  trigger-cloudflare:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Cloudflare Pages Deploy Hook
-        run: |
-          if [ -z "${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}" ]; then
-            echo "Error: CLOUDFLARE_DEPLOY_HOOK_URL secret is not set in GitHub repository settings."
-            echo "Please create a Deploy Hook in Cloudflare Pages and add the URL as a GitHub Action Secret."
-            exit 1
-          fi
-          
-          echo "Triggering Cloudflare Pages build..."
-          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}")
-          
-          if [ "$response" == "200" ]; then
-            echo "Successfully triggered Cloudflare Pages build!"
-          else
-            echo "Failed to trigger build. HTTP Status: $response"
-            exit 1
-          fi
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ETL Pipeline
+        run: npm run etl
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/webapp/public --project-name=quomida-etl --branch=${{ github.head_ref || github.ref_name }}

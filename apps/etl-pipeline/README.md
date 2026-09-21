@@ -90,19 +90,16 @@ Configure the client webapp `.env.production` to point to your provider:
 VITE_CATALOG_BASE_URL=https://data.yourdomain.com
 ```
 
-### 3. Qozara Official Infrastructure (Cloudflare Pages)
-For the official Qozara deployment, we host the ETL data on **Cloudflare Pages** to keep it completely isolated from the Vercel WebApp. This split infrastructure provides free unlimited preview environments for both apps without coupling their build processes.
+### 3. Qozara Official Infrastructure (Cloudflare Pages Direct Upload)
+For the official Qozara deployment, we use **GitHub Actions** to build the ETL pipeline and **Cloudflare Pages** strictly as the CDN. This is known as "Direct Upload" and prevents Cloudflare from needing to run build environments, while giving us full CI/CD control inside GitHub.
 
-**Cloudflare Pages Configuration:**
-- **Build Command**: `npm run etl`
-- **Build Output Directory**: `apps/webapp/public`
-- **Build Watch Paths**: Configured in Cloudflare to only build when files in `apps/etl-pipeline/` change (saving build minutes).
+**GitHub Actions Integration (`.github/workflows/etl.yml`):**
+- Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
+- Uses `cloudflare/wrangler-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
 
-**GitHub Actions Integration:**
-Because Cloudflare automatically builds on pushes and PRs, the GitHub Action (`.github/workflows/etl.yml`) is strictly retained for two purposes:
-1. **Manual Data Refresh**: Clicking "Run Workflow" in GitHub UI.
-2. **Scheduled Refresh**: A cron job that runs every 6 months to pull fresh data.
-The GitHub Action simply sends a POST request to a Cloudflare **Deploy Hook** (configured in GitHub Secrets as `CLOUDFLARE_DEPLOY_HOOK_URL`) to trigger the build on Cloudflare's servers.
+**Required GitHub Secrets:**
+- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with "Cloudflare Pages" edit permissions.
+- `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
 
 ---
 

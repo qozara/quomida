@@ -201,52 +201,22 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     throw customError;
   }
 
-  // Hydrate seed catalog if empty
-  const existingCount = await db.base_ingredients.find().exec();
+  // Hydrate global user settings if empty
   const now = Date.now();
-  if (existingCount.length === 0) {
-    let seedData: any = { base_ingredients: [], portions: [] };
-    if (typeof fetch !== 'undefined') {
-      try {
-        const seedUrl = (import.meta.env.BASE_URL || '/') + 'seed_v1.json';
-        const res = await fetch(seedUrl);
-        if (res.ok) {
-          seedData = await res.json();
-        } else {
-          console.warn('[RxDB] Seed file not found or failed to load. Booting with empty catalog.');
-        }
-      } catch (err) {
-        console.warn('[RxDB] Failed to fetch seed_v1.json:', err);
-      }
-    }
-    
-    const seededIngredients = (seedData.base_ingredients || []).map((ing: any) => ({
-      ...ing,
+  const existingSettings = await db.user_settings.findOne('global_settings').exec();
+  if (!existingSettings) {
+    await db.user_settings.insert({
+      id: 'global_settings',
+      locale: 'es-AR',
+      theme: 'dark',
+      daily_calorie_target: 2000,
+      custom_macros: {
+        protein: 150,
+        carbs: 200,
+        fats: 65
+      },
       updatedAt: now
-    }));
-    const seededPortions = (seedData.portions || []).map((p: any) => ({
-      ...p,
-      updatedAt: now
-    }));
-
-    await db.base_ingredients.bulkInsert(seededIngredients);
-    await db.portions.bulkInsert(seededPortions);
-
-    const existingSettings = await db.user_settings.findOne('global_settings').exec();
-    if (!existingSettings) {
-      await db.user_settings.insert({
-        id: 'global_settings',
-        locale: 'es-AR',
-        theme: 'dark',
-        daily_calorie_target: 2000,
-        custom_macros: {
-          protein: 150,
-          carbs: 200,
-          fats: 65
-        },
-        updatedAt: now
-      });
-    }
+    });
   }
 
   return db;

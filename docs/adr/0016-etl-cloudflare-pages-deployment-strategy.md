@@ -27,17 +27,16 @@ We have decided to split our CDN infrastructure:
 - **Bandwidth**: Serving large, static JSON files via Cloudflare's CDN is highly performant and avoids eating into Vercel's bandwidth limits.
 - **Decoupling**: The WebApp and ETL data build processes remain completely isolated.
 
-**Workflow Integration:**
-- **Pushes & PRs**: Cloudflare Pages automatically listens to GitHub and runs `npm run etl`. We configure Cloudflare's "Build Watch Paths" to only trigger when `apps/etl-pipeline/` changes.
-- **Cron Jobs & Manual Triggers**: We retain a slimmed-down `.github/workflows/etl.yml` GitHub Action. This action does *not* build the pipeline. Instead, it runs on a schedule (every 6 months) or via `workflow_dispatch`, and sends a `curl` request to a **Cloudflare Deploy Hook** to force a data refresh.
+**Workflow Integration (Direct Upload):**
+- **Pull Requests, Pushes to Main, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It is responsible for building the pipeline (`npm run etl`) directly in the GitHub Actions Ubuntu runner.
+- **Deployment**: After a successful build, the Action uses `cloudflare/wrangler-action` to directly upload the generated `apps/webapp/public` folder to Cloudflare's edge network. The Action automatically routes deployments from PRs to Preview environments, and pushes to `main` to the Production environment.
 
 ## Consequences
 
 **Positive:**
-- Developers get 1:1 Preview Environments for ETL changes.
-- Zero Vercel build minutes are wasted on data compilation.
-- The Git history remains perfectly clean (no auto-committing `seed_v1.json` or `catalog.json` payloads to the repository).
+- Complete CI/CD control remains in GitHub Actions.
+- Cloudflare is used strictly as a highly-performant static CDN.
+- Avoids Cloudflare Pages build environment debugging and limits.
 
 **Negative:**
-- Requires managing an additional deployment platform (Cloudflare).
-- Requires configuring a `CLOUDFLARE_DEPLOY_HOOK_URL` secret in GitHub to allow Actions to trigger manual/cron builds.
+- Requires managing Cloudflare API Tokens and Account IDs in GitHub Secrets.
