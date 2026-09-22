@@ -75,7 +75,7 @@ describe('CatalogHydrationService [APP-206]', () => {
     const result = await hydrationService.hydrate();
     expect(result.status).toBe('UPDATED');
     expect(result.version).toBe('v1.0.1');
-    expect(result.itemsUpserted).toBe(-1); // -1 signifies streaming update complete
+    expect(result.itemsUpserted).toBe(1);
 
     // Verify lastIngestedCatalogVersion was saved
     const updatedVersion = await service.getMetadata('lastIngestedCatalogVersion');

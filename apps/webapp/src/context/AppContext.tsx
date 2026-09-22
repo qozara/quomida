@@ -69,6 +69,8 @@ interface AppContextType {
   catalogVersion: string | null;
   catalogGeneratedAt: string | null;
   isHydratingCatalog: boolean;
+  hydrationProgress: { status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number };
+  abortCatalogUpdate: () => void;
   refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
 }
 
@@ -108,25 +110,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
   const [isHydratingCatalog, setIsHydratingCatalog] = useState(false);
+  const [hydrationProgress, setHydrationProgress] = useState<{ status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number }>({ status: 'idle', percentage: 0, loadedBytes: 0, itemsProcessed: 0 });
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
   const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
   const syncLock = React.useRef(false);
+  const hydrationAbortController = React.useRef<AbortController | null>(null);
+
+  const abortCatalogUpdate = useCallback(() => {
+    if (hydrationAbortController.current) {
+      hydrationAbortController.current.abort();
+      hydrationAbortController.current = null;
+    }
+  }, []);
 
   const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
+    if (isHydratingCatalog) {
+      return { status: 'SKIPPED', itemsUpserted: 0, error: 'Update already in progress' };
+    }
     setIsHydratingCatalog(true);
+    setHydrationProgress({ status: 'syncing', percentage: 0, loadedBytes: 0, itemsProcessed: 0 });
+    
+    hydrationAbortController.current = new AbortController();
+    
     try {
-      const res = await hydrationService.hydrate(options);
+      const res = await hydrationService.hydrate({
+        ...options,
+        signal: hydrationAbortController.current.signal,
+        onProgress: (progress) => {
+          setHydrationProgress({
+            status: 'syncing',
+            loadedBytes: progress.loadedBytes,
+            totalBytes: progress.totalBytes,
+            itemsProcessed: progress.itemsProcessed,
+            percentage: progress.totalBytes ? Math.min(100, Math.round((progress.loadedBytes / progress.totalBytes) * 100)) : 0
+          });
+        }
+      });
       if (res.version) {
         setCatalogVersion(res.version);
       }
       if (res.generatedAt) {
         setCatalogGeneratedAt(res.generatedAt);
       }
+      setHydrationProgress(prev => ({ ...prev, status: res.status === 'ERROR' ? 'error' : 'idle' }));
       return res;
+    } catch (e) {
+      setHydrationProgress(prev => ({ ...prev, status: 'error' }));
+      return { status: 'ERROR', itemsUpserted: 0 };
     } finally {
       setIsHydratingCatalog(false);
+      hydrationAbortController.current = null;
     }
-  }, [hydrationService]);
+  }, [hydrationService, isHydratingCatalog]);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -256,8 +291,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pDocs = await rxdb.portions.find().exec();
       setPortions(pDocs.map((d: any) => d.toJSON()));
 
-      // Subscribe to Base Ingredients
-      subIngs = dbService.observeIngredients().subscribe((docs: any[]) => {
+      // Subscribe to Custom Ingredients only (prevent loading millions of system items into memory)
+      subIngs = dbService.getDatabaseInstance()!.base_ingredients.find({ selector: { source: 'custom' } }).$.subscribe((docs: any[]) => {
         setIngredients(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
       });
 
@@ -520,6 +555,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         catalogVersion,
         catalogGeneratedAt,
         isHydratingCatalog,
+        hydrationProgress,
+        abortCatalogUpdate,
         refreshCatalog
       }}
     >

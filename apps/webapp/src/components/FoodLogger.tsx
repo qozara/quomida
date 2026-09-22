@@ -9,18 +9,59 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, t } = useApp();
+  const { ingredients, t, dbService, db } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [filteredIngredients, setFilteredIngredients] = useState<BaseIngredient[]>([]);
 
-  // Search results filter with custom ingredients sorted first
-  const filteredIngredients = searchQuery.trim() === ''
-    ? []
-    : ingredients
-        .filter((ing) => ing.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        .sort((a, b) => (a.source === 'custom' ? -1 : 1));
+  // Search results dynamic filter against RxDB and Custom ingredients
+  React.useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredIngredients([]);
+      return;
+    }
+
+    const query = searchQuery.trim().toLowerCase();
+    let isCancelled = false;
+
+    const performSearch = async () => {
+      // 1. Search local custom ingredients (in-memory)
+      const customMatches = ingredients.filter(ing => 
+        ing.name.toLowerCase().includes(query)
+      );
+
+      let systemMatches: BaseIngredient[] = [];
+      
+      // 2. Search massive system database (dynamic query)
+      if (db) {
+        try {
+          const docs = await db.base_ingredients.find({
+            selector: { 
+              source: 'system',
+              name: { $regex: new RegExp(query, 'i') } 
+            },
+            limit: 20
+          }).exec();
+          
+          if (!isCancelled) {
+            systemMatches = docs.map((d: any) => d.toJSON() as BaseIngredient);
+          }
+        } catch (e) {
+          console.error('Search query failed:', e);
+        }
+      }
+
+      if (!isCancelled) {
+        setFilteredIngredients([...customMatches, ...systemMatches].slice(0, 30));
+      }
+    };
+
+    performSearch();
+
+    return () => { isCancelled = true; };
+  }, [searchQuery, ingredients, db]);
 
   const handleAiParse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +73,25 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     setIsParsing(false);
 
     if (parsed && parsed.items.length > 0) {
-      const match = ingredients.find((ing) =>
-        ing.name.toLowerCase().includes(parsed.items[0].foodQuery.toLowerCase())
-      ) || ingredients[0];
+      const foodQuery = parsed.items[0].foodQuery.toLowerCase();
+      
+      let match = ingredients.find((ing) => ing.name.toLowerCase().includes(foodQuery));
+      
+      if (!match && db) {
+        try {
+          const docs = await db.base_ingredients.find({
+            selector: { name: { $regex: new RegExp(foodQuery, 'i') } },
+            limit: 1
+          }).exec();
+          if (docs.length > 0) match = docs[0].toJSON() as BaseIngredient;
+        } catch (e) {}
+      }
 
       if (match) {
         onSelectIngredient(match, 'meal_lunch');
+        setAiQuery('');
+      } else if (ingredients.length > 0) {
+        onSelectIngredient(ingredients[0], 'meal_lunch');
         setAiQuery('');
       }
     }
