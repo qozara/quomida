@@ -70,16 +70,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download Open Food Facts (OFF)
-        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
-        run: bash apps/etl-pipeline/scripts/download_off.sh
-
-      - name: Download Regional Datasets
-        if: ${{ github.event.inputs.include_regional == 'true' || github.event_name == 'schedule' }}
-        run: bash apps/etl-pipeline/scripts/download_regional_csvs.sh
-
-      - name: Run ETL Pipeline
-        run: npm run etl
+      - name: Run ETL Pipeline (Download & Parse)
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            FLAGS="$FLAGS --with-off"
+          fi
+          if [ "${{ github.event.inputs.include_regional }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            FLAGS="$FLAGS --with-regional"
+          fi
+          npm run etl -- $FLAGS
 
       - name: Prepare for Cloudflare Pages Deployment
         run: |

@@ -215,8 +215,27 @@ const isDirectExecution = process.argv[1] && (
 );
 
 if (isDirectExecution) {
-  runETL().catch((err) => {
-    console.error('[ETL Pipeline] Fatal error:', err);
+  import('child_process').then(({ execSync }) => {
+    const currentFile = fileURLToPath(import.meta.url);
+    const currentDir = path.dirname(currentFile);
+    const scriptDir = path.resolve(currentDir, '../scripts');
+
+    if (process.argv.includes('--with-regional')) {
+      console.log('[ETL Pipeline CLI] --with-regional flag detected. Running regional download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_regional_csvs.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-off')) {
+      console.log('[ETL Pipeline CLI] --with-off flag detected. Running Open Food Facts download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_off.sh')}"`, { stdio: 'inherit' });
+    }
+
+    runETL().catch((err) => {
+      console.error('[ETL Pipeline] Fatal error:', err);
+      process.exit(1);
+    });
+  }).catch(err => {
+    console.error('[ETL Pipeline] Fatal error importing child_process:', err);
     process.exit(1);
   });
 }
