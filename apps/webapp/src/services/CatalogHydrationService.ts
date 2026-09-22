@@ -81,7 +81,7 @@ export class CatalogHydrationService {
     }
 
     // 3. Fetch stream with auto-resume support
-    const catalogUrl = `${baseUrl}/catalog.ndjson${options?.force ? `?t=${Date.now()}` : ''}`;
+    const catalogUrl = `${baseUrl}/catalog.json${options?.force ? `?t=${Date.now()}` : ''}`;
     
     let itemsProcessed = 0;
     let itemsUpsertedCount = 0;

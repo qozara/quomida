@@ -5,7 +5,7 @@
 
 ## Context and Problem Statement
 
-Following the initial release of the decoupled catalog hydration (ADR 0015), Quomida began integrating the massive Open Food Facts (OFF) database, causing the `catalog.ndjson` file to swell from kilobytes to over 50MB (millions of rows).
+Following the initial release of the decoupled catalog hydration (ADR 0015), Quomida began integrating the massive Open Food Facts (OFF) database, causing the `catalog.json` file to swell from kilobytes to over 50MB (millions of rows).
 
 The original client-side delta diffing strategy pulled the entire `source: 'system'` RxDB collection into memory to compare against the incoming stream. As the database grew, this caused:
 1. **Out-of-Memory (OOM) Crashes:** Mobile Safari and lower-end Android devices crashed when attempting to hold hundreds of thousands of RxDB documents in RAM simultaneously.
@@ -18,7 +18,7 @@ The original client-side delta diffing strategy pulled the entire `source: 'syst
 We have overhauled the Catalog Hydration Service and the UI search patterns to implement a **Resumable, Memory-Safe Streaming Architecture**:
 
 1. **CDN-Level Compression with Uncompressed Fallback (Brotli/GZIP)**:
-   - The ETL pipeline outputs standard uncompressed `catalog.ndjson`.
+   - The ETL pipeline outputs standard uncompressed `catalog.json`.
    - We rely exclusively on Cloudflare/GitHub Pages edge nodes to apply `Content-Encoding: br` (Brotli) or `gzip` natively on the wire.
    - The browser automatically decompresses it, reducing the 50MB payload to ~5MB for the initial download.
 

@@ -82,7 +82,7 @@ export function resolveIngredients(items: RawIngredientItem[]): RawIngredientIte
 
 /**
  * Reads NDJSON files sequentially, resolves conflicts in-memory,
- * and outputs a deduped `catalog.ndjson`.
+ * and outputs a deduped `catalog.json`.
  */
 export async function resolveAndExportNDJSON(
   inputFiles: string[],

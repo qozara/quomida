@@ -49,5 +49,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .vercel
-apps/webapp/public/catalog.ndjson
+apps/webapp/public/catalog.json
 apps/etl-pipeline/data/temp/
+apps/webapp/public/catalog.ndjson

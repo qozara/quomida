@@ -21,8 +21,8 @@ We have implemented a **Decoupled Catalog Hydration Architecture** using a **Two
 1. **Two-File Distribution Strategy**:
    - The ETL pipeline (`apps/etl-pipeline`) outputs two separate assets:
      - `catalog_meta.json`: A lightweight manifest (~50 bytes) containing `{ "catalogVersion": "...", "generatedAt": "..." }`.
-     - `catalog.ndjson`: The complete, versioned payload containing all validated food items.
-   - The client `CatalogHydrationService` always checks `catalog_meta.json` first (with cache-busting). It **only** downloads the larger `catalog.ndjson` if the remote version differs from the version stored in the local `system_metadata` RxDB collection.
+     - `catalog.json`: The complete, versioned payload containing all validated food items.
+   - The client `CatalogHydrationService` always checks `catalog_meta.json` first (with cache-busting). It **only** downloads the larger `catalog.json` if the remote version differs from the version stored in the local `system_metadata` RxDB collection.
 
 2. **Client-Side In-Memory Delta Upsert**:
    - When a new catalog is downloaded, `CatalogHydrationService` queries RxDB for existing items with `source: 'system'` only.
@@ -51,4 +51,4 @@ We have implemented a **Decoupled Catalog Hydration Architecture** using a **Two
   - **Infrastructure Portability**: Can switch static hosting providers simply by updating `VITE_CATALOG_BASE_URL`.
   - **Offline Resilience**: Web application functions completely offline using existing RxDB records or initial bundled seeds.
 - **Cons**:
-  - Requires maintaining two files (`catalog_meta.json` and `catalog.ndjson`) in the ETL pipeline output.
+  - Requires maintaining two files (`catalog_meta.json` and `catalog.json`) in the ETL pipeline output.

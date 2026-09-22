@@ -192,7 +192,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     if (!fs.existsSync(publicDir)) {
       fs.mkdirSync(publicDir, { recursive: true });
     }
-    const catalogPath = path.join(publicDir, 'catalog.ndjson');
+    const catalogPath = path.join(publicDir, 'catalog.json');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
     
     await resolveAndExportNDJSON(intermediateFiles, catalogPath, metaPath);

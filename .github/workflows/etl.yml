@@ -37,7 +37,7 @@ jobs:
 
       - name: Prepare for Cloudflare Pages Deployment
         run: |
-          # Remove catalog.ndjson from .gitignore so Wrangler includes it in the upload
+          # Remove catalog.json from .gitignore so Wrangler includes it in the upload
           sed -i '/catalog\.ndjson/d' .gitignore || true
           rm -f apps/webapp/public/.gitignore || true
 

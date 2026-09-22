@@ -68,7 +68,7 @@ describe('CatalogHydrationService [APP-206]', () => {
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
-      if (String(url).includes('catalog.ndjson')) return new Response(catalogNdjson, { status: 200 });
+      if (String(url).includes('catalog.json')) return new Response(catalogNdjson, { status: 200 });
       return new Response('{}', { status: 200 });
     });
 
@@ -115,7 +115,7 @@ describe('CatalogHydrationService [APP-206]', () => {
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
-      if (String(url).includes('catalog.ndjson')) return new Response(catalogNdjson, { status: 200 });
+      if (String(url).includes('catalog.json')) return new Response(catalogNdjson, { status: 200 });
       return new Response('{}', { status: 200 });
     });
 
