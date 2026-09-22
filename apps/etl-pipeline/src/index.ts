@@ -86,7 +86,7 @@ function findDataFile(dirPath: string, extension: string): string | null {
   return path.join(dirPath, match);
 }
 
-const STAGES = ['INIT', 'SYSTEM', 'ARGENFOODS', 'SARA2', 'TBCA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
+const STAGES = ['INIT', 'SYSTEM', 'ARGENFOODS', 'SARA2', 'TBCA', 'USDA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
 
 function hasCompleted(currentStage: string, targetStage: string): boolean {
   return STAGES.indexOf(currentStage) > STAGES.indexOf(targetStage);
@@ -169,11 +169,24 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
       const count = await parseTbcaCSV(tbcaCsv, tbcaOut);
       console.log(`[ETL Pipeline] Loaded ${count} items from TBCA`);
     }
+    tracker.updateStage('USDA');
+    state = tracker.getState();
+  }
+
+  // 5. USDA
+  const usdaOut = addIntermediate('usda');
+  if (!hasCompleted(state.stage, 'USDA')) {
+    console.log(`\n[ETL Pipeline] --- Processing USDA ---`);
+    const usdaCsv = findDataFile(path.join(dataRawDir, 'usda'), '.csv');
+    if (usdaCsv) {
+      const count = await parseUsdaCSV(usdaCsv, usdaOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from USDA`);
+    }
     tracker.updateStage('OPENFOODFACTS');
     state = tracker.getState();
   }
 
-  // 5. Open Food Facts
+  // 6. Open Food Facts
   const offOut = addIntermediate('openfoodfacts');
   if (!hasCompleted(state.stage, 'OPENFOODFACTS')) {
     console.log(`\n[ETL Pipeline] --- Processing Open Food Facts ---`);
@@ -223,6 +236,11 @@ if (isDirectExecution) {
     if (process.argv.includes('--with-regional')) {
       console.log('[ETL Pipeline CLI] --with-regional flag detected. Running regional download script...');
       execSync(`bash "${path.join(scriptDir, 'download_regional_csvs.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-usda')) {
+      console.log('[ETL Pipeline CLI] --with-usda flag detected. Running USDA download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_usda.sh')}"`, { stdio: 'inherit' });
     }
 
     if (process.argv.includes('--with-off')) {

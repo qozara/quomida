@@ -27,6 +27,11 @@ on:
         required: true
         type: boolean
         default: true
+      include_usda:
+        description: 'Download & process USDA FoodData Central CSV'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   build-and-deploy:
@@ -78,6 +83,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.include_regional }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-regional"
+          fi
+          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            FLAGS="$FLAGS --with-usda"
           fi
           npm run etl -- $FLAGS
 
