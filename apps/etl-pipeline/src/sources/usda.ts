@@ -5,6 +5,9 @@ import type { RawIngredientItem } from '../types.js';
 
 export async function parseUsdaCSV(csvPath: string, outNdjsonPath: string): Promise<number> {
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(csvPath)) {
+      return resolve(0);
+    }
     let count = 0;
     const writeStream = fs.createWriteStream(outNdjsonPath, { flags: 'w' });
     const parser = createReadStream(csvPath).pipe(
@@ -41,8 +44,9 @@ export async function parseUsdaCSV(csvPath: string, outNdjsonPath: string): Prom
     });
 
     parser.on('end', () => {
-      writeStream.end();
-      resolve(count);
+      writeStream.end(() => {
+        resolve(count);
+      });
     });
   });
 }

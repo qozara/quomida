@@ -120,12 +120,12 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
 
   it('ingests raw files from dataRawDir and resolves them properly', async () => {
     const rawDir = path.join(tempDir, 'raw');
-    const argenDir = path.join(rawDir, 'argenfoods');
-    fs.mkdirSync(argenDir, { recursive: true });
+    const usdaDir = path.join(rawDir, 'usda');
+    fs.mkdirSync(usdaDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(argenDir, 'argenfoods.csv'),
-      'codigo,alimento,energia_kcal,proteina,carbohidratos,lipidos\n9999,Alimento Test,100,5,10,2\n',
+      path.join(usdaDir, 'usda.csv'),
+      'fdc_id,description,energy,protein,carbohydrate,lipid\n9999,Alimento Test,100,5,10,2\n',
       'utf-8'
     );
 

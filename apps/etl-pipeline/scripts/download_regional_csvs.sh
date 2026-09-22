@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAW_DIR="${SCRIPT_DIR}/../data/raw"
 
 echo "==> Preparing regional dataset directories..."
-mkdir -p "${RAW_DIR}/argenfoods"
 mkdir -p "${RAW_DIR}/sara2"
 mkdir -p "${RAW_DIR}/tbca"
 
@@ -16,11 +15,10 @@ mkdir -p "${RAW_DIR}/tbca"
 # you can simply delete this script and remove it from the GitHub Actions workflow.
 # ---------------------------------------------------------
 
-ARGENFOODS_URL="YOUR_ARGENFOODS_CSV_URL_HERE"
-SARA2_URL="YOUR_SARA2_CSV_URL_HERE"
-TBCA_URL="YOUR_TBCA_CSV_URL_HERE"
+SARA2_URL="YOUR_SARA2_URL_HERE"
+TBCA_URL="YOUR_TBCA_URL_HERE"
 
-download_csv() {
+download_dataset() {
   local url=$1
   local dest=$2
   local name=$3
@@ -42,8 +40,7 @@ download_csv() {
   }
 }
 
-download_csv "${ARGENFOODS_URL}" "${RAW_DIR}/argenfoods/argenfoods.csv" "ARGENFOODS"
-download_csv "${SARA2_URL}" "${RAW_DIR}/sara2/sara2.csv" "SARA 2"
-download_csv "${TBCA_URL}" "${RAW_DIR}/tbca/tbca.csv" "TBCA"
+download_dataset "${SARA2_URL}" "${RAW_DIR}/sara2/sara2.csv" "SARA2"
+download_dataset "${TBCA_URL}" "${RAW_DIR}/tbca/tbca.csv" "TBCA"
 
 echo "==> Regional datasets step complete!"

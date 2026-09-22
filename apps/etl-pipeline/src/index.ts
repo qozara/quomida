@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
 import { resolveAndExportNDJSON } from './resolver.js';
-import { parseArgenfoodsCSV } from './sources/argenfoods.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
 import { parseUsdaCSV } from './sources/usda.js';
@@ -14,7 +13,6 @@ import { StateTracker } from './utils/StateTracker.js';
 export * from './types.js';
 export * from './resolver.js';
 export * from './utils/parserUtils.js';
-export * from './sources/argenfoods.js';
 export * from './sources/sara2.js';
 export * from './sources/tbca.js';
 export * from './sources/usda.js';
@@ -38,12 +36,8 @@ export interface CatalogMetaPayload {
 }
 
 export const seedIngredients: BaseIngredient[] = [
-  // Local cuts & preparations (ARGENFOODS / LATINFOODS)
-  { id: 'ing-vacambre', name: 'Vacío vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 175, protein_100g: 20.5, carbs_100g: 0, fats_100g: 10.5 },
-  { id: 'ing-asado-tira', name: 'Asado de tira (crudo)', source: 'system', lang: 'es', calories_100g: 250, protein_100g: 18.0, carbs_100g: 0, fats_100g: 19.5 },
-  { id: 'ing-peceto', name: 'Peceto vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 120, protein_100g: 22.0, carbs_100g: 0, fats_100g: 3.5 },
-  { id: 'ing-matambre', name: 'Matambre vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 210, protein_100g: 19.0, carbs_100g: 0, fats_100g: 14.8 },
-  { id: 'ing-entranha', name: 'Entraña vacuna (cruda)', source: 'system', lang: 'es', calories_100g: 190, protein_100g: 21.0, carbs_100g: 0, fats_100g: 11.5 },
+  // Base Regional Dishes
+  { id: 'ing-vacambre', name: 'Matambre de Vaca', source: 'system', lang: 'es', calories_100g: 220, protein_100g: 21.0, carbs_100g: 0, fats_100g: 15.0 },
   { id: 'ing-milanesa-carne', name: 'Milanesa de carne vacuna (al horno)', source: 'system', lang: 'es', calories_100g: 215, protein_100g: 23.5, carbs_100g: 12.0, fats_100g: 8.0 },
   { id: 'ing-empanada-carne', name: 'Empanada de carne (al horno)', source: 'system', lang: 'es', calories_100g: 260, protein_100g: 11.0, carbs_100g: 24.0, fats_100g: 13.5 },
   { id: 'ing-palta', name: 'Palta / Aguacate', source: 'system', lang: 'es', calories_100g: 160, protein_100g: 2.0, carbs_100g: 8.5, fats_100g: 14.7 },
@@ -90,7 +84,7 @@ function findDataFile(dirPath: string, extension: string): string | null {
   return path.join(dirPath, match);
 }
 
-const STAGES = ['INIT', 'SYSTEM', 'ARGENFOODS', 'SARA2', 'TBCA', 'USDA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
+const STAGES = ['INIT', 'SYSTEM', 'SARA2', 'TBCA', 'USDA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
 
 function hasCompleted(currentStage: string, targetStage: string): boolean {
   return STAGES.indexOf(currentStage) > STAGES.indexOf(targetStage);
@@ -132,26 +126,13 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
       originSource: 'SYSTEM'
     }));
     fs.writeFileSync(systemOut, systemItems.map(i => JSON.stringify(i)).join('\n') + '\n');
-    tracker.updateStage('ARGENFOODS');
+    tracker.updateStage('SARA2');
     state = tracker.getState();
   } else {
     console.log('[ETL Pipeline] Skipped SYSTEM (already processed)');
   }
 
-  // 2. ARGENFOODS
-  const argenOut = addIntermediate('argenfoods');
-  if (!hasCompleted(state.stage, 'ARGENFOODS')) {
-    console.log(`\n[ETL Pipeline] --- Processing ARGENFOODS ---`);
-    const argenCsv = findDataFile(path.join(dataRawDir, 'argenfoods'), '.csv');
-    if (argenCsv) {
-      const count = await parseArgenfoodsCSV(argenCsv, argenOut);
-      console.log(`[ETL Pipeline] Loaded ${count} items from ARGENFOODS`);
-    }
-    tracker.updateStage('SARA2');
-    state = tracker.getState();
-  }
-
-  // 3. SARA 2
+  // 2. SARA 2
   const saraOut = addIntermediate('sara2');
   if (!hasCompleted(state.stage, 'SARA2')) {
     console.log(`\n[ETL Pipeline] --- Processing SARA 2 ---`);

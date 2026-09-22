@@ -3,19 +3,7 @@ import { resolveIngredients } from '../src/resolver.js';
 import type { RawIngredientItem } from '../src/types.js';
 
 describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
-  it('enforces source hierarchy: SYSTEM > ARGENFOODS > SARA2 > TBCA > OPENFOODFACTS', () => {
-    const argenItem: RawIngredientItem = {
-      id: 'ing-argen-1234567890',
-      name: 'Asado vacuno',
-      source: 'system',
-      lang: 'es-AR',
-      calories_100g: 250,
-      protein_100g: 18,
-      carbs_100g: 0,
-      fats_100g: 20,
-      originSource: 'ARGENFOODS'
-    };
-
+  it('enforces source hierarchy: SYSTEM > SARA2 > TBCA > USDA > OPENFOODFACTS', () => {
     const saraItem: RawIngredientItem = {
       id: 'ing-sara-0987654321',
       name: 'Asado Vacuno',
@@ -26,6 +14,18 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
       carbs_100g: 0,
       fats_100g: 18,
       originSource: 'SARA2'
+    };
+
+    const usdaItem: RawIngredientItem = {
+      id: 'ing-usda-1234567890',
+      name: 'Asado vacuno',
+      source: 'system',
+      lang: 'en',
+      calories_100g: 250,
+      protein_100g: 18,
+      carbs_100g: 0,
+      fats_100g: 20,
+      originSource: 'USDA'
     };
 
     const tbcaItem: RawIngredientItem = {
@@ -41,15 +41,15 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
     };
 
     // Feeding in reverse priority order
-    const resolved = resolveIngredients([tbcaItem, saraItem, argenItem]);
+    const resolved = resolveIngredients([usdaItem, tbcaItem, saraItem]);
 
     expect(resolved.length).toBe(1);
-    expect(resolved[0].id).toBe(argenItem.id);
-    expect(resolved[0].originSource).toBe('ARGENFOODS');
-    expect(resolved[0].calories_100g).toBe(250);
+    expect(resolved[0].id).toBe(saraItem.id);
+    expect(resolved[0].originSource).toBe('SARA2');
+    expect(resolved[0].calories_100g).toBe(240);
   });
 
-  it('preserves SYSTEM items above ARGENFOODS', () => {
+  it('preserves SYSTEM items above SARA2', () => {
     const systemItem: RawIngredientItem = {
       id: 'ing-apple',
       name: 'Manzana roja',
@@ -62,8 +62,8 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
       originSource: 'SYSTEM'
     };
 
-    const argenItem: RawIngredientItem = {
-      id: 'ing-argen-manzana',
+    const saraItem: RawIngredientItem = {
+      id: 'ing-sara-manzana',
       name: 'Manzana Roja',
       source: 'system',
       lang: 'es-AR',
@@ -71,10 +71,10 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
       protein_100g: 0.4,
       carbs_100g: 14,
       fats_100g: 0.2,
-      originSource: 'ARGENFOODS'
+      originSource: 'SARA2'
     };
 
-    const resolved = resolveIngredients([argenItem, systemItem]);
+    const resolved = resolveIngredients([saraItem, systemItem]);
     expect(resolved.length).toBe(1);
     expect(resolved[0].id).toBe('ing-apple');
     expect(resolved[0].originSource).toBe('SYSTEM');
@@ -108,7 +108,7 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
     };
 
     const genericDulceDeLeche: RawIngredientItem = {
-      id: 'ing-argen-ddl',
+      id: 'ing-sara-ddl',
       name: 'Dulce de Leche',
       source: 'system',
       lang: 'es-AR',
@@ -116,7 +116,7 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
       protein_100g: 6.8,
       carbs_100g: 54.5,
       fats_100g: 6.2,
-      originSource: 'ARGENFOODS'
+      originSource: 'SARA2'
     };
 
     const resolved = resolveIngredients([genericDulceDeLeche, offProduct1, offProduct2]);
@@ -124,7 +124,7 @@ describe('ETL Ingredient Resolver [ETL-RESOLVER]', () => {
     // All 3 should be kept: the generic one and the 2 distinct barcodes
     expect(resolved.length).toBe(3);
     const ids = resolved.map(r => r.id);
-    expect(ids).toContain('ing-argen-ddl');
+    expect(ids).toContain('ing-sara-ddl');
     expect(ids).toContain('ing-off-7791234567890');
     expect(ids).toContain('ing-off-7799999999999');
   });

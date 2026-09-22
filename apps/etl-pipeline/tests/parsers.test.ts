@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { parseArgenfoodsCSV } from '../src/sources/argenfoods.js';
+import { parseUsdaCSV } from '../src/sources/usda.js';
 import { parseSara2CSV } from '../src/sources/sara2.js';
 import { parseTbcaCSV } from '../src/sources/tbca.js';
 import { parseOpenFoodFactsJSONL } from '../src/sources/openfoodfacts.js';
@@ -27,38 +27,38 @@ describe('ETL Source Parsers [ETL-PARSERS]', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  describe('ARGENFOODS Parser', () => {
+  describe('USDA Parser', () => {
     it('returns empty array if file does not exist', async () => {
       const outPath = path.join(tempDir, 'out.ndjson');
-      const count = await parseArgenfoodsCSV(path.join(tempDir, 'nonexistent.csv'), outPath);
+      const count = await parseUsdaCSV(path.join(tempDir, 'nonexistent.csv'), outPath);
       expect(count).toBe(0);
       expect(readNdjson(outPath)).toEqual([]);
     });
 
-    it('parses ARGENFOODS CSV data correctly and sets lang to es-AR', async () => {
-      const csvPath = path.join(tempDir, 'argenfoods.csv');
+    it('parses USDA CSV data correctly', async () => {
+      const csvPath = path.join(tempDir, 'usda.csv');
       const outPath = path.join(tempDir, 'out.ndjson');
-      const csvContent = `codigo,alimento,energia_kcal,proteina,carbohidratos,lipidos
-0101,Asado vacuno crudo,250.5,18.2,0,19.8
-0102,Manzana roja,52,0.3,13.8,0.2
+      const csvContent = `fdc_id,description,energy,protein,carbohydrate,lipid
+1001,Butter,717,0.85,0.06,81.1
+1002,Cheese,402,25.18,1.28,33.14
 `;
       fs.writeFileSync(csvPath, csvContent, 'utf-8');
 
-      const count = await parseArgenfoodsCSV(csvPath, outPath);
+      const count = await parseUsdaCSV(csvPath, outPath);
       expect(count).toBe(2);
 
       const items = readNdjson(outPath);
       expect(items.length).toBe(2);
 
-      const asado = items[0];
-      expect(asado.name).toBe('Asado vacuno crudo');
-      expect(asado.lang).toBe('es-AR');
-      expect(asado.calories_100g).toBe(250.5);
-      expect(asado.protein_100g).toBe(18.2);
-      expect(asado.carbs_100g).toBe(0);
-      expect(asado.fats_100g).toBe(19.8);
-      expect(asado.originSource).toBe('ARGENFOODS');
-      expect(asado.id.startsWith('ing-argen-')).toBe(true);
+      const butter = items[0];
+      expect(butter.name).toBe('Butter');
+      expect(butter.lang).toBe('en');
+      expect(butter.calories_100g).toBe(717);
+      expect(butter.protein_100g).toBe(0.85);
+      expect(butter.carbs_100g).toBe(0.06);
+      expect(butter.fats_100g).toBe(81.1);
+      expect(butter.originSource).toBe('USDA');
+      expect(butter.id.startsWith('usda-1001')).toBe(true);
     });
   });
 

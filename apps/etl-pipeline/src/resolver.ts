@@ -8,11 +8,10 @@ import type { BaseIngredient } from '@quomida/domain-core';
 
 export const SOURCE_PRIORITY: Record<DataSourceOrigin, number> = {
   SYSTEM: 1,
-  ARGENFOODS: 2,
-  SARA2: 3,
-  TBCA: 4,
-  USDA: 5,
-  OPENFOODFACTS: 6
+  SARA2: 2,
+  TBCA: 3,
+  USDA: 4,
+  OPENFOODFACTS: 5
 };
 
 export function sanitizeIngredient(raw: any): BaseIngredient {
