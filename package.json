@@ -20,7 +20,7 @@
     "test:web:e2e": "npm run test:e2e --workspace=@quomida/webapp",
     "test:all:non-interactive": "vitest run && npm run test:web:e2e",
     "cli": "npm run start --workspace=@quomida/cli",
-    "etl": "npm run build --workspace=@quomida/etl-pipeline && npm run start --workspace=@quomida/etl-pipeline"
+    "etl": "npm run build --workspace=@quomida/etl-pipeline && npx tsx apps/etl-pipeline/src/index.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
