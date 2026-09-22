@@ -95,23 +95,24 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     const emptyRawDir = path.join(tempDir, 'empty_raw');
     fs.mkdirSync(emptyRawDir, { recursive: true });
     
-    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir });
+    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, reset: true });
 
-    const catalogPath = path.join(publicDir, 'catalog.json');
+    const catalogPath = path.join(publicDir, 'catalog.ndjson');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
 
     expect(fs.existsSync(catalogPath)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
 
-    const catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
+    const items = catalogDataRaw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
     const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
 
-    expect(catalogData.catalogVersion).toBeDefined();
-    expect(metaData.catalogVersion).toBe(catalogData.catalogVersion);
-    expect(Array.isArray(catalogData.items)).toBe(true);
-    expect(catalogData.items.length).toBeGreaterThan(0);
+    expect(metaData.catalogVersion).toBeDefined();
+    expect(metaData.generatedAt).toBeDefined();
+    expect(Array.isArray(items)).toBe(true);
+    expect(items.length).toBeGreaterThan(0);
 
-    const firstItem = catalogData.items[0];
+    const firstItem = items[0];
     expect(firstItem.id).toBeDefined();
     expect(firstItem.contentHash).toBeDefined();
     expect(firstItem.source).toBe('system');
@@ -128,12 +129,16 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
       'utf-8'
     );
 
-    await runETL({ publicDir, assetsDir, dataRawDir: rawDir });
+    await runETL({ publicDir, assetsDir, dataRawDir: rawDir, reset: true });
 
-    const catalogPath = path.join(publicDir, 'catalog.json');
-    const catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
-
-    const testItem = catalogData.items.find((i: any) => i.name === 'Alimento Test');
+    const catalogPath = path.join(publicDir, 'catalog.ndjson');
+    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
+    const items = catalogDataRaw
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => JSON.parse(line));
+    
+    const testItem = items.find((i: any) => i.name === 'Alimento Test');
     expect(testItem).toBeDefined();
     expect(testItem.calories_100g).toBe(100);
     expect(testItem.source).toBe('system');

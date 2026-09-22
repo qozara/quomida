@@ -1,18 +1,15 @@
 import fs from 'fs';
 import zlib from 'zlib';
 import ndjson from 'ndjson';
+import { Transform } from 'stream';
 import { parseFloatSafe } from '../utils/parserUtils.js';
-import type { RawIngredientItem } from '../types.js';
+import type { StateTracker } from '../utils/StateTracker.js';
 
-/**
- * A mapping of supported Open Food Facts country tags (lowercase) to their target language codes.
- * To gradually include more countries, simply add them to this map.
- */
 export const ALLOWED_COUNTRIES: Record<string, string> = {
   // Latin America
   'argentina': 'es-AR',
   'brazil': 'pt-BR',
-  'brasil': 'pt-BR', // Alternative spelling
+  'brasil': 'pt-BR',
   'uruguay': 'es-UY',
   'chile': 'es-CL',
   'paraguay': 'es-PY',
@@ -24,43 +21,76 @@ export const ALLOWED_COUNTRIES: Record<string, string> = {
   
   // Europe
   'spain': 'es-ES',
-  'espana': 'es-ES', // Tag variation
+  'espana': 'es-ES',
   'france': 'fr-FR',
   'uk': 'en-GB',
-  'united kingdom': 'en-GB', // Tag variation
-  'united-kingdom': 'en-GB', // Hyphenated tag
+  'united kingdom': 'en-GB',
+  'united-kingdom': 'en-GB',
   'germany': 'de-DE',
   'italy': 'it-IT',
   
   // North America
   'usa': 'en-US',
-  'united states': 'en-US', // Tag variation
-  'united-states': 'en-US', // Hyphenated tag
+  'united states': 'en-US',
+  'united-states': 'en-US',
 };
 
 /**
  * Streams an Open Food Facts JSONL dump (compressed as .gz).
- * Filters items whose countries_tags contain any of the ALLOWED_COUNTRIES.
- * Maps barcode / code directly into a unique identifier.
+ * Tracks bytes read and skips lines based on state for resumability.
  */
-export async function parseOpenFoodFactsJSONL(filePath: string): Promise<RawIngredientItem[]> {
+export async function parseOpenFoodFactsJSONL(
+  filePath: string,
+  outPath: string,
+  stateTracker: StateTracker
+): Promise<number> {
   if (!fs.existsSync(filePath)) {
-    return [];
+    return 0;
   }
 
-  const results: RawIngredientItem[] = [];
+  const fileStats = fs.statSync(filePath);
+  const totalBytes = fileStats.size;
+
+  const state = stateTracker.getState();
+  let linesProcessed = state.processedLines['OPENFOODFACTS'] || 0;
+  let linesSkipped = 0;
   
-  // Directly stream the compressed .gz file to save ~15GB of disk space
+  const outStream = fs.createWriteStream(outPath, { flags: linesProcessed > 0 ? 'a' : 'w' });
+
+  let bytesRead = 0;
+  const progressStream = new Transform({
+    transform(chunk, encoding, callback) {
+      bytesRead += chunk.length;
+      callback(null, chunk);
+    }
+  });
+
+  // Log progress periodically
+  const logInterval = setInterval(() => {
+    const percentage = ((bytesRead / totalBytes) * 100).toFixed(2);
+    const mbRead = (bytesRead / (1024 * 1024)).toFixed(1);
+    const mbTotal = (totalBytes / (1024 * 1024)).toFixed(1);
+    console.log(`[ETL Pipeline] [OPENFOODFACTS] ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Processed: ${linesProcessed} lines`);
+    stateTracker.updateMetrics('OPENFOODFACTS', { lines: linesProcessed, bytes: bytesRead });
+  }, 5000);
+
   const stream = fs.createReadStream(filePath)
+    .pipe(progressStream)
     .pipe(zlib.createGunzip())
     .pipe(ndjson.parse());
 
   for await (const product of stream) {
+    if (linesSkipped < linesProcessed) {
+      linesSkipped++;
+      continue;
+    }
+
+    linesProcessed++;
+
     if (!product || typeof product !== 'object') {
       continue;
     }
 
-    // Filter by country tags
     const countries: string[] = Array.isArray(product.countries_tags)
       ? product.countries_tags.map((c: unknown) => String(c).toLowerCase())
       : typeof product.countries === 'string'
@@ -69,9 +99,7 @@ export async function parseOpenFoodFactsJSONL(filePath: string): Promise<RawIngr
 
     let matchedLang: string | null = null;
     
-    // Check if the product has a tag that matches our ALLOWED_COUNTRIES mapping
     for (const tag of countries) {
-      // Tags often look like 'en:argentina' or just 'argentina'
       const cleanTag = tag.replace(/^[^:]+:/, '').trim();
       if (ALLOWED_COUNTRIES[cleanTag]) {
         matchedLang = ALLOWED_COUNTRIES[cleanTag];
@@ -106,7 +134,7 @@ export async function parseOpenFoodFactsJSONL(filePath: string): Promise<RawIngr
 
     const id = `ing-off-${code}`;
 
-    results.push({
+    const item = {
       id,
       name: rawName.trim(),
       source: 'system',
@@ -118,8 +146,15 @@ export async function parseOpenFoodFactsJSONL(filePath: string): Promise<RawIngr
       originSource: 'OPENFOODFACTS',
       barcode: code,
       originalId: code
-    });
+    };
+
+    outStream.write(JSON.stringify(item) + '\n');
   }
 
-  return results;
+  clearInterval(logInterval);
+  stateTracker.updateMetrics('OPENFOODFACTS', { lines: linesProcessed, bytes: bytesRead });
+  
+  return new Promise((resolve) => {
+    outStream.end(() => resolve(linesProcessed));
+  });
 }

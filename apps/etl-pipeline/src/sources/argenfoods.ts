@@ -1,18 +1,19 @@
 import fs from 'fs';
 import { parse } from 'csv-parse';
 import { parseFloatSafe, generateDeterministicId } from '../utils/parserUtils.js';
-import type { RawIngredientItem } from '../types.js';
 
 /**
- * Parses ARGENFOODS nutritional composition dataset in CSV format.
- * Maps values directly to macros and standardizes lang to 'es-AR'.
+ * Parses ARGENFOODS nutritional composition dataset in CSV format
+ * and writes the extracted items as an NDJSON stream to outPath.
  */
-export async function parseArgenfoodsCSV(filePath: string): Promise<RawIngredientItem[]> {
+export async function parseArgenfoodsCSV(filePath: string, outPath: string): Promise<number> {
   if (!fs.existsSync(filePath)) {
-    return [];
+    return 0;
   }
 
-  const results: RawIngredientItem[] = [];
+  let count = 0;
+  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
+  
   const parser = fs.createReadStream(filePath).pipe(
     parse({
       columns: (header: string[]) => header.map((h: string) => h.trim().toLowerCase()),
@@ -33,7 +34,7 @@ export async function parseArgenfoodsCSV(filePath: string): Promise<RawIngredien
 
     const id = generateDeterministicId('argen', code || name);
 
-    results.push({
+    const item = {
       id,
       name: name.trim(),
       source: 'system',
@@ -44,8 +45,13 @@ export async function parseArgenfoodsCSV(filePath: string): Promise<RawIngredien
       fats_100g: fats,
       originSource: 'ARGENFOODS',
       originalId: code ? String(code).trim() : undefined
-    });
+    };
+
+    outStream.write(JSON.stringify(item) + '\n');
+    count++;
   }
 
-  return results;
+  return new Promise((resolve) => {
+    outStream.end(() => resolve(count));
+  });
 }

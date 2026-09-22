@@ -1,19 +1,19 @@
 import fs from 'fs';
 import { parse } from 'csv-parse';
 import { parseFloatSafe, generateDeterministicId } from '../utils/parserUtils.js';
-import type { RawIngredientItem } from '../types.js';
 
 /**
- * Parses SARA 2 (Sistema de Análisis y Registro de Alimentos) dataset in CSV format.
- * Maps CHO_disponibles to carbs_100g and defaults missing values to 0.0.
- * Standardizes lang to 'es-AR'.
+ * Parses SARA 2 (Sistema de Análisis y Registro de Alimentos) dataset in CSV format
+ * and writes the extracted items as an NDJSON stream to outPath.
  */
-export async function parseSara2CSV(filePath: string): Promise<RawIngredientItem[]> {
+export async function parseSara2CSV(filePath: string, outPath: string): Promise<number> {
   if (!fs.existsSync(filePath)) {
-    return [];
+    return 0;
   }
 
-  const results: RawIngredientItem[] = [];
+  let count = 0;
+  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
+
   const parser = fs.createReadStream(filePath).pipe(
     parse({
       columns: (header: string[]) => header.map((h: string) => h.trim().toLowerCase()),
@@ -29,7 +29,6 @@ export async function parseSara2CSV(filePath: string): Promise<RawIngredientItem
 
     const calories = parseFloatSafe(record['energia_kcal'] || record['energia'] || record['calorias'] || record['energy_kcal']);
     const protein = parseFloatSafe(record['proteinas'] || record['proteina'] || record['protein']);
-    // Prioritize CHO disponibles, then fallback to carbohidratos
     const carbs = parseFloatSafe(
       record['cho_disponibles'] ||
       record['cho_disp'] ||
@@ -42,7 +41,7 @@ export async function parseSara2CSV(filePath: string): Promise<RawIngredientItem
 
     const id = generateDeterministicId('sara', code || name);
 
-    results.push({
+    const item = {
       id,
       name: name.trim(),
       source: 'system',
@@ -53,8 +52,13 @@ export async function parseSara2CSV(filePath: string): Promise<RawIngredientItem
       fats_100g: fats,
       originSource: 'SARA2',
       originalId: code ? String(code).trim() : undefined
-    });
+    };
+
+    outStream.write(JSON.stringify(item) + '\n');
+    count++;
   }
 
-  return results;
+  return new Promise((resolve) => {
+    outStream.end(() => resolve(count));
+  });
 }

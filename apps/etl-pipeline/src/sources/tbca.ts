@@ -1,18 +1,19 @@
 import fs from 'fs';
 import { parse } from 'csv-parse';
 import { parseFloatSafe, generateDeterministicId } from '../utils/parserUtils.js';
-import type { RawIngredientItem } from '../types.js';
 
 /**
- * Parses TBCA (Tabela Brasileira de Composição de Alimentos) dataset in CSV format.
- * Standardizes lang to 'pt-BR'.
+ * Parses TBCA (Tabela Brasileira de Composição de Alimentos) dataset in CSV format
+ * and writes the extracted items as an NDJSON stream to outPath.
  */
-export async function parseTbcaCSV(filePath: string): Promise<RawIngredientItem[]> {
+export async function parseTbcaCSV(filePath: string, outPath: string): Promise<number> {
   if (!fs.existsSync(filePath)) {
-    return [];
+    return 0;
   }
 
-  const results: RawIngredientItem[] = [];
+  let count = 0;
+  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
+
   const parser = fs.createReadStream(filePath).pipe(
     parse({
       columns: (header: string[]) => header.map((h: string) => h.trim().toLowerCase()),
@@ -43,7 +44,7 @@ export async function parseTbcaCSV(filePath: string): Promise<RawIngredientItem[
 
     const id = generateDeterministicId('tbca', code || name);
 
-    results.push({
+    const item = {
       id,
       name: name.trim(),
       source: 'system',
@@ -54,8 +55,13 @@ export async function parseTbcaCSV(filePath: string): Promise<RawIngredientItem[
       fats_100g: fats,
       originSource: 'TBCA',
       originalId: code ? String(code).trim() : undefined
-    });
+    };
+
+    outStream.write(JSON.stringify(item) + '\n');
+    count++;
   }
 
-  return results;
+  return new Promise((resolve) => {
+    outStream.end(() => resolve(count));
+  });
 }

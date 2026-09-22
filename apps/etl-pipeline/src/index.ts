@@ -1,14 +1,14 @@
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
-import { resolveIngredients } from './resolver.js';
+import { resolveAndExportNDJSON } from './resolver.js';
 import { parseArgenfoodsCSV } from './sources/argenfoods.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
 import { parseOpenFoodFactsJSONL } from './sources/openfoodfacts.js';
+import { StateTracker } from './utils/StateTracker.js';
 
 export * from './types.js';
 export * from './resolver.js';
@@ -63,99 +63,11 @@ export const seedPortions: Portion[] = [
   { id: 'port-aceite-1', base_food_id: 'ing-aceite-oliva', name: '1 cucharada (15ml)', equivalent_weight_g: 14 }
 ];
 
-/**
- * Sanitizes input food records to prevent XSS and malformed numerical entries.
- */
-export function sanitizeIngredient(raw: BaseIngredient): BaseIngredient {
-  const sanitizedName = (raw.name || '')
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<[^>]*>?/gm, '')
-    .trim();
-
-  const calories = Math.max(0, Number.isFinite(raw.calories_100g) ? raw.calories_100g : 0);
-  const protein = Math.max(0, Number.isFinite(raw.protein_100g) ? raw.protein_100g : 0);
-  const carbs = Math.max(0, Number.isFinite(raw.carbs_100g) ? raw.carbs_100g : 0);
-  const fats = Math.max(0, Number.isFinite(raw.fats_100g) ? raw.fats_100g : 0);
-
-  return {
-    ...raw,
-    id: String(raw.id).trim(),
-    name: sanitizedName,
-    source: 'system',
-    lang: raw.lang || 'es',
-    calories_100g: calories,
-    protein_100g: protein,
-    carbs_100g: carbs,
-    fats_100g: fats
-  };
-}
-
-/**
- * Computes an MD5 content hash for a single food item based on its nutritional profile and name.
- */
-export function computeContentHash(ingredient: BaseIngredient): string {
-  const payload = [
-    ingredient.name,
-    ingredient.calories_100g,
-    ingredient.protein_100g,
-    ingredient.carbs_100g,
-    ingredient.fats_100g,
-    ingredient.lang
-  ].join('|');
-
-  return crypto.createHash('md5').update(payload, 'utf8').digest('hex');
-}
-
-/**
- * Computes a deterministic catalog version hash across all ingredients.
- */
-export function computeCatalogVersion(items: (BaseIngredient & { contentHash?: string })[]): string {
-  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
-  const composite = sorted
-    .map((item) => `${item.id}:${item.contentHash || computeContentHash(item)}`)
-    .join(';');
-
-  return crypto.createHash('md5').update(composite, 'utf8').digest('hex');
-}
-
-/**
- * Builds the full versioned catalog payload from ingredients.
- */
-export function buildCatalogPayload(ingredients: BaseIngredient[] = seedIngredients): {
-  catalog: CatalogPayload;
-  meta: CatalogMetaPayload;
-} {
-  const sanitizedItems: CatalogItem[] = ingredients.map((raw) => {
-    const sanitized = sanitizeIngredient(raw);
-    const contentHash = computeContentHash(sanitized);
-    return {
-      ...sanitized,
-      contentHash
-    };
-  });
-
-  const catalogVersion = computeCatalogVersion(sanitizedItems);
-  const generatedAt = new Date().toISOString();
-
-  const catalog: CatalogPayload = {
-    catalogVersion,
-    generatedAt,
-    items: sanitizedItems
-  };
-
-  const meta: CatalogMetaPayload = {
-    catalogVersion,
-    generatedAt
-  };
-
-  return { catalog, meta };
-}
-
 export interface RunETLOptions {
   publicDir?: string;
   assetsDir?: string;
   dataRawDir?: string;
+  reset?: boolean;
 }
 
 function findDataFile(dirPath: string, extension: string): string | null {
@@ -173,97 +85,126 @@ function findDataFile(dirPath: string, extension: string): string | null {
   return path.join(dirPath, match);
 }
 
-/**
- * Orchestrates the full ETL extraction, deduplication, sanitization, and packaging pipeline.
- */
-export async function runETL(options?: RunETLOptions): Promise<{
-  catalog: CatalogPayload;
-  meta: CatalogMetaPayload;
-}> {
+const STAGES = ['INIT', 'SYSTEM', 'ARGENFOODS', 'SARA2', 'TBCA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
+
+function hasCompleted(currentStage: string, targetStage: string): boolean {
+  return STAGES.indexOf(currentStage) > STAGES.indexOf(targetStage);
+}
+
+export async function runETL(options?: RunETLOptions): Promise<void> {
   const currentFile = fileURLToPath(import.meta.url);
   const currentDir = path.dirname(currentFile);
-
+  
   const publicDir = options?.publicDir || path.resolve(currentDir, '../../webapp/public');
   const dataRawDir = options?.dataRawDir || path.resolve(currentDir, '../data/raw');
+  const tempDir = path.resolve(currentDir, '../data/temp');
 
-  console.log('[ETL Pipeline] Starting nutritional dataset ingestion...');
-  console.log(`[ETL Pipeline] Looking for raw datasets in: ${dataRawDir}`);
-
-  // 1. Convert built-in system seed ingredients
-  const systemItems: RawIngredientItem[] = seedIngredients.map((item) => ({
-    ...item,
-    originSource: 'SYSTEM'
-  }));
-  console.log(`[ETL Pipeline] Loaded ${systemItems.length} foundational SYSTEM seed items.`);
-
-  // 2. Parse ARGENFOODS
-  console.log(`\n[ETL Pipeline] --- Processing ARGENFOODS ---`);
-  const argenCsv = findDataFile(path.join(dataRawDir, 'argenfoods'), '.csv');
-  const argenItems = argenCsv ? await parseArgenfoodsCSV(argenCsv) : [];
-  if (argenCsv) {
-    console.log(`[ETL Pipeline] Loaded ${argenItems.length} items from ARGENFOODS (${argenCsv})`);
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
   }
 
-  // 3. Parse SARA 2
-  console.log(`\n[ETL Pipeline] --- Processing SARA 2 ---`);
-  const saraCsv = findDataFile(path.join(dataRawDir, 'sara2'), '.csv');
-  const saraItems = saraCsv ? await parseSara2CSV(saraCsv) : [];
-  if (saraCsv) {
-    console.log(`[ETL Pipeline] Loaded ${saraItems.length} items from SARA 2 (${saraCsv})`);
+  const tracker = new StateTracker(tempDir);
+  if (options?.reset || process.argv.includes('--reset')) {
+    tracker.reset();
   }
 
-  // 4. Parse TBCA
-  console.log(`\n[ETL Pipeline] --- Processing TBCA ---`);
-  const tbcaCsv = findDataFile(path.join(dataRawDir, 'tbca'), '.csv');
-  const tbcaItems = tbcaCsv ? await parseTbcaCSV(tbcaCsv) : [];
-  if (tbcaCsv) {
-    console.log(`[ETL Pipeline] Loaded ${tbcaItems.length} items from TBCA (${tbcaCsv})`);
+  let state = tracker.getState();
+  console.log(`[ETL Pipeline] Starting... Resuming from stage: ${state.stage}`);
+
+  const intermediateFiles: string[] = [];
+  const addIntermediate = (name: string) => {
+    const f = path.join(tempDir, `${name}.ndjson`);
+    intermediateFiles.push(f);
+    return f;
+  };
+
+  // 1. SYSTEM
+  const systemOut = addIntermediate('system');
+  if (!hasCompleted(state.stage, 'SYSTEM')) {
+    console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
+    const systemItems: RawIngredientItem[] = seedIngredients.map((item) => ({
+      ...item,
+      originSource: 'SYSTEM'
+    }));
+    fs.writeFileSync(systemOut, systemItems.map(i => JSON.stringify(i)).join('\n') + '\n');
+    tracker.updateStage('ARGENFOODS');
+    state = tracker.getState();
+  } else {
+    console.log('[ETL Pipeline] Skipped SYSTEM (already processed)');
   }
 
-  // 5. Parse Open Food Facts
-  console.log(`\n[ETL Pipeline] --- Processing Open Food Facts ---`);
-  const offJsonlGz = findDataFile(path.join(dataRawDir, 'openfoodfacts'), '.jsonl.gz');
-  const offItems = offJsonlGz ? await parseOpenFoodFactsJSONL(offJsonlGz) : [];
-  if (offJsonlGz) {
-    console.log(`[ETL Pipeline] Loaded ${offItems.length} items from Open Food Facts (${offJsonlGz})`);
+  // 2. ARGENFOODS
+  const argenOut = addIntermediate('argenfoods');
+  if (!hasCompleted(state.stage, 'ARGENFOODS')) {
+    console.log(`\n[ETL Pipeline] --- Processing ARGENFOODS ---`);
+    const argenCsv = findDataFile(path.join(dataRawDir, 'argenfoods'), '.csv');
+    if (argenCsv) {
+      const count = await parseArgenfoodsCSV(argenCsv, argenOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from ARGENFOODS`);
+    }
+    tracker.updateStage('SARA2');
+    state = tracker.getState();
   }
 
-  // 6. Pool and resolve collisions according to source hierarchy
-  console.log(`\n[ETL Pipeline] --- Deduplication & Resolution ---`);
-  const rawPool: RawIngredientItem[] = [
-    ...systemItems,
-    ...argenItems,
-    ...saraItems,
-    ...tbcaItems,
-    ...offItems
-  ];
-
-  console.log(`[ETL Pipeline] Total raw pooled items before deduplication: ${rawPool.length}`);
-  const resolvedItems = resolveIngredients(rawPool);
-  console.log(`[ETL Pipeline] Deduplicated and resolved catalog items: ${resolvedItems.length}`);
-
-  // 7. Sanitize, hash, and build payloads
-  const { catalog, meta } = buildCatalogPayload(resolvedItems);
-
-  // 8. Output catalog.json and catalog_meta.json to webapp/public/
-  if (!fs.existsSync(publicDir)) {
-    fs.mkdirSync(publicDir, { recursive: true });
+  // 3. SARA 2
+  const saraOut = addIntermediate('sara2');
+  if (!hasCompleted(state.stage, 'SARA2')) {
+    console.log(`\n[ETL Pipeline] --- Processing SARA 2 ---`);
+    const saraCsv = findDataFile(path.join(dataRawDir, 'sara2'), '.csv');
+    if (saraCsv) {
+      const count = await parseSara2CSV(saraCsv, saraOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from SARA 2`);
+    }
+    tracker.updateStage('TBCA');
+    state = tracker.getState();
   }
-  const catalogPath = path.join(publicDir, 'catalog.json');
-  const metaPath = path.join(publicDir, 'catalog_meta.json');
 
-  fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf-8');
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
-  console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
-  console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
+  // 4. TBCA
+  const tbcaOut = addIntermediate('tbca');
+  if (!hasCompleted(state.stage, 'TBCA')) {
+    console.log(`\n[ETL Pipeline] --- Processing TBCA ---`);
+    const tbcaCsv = findDataFile(path.join(dataRawDir, 'tbca'), '.csv');
+    if (tbcaCsv) {
+      const count = await parseTbcaCSV(tbcaCsv, tbcaOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from TBCA`);
+    }
+    tracker.updateStage('OPENFOODFACTS');
+    state = tracker.getState();
+  }
 
-  // 9. Generate _headers file for Cloudflare Pages to allow CORS from WebApp
-  const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
-  const headersPath = path.join(publicDir, '_headers');
-  fs.writeFileSync(headersPath, headersContent, 'utf-8');
-  console.log(`[ETL Pipeline] Generated CORS _headers for Cloudflare Pages at ${headersPath}`);
+  // 5. Open Food Facts
+  const offOut = addIntermediate('openfoodfacts');
+  if (!hasCompleted(state.stage, 'OPENFOODFACTS')) {
+    console.log(`\n[ETL Pipeline] --- Processing Open Food Facts ---`);
+    const offJsonlGz = findDataFile(path.join(dataRawDir, 'openfoodfacts'), '.jsonl.gz');
+    if (offJsonlGz) {
+      const count = await parseOpenFoodFactsJSONL(offJsonlGz, offOut, tracker);
+      console.log(`[ETL Pipeline] Loaded ${count} items from Open Food Facts`);
+    }
+    tracker.updateStage('RESOLVER');
+    state = tracker.getState();
+  }
 
-  return { catalog, meta };
+  // 6. Resolution & Export
+  if (!hasCompleted(state.stage, 'RESOLVER')) {
+    console.log(`\n[ETL Pipeline] --- Deduplication & Export ---`);
+    if (!fs.existsSync(publicDir)) {
+      fs.mkdirSync(publicDir, { recursive: true });
+    }
+    const catalogPath = path.join(publicDir, 'catalog.ndjson');
+    const metaPath = path.join(publicDir, 'catalog_meta.json');
+    
+    await resolveAndExportNDJSON(intermediateFiles, catalogPath, metaPath);
+
+    // Generate _headers file for Cloudflare Pages
+    const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
+    const headersPath = path.join(publicDir, '_headers');
+    fs.writeFileSync(headersPath, headersContent, 'utf-8');
+
+    tracker.updateStage('DONE');
+  }
+
+  console.log('[ETL Pipeline] Success!');
 }
 
 // Auto-run if executed directly
