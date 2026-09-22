@@ -21,7 +21,7 @@ export async function parseUsdaCSV(csvPath: string, outNdjsonPath: string): Prom
         const item: RawIngredientItem = {
           id: `usda-${record.fdc_id || Date.now()}-${count}`,
           name: record.description || 'Unknown USDA item',
-          source: 'usda',
+          source: 'system',
           lang: 'en',
           calories_100g: parseFloat(record.energy) || 0,
           protein_100g: parseFloat(record.protein) || 0,

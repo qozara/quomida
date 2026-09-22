@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 export interface EtlState {
-  stage: 'INIT' | 'ARGENFOODS' | 'SARA2' | 'TBCA' | 'OPENFOODFACTS' | 'RESOLVER' | 'EXPORT' | 'DONE';
+  stage: 'INIT' | 'SYSTEM' | 'ARGENFOODS' | 'SARA2' | 'TBCA' | 'USDA' | 'OPENFOODFACTS' | 'RESOLVER' | 'EXPORT' | 'DONE';
   processedLines: Record<string, number>;
   bytesRead: Record<string, number>;
 }

@@ -11,7 +11,8 @@ export const SOURCE_PRIORITY: Record<DataSourceOrigin, number> = {
   ARGENFOODS: 2,
   SARA2: 3,
   TBCA: 4,
-  OPENFOODFACTS: 5
+  USDA: 5,
+  OPENFOODFACTS: 6
 };
 
 export function sanitizeIngredient(raw: any): BaseIngredient {

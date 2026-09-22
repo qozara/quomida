@@ -7,6 +7,7 @@ import { resolveAndExportNDJSON } from './resolver.js';
 import { parseArgenfoodsCSV } from './sources/argenfoods.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
+import { parseUsdaCSV } from './sources/usda.js';
 import { parseOpenFoodFactsJSONL } from './sources/openfoodfacts.js';
 import { StateTracker } from './utils/StateTracker.js';
 
@@ -16,6 +17,7 @@ export * from './utils/parserUtils.js';
 export * from './sources/argenfoods.js';
 export * from './sources/sara2.js';
 export * from './sources/tbca.js';
+export * from './sources/usda.js';
 export * from './sources/openfoodfacts.js';
 
 export interface CatalogItem extends BaseIngredient {
