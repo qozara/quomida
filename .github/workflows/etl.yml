@@ -35,6 +35,12 @@ jobs:
       - name: Run ETL Pipeline
         run: npm run etl
 
+      - name: Prepare for Cloudflare Pages Deployment
+        run: |
+          # Remove catalog.ndjson from .gitignore so Wrangler includes it in the upload
+          sed -i '/catalog\.ndjson/d' .gitignore || true
+          rm -f apps/webapp/public/.gitignore || true
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
