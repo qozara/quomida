@@ -89,7 +89,11 @@ export async function resolveAndExportNDJSON(
   outPath: string,
   metaPath: string
 ): Promise<{ catalogVersion: string; generatedAt: string }> {
-  const resolvedMap = new Map<string, RawIngredientItem>();
+  const seenKeys = new Set<string>();
+  const catalogVersionItems: { id: string; hash: string }[] = [];
+
+  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
+  let exportedCount = 0;
 
   for (const file of inputFiles) {
     if (!fs.existsSync(file)) continue;
@@ -105,44 +109,33 @@ export async function resolveAndExportNDJSON(
         ? `barcode:${item.barcode.trim()}`
         : `name:${normalizeFoodName(item.name)}`;
 
-      const existing = resolvedMap.get(key);
-      if (!existing) {
-        resolvedMap.set(key, item);
-      } else {
-        const existingPriority = SOURCE_PRIORITY[existing.originSource] ?? 999;
-        const itemPriority = SOURCE_PRIORITY[item.originSource] ?? 999;
-
-        if (itemPriority < existingPriority) {
-          resolvedMap.set(key, item);
-        }
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        
+        const sanitized = sanitizeIngredient(item);
+        const contentHash = computeContentHash(sanitized);
+        const finalItem = {
+          ...sanitized,
+          contentHash
+        };
+        
+        outStream.write(JSON.stringify(finalItem) + '\n');
+        catalogVersionItems.push({ id: finalItem.id, hash: contentHash });
+        exportedCount++;
       }
     }
   }
 
-  const finalItems = Array.from(resolvedMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-  
-  // Sanitize and hash
-  const catalogItems = finalItems.map(raw => {
-    const sanitized = sanitizeIngredient(raw);
-    return {
-      ...sanitized,
-      contentHash: computeContentHash(sanitized)
-    };
-  });
-
-  const catalogVersion = computeCatalogVersion(catalogItems);
-  const generatedAt = new Date().toISOString();
-
-  // Export to NDJSON
-  console.log(`[ETL Pipeline] Exporting ${catalogItems.length} items to ${outPath}`);
-  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
-  for (const item of catalogItems) {
-    outStream.write(JSON.stringify(item) + '\n');
-  }
-  
   await new Promise<void>((resolve) => {
     outStream.end(() => resolve());
   });
+
+  console.log(`[ETL Pipeline] Exported ${exportedCount} items to ${outPath}`);
+
+  catalogVersionItems.sort((a, b) => a.id.localeCompare(b.id));
+  const composite = catalogVersionItems.map(item => `${item.id}:${item.hash}`).join(';');
+  const catalogVersion = crypto.createHash('md5').update(composite, 'utf8').digest('hex');
+  const generatedAt = new Date().toISOString();
 
   // Export meta
   const meta = { catalogVersion, generatedAt };

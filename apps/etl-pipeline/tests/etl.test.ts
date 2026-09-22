@@ -95,7 +95,7 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     const emptyRawDir = path.join(tempDir, 'empty_raw');
     fs.mkdirSync(emptyRawDir, { recursive: true });
     
-    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, reset: true });
+    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, tempDir, reset: true });
 
     const catalogPath = path.join(publicDir, 'catalog.ndjson');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
@@ -129,7 +129,7 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
       'utf-8'
     );
 
-    await runETL({ publicDir, assetsDir, dataRawDir: rawDir, reset: true });
+    await runETL({ publicDir, assetsDir, dataRawDir: rawDir, tempDir, reset: true });
 
     const catalogPath = path.join(publicDir, 'catalog.ndjson');
     const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');

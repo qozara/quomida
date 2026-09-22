@@ -1,6 +1,7 @@
 import fs from 'fs';
 import zlib from 'zlib';
 import ndjson from 'ndjson';
+import readline from 'readline';
 import { Transform } from 'stream';
 import { parseFloatSafe } from '../utils/parserUtils.js';
 import type { StateTracker } from '../utils/StateTracker.js';
@@ -52,10 +53,10 @@ export async function parseOpenFoodFactsJSONL(
   const totalBytes = fileStats.size;
 
   const state = stateTracker.getState();
-  let linesProcessed = state.processedLines['OPENFOODFACTS'] || 0;
-  let linesSkipped = 0;
+  const targetLine = state.processedLines['OPENFOODFACTS'] || 0;
+  let currentLine = 0;
   
-  const outStream = fs.createWriteStream(outPath, { flags: linesProcessed > 0 ? 'a' : 'w' });
+  const outStream = fs.createWriteStream(outPath, { flags: targetLine > 0 ? 'a' : 'w' });
 
   let bytesRead = 0;
   const progressStream = new Transform({
@@ -70,22 +71,38 @@ export async function parseOpenFoodFactsJSONL(
     const percentage = ((bytesRead / totalBytes) * 100).toFixed(2);
     const mbRead = (bytesRead / (1024 * 1024)).toFixed(1);
     const mbTotal = (totalBytes / (1024 * 1024)).toFixed(1);
-    console.log(`[ETL Pipeline] [OPENFOODFACTS] ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Processed: ${linesProcessed} lines`);
-    stateTracker.updateMetrics('OPENFOODFACTS', { lines: linesProcessed, bytes: bytesRead });
+    
+    if (currentLine < targetLine) {
+      console.log(`[ETL Pipeline] [OPENFOODFACTS] ⏩ Fast-Forwarding... ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Checkpoint: ${targetLine} lines`);
+    } else {
+      console.log(`[ETL Pipeline] [OPENFOODFACTS] ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Processed: ${currentLine} lines`);
+      stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
+    }
   }, 5000);
 
   const stream = fs.createReadStream(filePath)
     .pipe(progressStream)
-    .pipe(zlib.createGunzip())
-    .pipe(ndjson.parse());
+    .pipe(zlib.createGunzip());
 
-  for await (const product of stream) {
-    if (linesSkipped < linesProcessed) {
-      linesSkipped++;
+  const rl = readline.createInterface({
+    input: stream,
+    crlfDelay: Infinity
+  });
+
+  for await (const line of rl) {
+    currentLine++;
+    if (currentLine <= targetLine) {
       continue;
     }
 
-    linesProcessed++;
+    if (!line.trim()) continue;
+
+    let product;
+    try {
+      product = JSON.parse(line);
+    } catch (e) {
+      continue;
+    }
 
     if (!product || typeof product !== 'object') {
       continue;
@@ -152,9 +169,9 @@ export async function parseOpenFoodFactsJSONL(
   }
 
   clearInterval(logInterval);
-  stateTracker.updateMetrics('OPENFOODFACTS', { lines: linesProcessed, bytes: bytesRead });
+  stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
   
   return new Promise((resolve) => {
-    outStream.end(() => resolve(linesProcessed));
+    outStream.end(() => resolve(currentLine));
   });
 }

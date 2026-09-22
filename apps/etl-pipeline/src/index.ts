@@ -67,6 +67,7 @@ export interface RunETLOptions {
   publicDir?: string;
   assetsDir?: string;
   dataRawDir?: string;
+  tempDir?: string;
   reset?: boolean;
 }
 
@@ -97,7 +98,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
   
   const publicDir = options?.publicDir || path.resolve(currentDir, '../../webapp/public');
   const dataRawDir = options?.dataRawDir || path.resolve(currentDir, '../data/raw');
-  const tempDir = path.resolve(currentDir, '../data/temp');
+  const tempDir = options?.tempDir || path.resolve(currentDir, '../data/temp');
 
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
