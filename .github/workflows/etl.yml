@@ -16,12 +16,50 @@ on:
     # Run every 6 months (Jan 1st and Jul 1st at midnight)
     - cron: '0 0 1 1,7 *'
   workflow_dispatch:
+    inputs:
+      include_openfoodfacts:
+        description: 'Download & process Open Food Facts (13GB .gz)'
+        required: true
+        type: boolean
+        default: false
+      include_regional:
+        description: 'Download & process LATAM Regional CSVs (Argenfoods, SARA2, TBCA)'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Maximize Build Space
+        # This frees up ~30GB of disk space on the GitHub runner, essential for the 13GB OFF file
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Cache Open Food Facts Dataset
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        uses: actions/cache@v4
+        with:
+          path: apps/etl-pipeline/data/raw/openfoodfacts/openfoodfacts-products.jsonl.gz
+          # Cache keyed by month so we download a fresh copy monthly
+          key: off-dataset-${{ runner.os }}-${{ env.CACHE_DATE }}
+          restore-keys: |
+            off-dataset-${{ runner.os }}-
+
+      - name: Set Cache Date
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        run: echo "CACHE_DATE=$(date +'%Y-%m')" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,13 +70,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download Open Food Facts (OFF)
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        run: bash apps/etl-pipeline/scripts/download_off.sh
+
+      - name: Download Regional Datasets
+        if: ${{ github.event.inputs.include_regional == 'true' || github.event_name == 'schedule' }}
+        run: bash apps/etl-pipeline/scripts/download_regional_csvs.sh
+
       - name: Run ETL Pipeline
         run: npm run etl
 
       - name: Prepare for Cloudflare Pages Deployment
         run: |
           # Remove catalog.json from .gitignore so Wrangler includes it in the upload
-          sed -i '/catalog\.ndjson/d' .gitignore || true
+          sed -i '/catalog\.json/d' .gitignore || true
           rm -f apps/webapp/public/.gitignore || true
 
       - name: Deploy to Cloudflare Pages

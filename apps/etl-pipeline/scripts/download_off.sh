@@ -17,7 +17,12 @@ echo "    Using curl with resume (-C -) and retry logic."
 # -C -: Resume interrupted downloads automatically
 # --retry 10: Retry up to 10 times on network failure
 # --retry-delay 5: Wait 5 seconds between retries
-curl -L -f -C - --retry 10 --retry-delay 5 --progress-bar "${DUMP_URL}" -o "${GZ_FILE}"
+curl -L -f -C - --retry 10 --retry-delay 5 --progress-bar "${DUMP_URL}" -o "${GZ_FILE}" || {
+  echo "[!] FATAL ERROR: Failed to download Open Food Facts dataset."
+  echo "    URL: ${DUMP_URL}"
+  echo "    The file may be inaccessible or the server is down. Failing the build."
+  exit 1
+}
 
 echo "==> Download complete!"
 echo "==> We will NOT decompress the file."
