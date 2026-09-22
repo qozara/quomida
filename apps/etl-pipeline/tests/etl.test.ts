@@ -90,8 +90,12 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(v3).not.toBe(v1);
   });
 
-  it('generates catalog.json and catalog_meta.json in public directory with matching versions', () => {
-    runETL({ publicDir, assetsDir });
+  it('generates catalog.json and catalog_meta.json in public directory with matching versions', async () => {
+    // Pass a fake empty dataRawDir so it doesn't accidentally read the massive 10GB real dump during tests
+    const emptyRawDir = path.join(tempDir, 'empty_raw');
+    fs.mkdirSync(emptyRawDir, { recursive: true });
+    
+    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir });
 
     const catalogPath = path.join(publicDir, 'catalog.json');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
@@ -111,5 +115,27 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(firstItem.id).toBeDefined();
     expect(firstItem.contentHash).toBeDefined();
     expect(firstItem.source).toBe('system');
+  });
+
+  it('ingests raw files from dataRawDir and resolves them properly', async () => {
+    const rawDir = path.join(tempDir, 'raw');
+    const argenDir = path.join(rawDir, 'argenfoods');
+    fs.mkdirSync(argenDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(argenDir, 'argenfoods.csv'),
+      'codigo,alimento,energia_kcal,proteina,carbohidratos,lipidos\n9999,Alimento Test,100,5,10,2\n',
+      'utf-8'
+    );
+
+    await runETL({ publicDir, assetsDir, dataRawDir: rawDir });
+
+    const catalogPath = path.join(publicDir, 'catalog.json');
+    const catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+
+    const testItem = catalogData.items.find((i: any) => i.name === 'Alimento Test');
+    expect(testItem).toBeDefined();
+    expect(testItem.calories_100g).toBe(100);
+    expect(testItem.source).toBe('system');
   });
 });

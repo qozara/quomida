@@ -11,6 +11,10 @@ dev-dist/
 apps/webapp/public/catalog.json
 apps/webapp/public/catalog_meta.json
 apps/webapp/public/seed_v1.json
+apps/webapp/public/_headers
+apps/etl-pipeline/data/raw/**/*.csv
+apps/etl-pipeline/data/raw/**/*.jsonl
+apps/etl-pipeline/data/raw/**/*.gz
 
 # Environment & local secrets
 .env

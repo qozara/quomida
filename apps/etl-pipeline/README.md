@@ -43,7 +43,33 @@ To optimize client bandwidth and avoid downloading megabytes of static JSON on e
      ]
    }
    ```
-3. **`seed_v1.json`**: Also outputs an offline bundle fallback to `apps/webapp/src/assets/seed_v1.json` for first-time offline application boots.
+
+---
+
+## 🥗 Supported Nutritional Data Sources
+
+The ingestion pipeline supports regional Latin American food tables and global packaged food dumps:
+
+1. **System Seeds**: Hardcoded foundational cuts, whole foods, and common pantry staples.
+2. **ARGENFOODS (Argentina)**: National food composition database (`data/raw/argenfoods/*.csv`), tagged with `lang: "es-AR"`.
+3. **SARA 2 (Argentina)**: Sistema de Análisis y Registro de Alimentos (`data/raw/sara2/*.csv`), handling $CHO_{disponibles}$ and trace markers (`lang: "es-AR"`).
+4. **TBCA (Brazil)**: Tabela Brasileira de Composição de Alimentos (`data/raw/tbca/*.csv`), tagged with `lang: "pt-BR"`.
+5. **Open Food Facts (OFF)**: Packaged goods JSONL dump (`data/raw/openfoodfacts/*.jsonl`), filtered for `en:argentina` and `en:brazil`.
+
+### 🔄 Conflict Resolution & Deduplication Hierarchy
+
+When compiling items, the resolver applies a strict priority hierarchy:
+$$\text{SYSTEM} > \text{ARGENFOODS} > \text{SARA 2} > \text{TBCA} > \text{Open Food Facts}$$
+
+- **Generic Items**: Grouped by normalized name (lowercased, accents removed, excess whitespace collapsed). Collisions retain the higher-priority source.
+- **Packaged Items (OFF)**: Identified by barcode/EAN (`ing-off-<barcode>`) to prevent merging distinct commercial brands or overwriting generic whole foods.
+
+### 📥 Downloading Open Food Facts Dump
+
+An automated script is provided to download and decompress the latest Open Food Facts JSONL dump:
+```bash
+./apps/etl-pipeline/scripts/download_off.sh
+```
 
 ---
 
@@ -66,7 +92,6 @@ npm run etl
 Build outputs:
 - `apps/webapp/public/catalog.json` (gitignored)
 - `apps/webapp/public/catalog_meta.json` (gitignored)
-- `apps/webapp/src/assets/seed_v1.json`
 
 ---
 
