@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-The Quomida application consists of a primary React/Vite WebApp and a decoupled `@quomida/etl-pipeline`. The ETL pipeline processes massive nutritional datasets (like USDA or ARGENFOODS) into lightweight, versioned `catalog.json` and `catalog_meta.json` payloads that the WebApp fetches at runtime.
+The Quomida application consists of a primary React/Vite WebApp and a decoupled `@quomida/etl-pipeline`. The ETL pipeline processes massive nutritional datasets (like USDA or ARGENFOODS) into lightweight, versioned `catalog.ndjson` and `catalog_meta.json` payloads that the WebApp fetches at runtime.
 
 Originally, the webapp was deployed on Vercel, and the ETL pipeline outputs were considered for deployment via GitHub Pages using GitHub Actions.
 
