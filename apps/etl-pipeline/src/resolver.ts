@@ -88,7 +88,7 @@ export async function resolveAndExportNDJSON(
   inputFiles: string[],
   outPath: string,
   metaPath: string
-): Promise<{ catalogVersion: string; generatedAt: string }> {
+): Promise<CatalogMetaPayload> {
   const seenKeys = new Set<string>();
   const catalogVersionItems: { id: string; hash: string }[] = [];
 
@@ -132,13 +132,26 @@ export async function resolveAndExportNDJSON(
 
   console.log(`[ETL Pipeline] Exported ${exportedCount} items to ${outPath}`);
 
+  // Extract sources from input files (e.g. 'system.ndjson' -> 'SYSTEM')
+  const sources = inputFiles
+    .filter(file => fs.existsSync(file))
+    .map(file => {
+      const filename = file.split(/[/\\]/).pop() || '';
+      return filename.replace('.ndjson', '').toUpperCase();
+    });
+
   catalogVersionItems.sort((a, b) => a.id.localeCompare(b.id));
   const composite = catalogVersionItems.map(item => `${item.id}:${item.hash}`).join(';');
   const catalogVersion = crypto.createHash('md5').update(composite, 'utf8').digest('hex');
   const generatedAt = new Date().toISOString();
 
   // Export meta
-  const meta = { catalogVersion, generatedAt };
+  const meta: CatalogMetaPayload = { 
+    catalogVersion, 
+    generatedAt,
+    itemCount: exportedCount,
+    sources
+  };
   fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
 
   return meta;

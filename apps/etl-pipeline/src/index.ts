@@ -31,6 +31,8 @@ export interface CatalogPayload {
 export interface CatalogMetaPayload {
   catalogVersion: string;
   generatedAt: string;
+  itemCount: number;
+  sources: string[];
 }
 
 export const seedIngredients: BaseIngredient[] = [
