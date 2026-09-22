@@ -218,9 +218,14 @@ if (isDirectExecution) {
     const currentDir = path.dirname(currentFile);
     const scriptDir = path.resolve(currentDir, '../scripts');
 
-    if (process.argv.includes('--with-regional')) {
-      console.log('[ETL Pipeline CLI] --with-regional flag detected. Running regional download script...');
-      execSync(`bash "${path.join(scriptDir, 'download_regional_csvs.sh')}"`, { stdio: 'inherit' });
+    if (process.argv.includes('--with-sara2')) {
+      console.log('[ETL Pipeline CLI] --with-sara2 flag detected. Running SARA2 download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_sara2.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-tbca')) {
+      console.log('[ETL Pipeline CLI] --with-tbca flag detected. Running TBCA download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_tbca.sh')}"`, { stdio: 'inherit' });
     }
 
     if (process.argv.includes('--with-usda')) {

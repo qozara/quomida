@@ -22,8 +22,13 @@ on:
         required: true
         type: boolean
         default: false
-      include_regional:
-        description: 'Download & process LATAM Regional CSVs (Argenfoods, SARA2, TBCA)'
+      include_sara2:
+        description: 'Download & process SARA2 CSV'
+        required: true
+        type: boolean
+        default: true
+      include_tbca:
+        description: 'Download & process TBCA CSV'
         required: true
         type: boolean
         default: true
@@ -81,10 +86,13 @@ jobs:
           if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-off"
           fi
-          if [ "${{ github.event.inputs.include_regional }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-            FLAGS="$FLAGS --with-regional"
+          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+            FLAGS="$FLAGS --with-sara2"
           fi
-          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+            FLAGS="$FLAGS --with-tbca"
+          fi
+          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
             FLAGS="$FLAGS --with-usda"
           fi
           npm run etl -- $FLAGS
