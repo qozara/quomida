@@ -149,6 +149,10 @@ export async function parseOpenFoodFactsJSONL(
     const carbs = parseFloatSafe(nutriments['carbohydrates_100g'] ?? product['carbohydrates_100g']);
     const fats = parseFloatSafe(nutriments['fat_100g'] ?? product['fat_100g']);
 
+    if (calories === 0 && protein === 0 && carbs === 0 && fats === 0) {
+      continue;
+    }
+
     const id = `ing-off-${code}`;
 
     const item = {
