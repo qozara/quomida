@@ -95,9 +95,13 @@ cp apps/etl-pipeline/.env.example apps/etl-pipeline/.env
 ```
 Inside `.env`, configure the URLs. You can point them to remote HTTP endpoints or directly to local files via `file://`:
 ```env
-# Using local sample datasets
+# Option 1: Using local sample CSV datasets (Requires CSV parsing)
 SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
 SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
+
+# Option 2: Fast-path using a finalized system catalog NDJSON (Skips CSV parsing)
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
+# PREBUILT_SYSTEM_CATALOG_URL="file://./data/templates/catalog_system.ndjson"
 
 # External sources
 TBCA_URL="https://example.com/actual_tbca.csv"

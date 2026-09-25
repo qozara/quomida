@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw } from 'lucide-react';
 
+import systemMeta from '../generated/catalog_system_meta.json';
+
 export const SettingsModal: React.FC = () => {
   const {
     locale,
@@ -315,8 +317,12 @@ export const SettingsModal: React.FC = () => {
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
           </span>
           <span className="text-[10px] text-slate-600 font-mono uppercase">
-            Catalog: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
+            External: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
             {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
+          </span>
+          <span className="text-[10px] text-slate-600 font-mono uppercase">
+            System: {systemMeta?.catalogVersion ? systemMeta.catalogVersion.substring(0, 8) : 'None'}
+            {systemMeta?.generatedAt ? ` • ${new Date(systemMeta.generatedAt).toLocaleDateString()}` : ''}
           </span>
         </div>
 

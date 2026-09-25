@@ -14,6 +14,11 @@ fi
 echo "==> Preparing SYSTEM dataset directory..."
 mkdir -p "${RAW_DIR}"
 
+if [ -n "${PREBUILT_SYSTEM_CATALOG_URL:-}" ]; then
+  echo "[!] PREBUILT_SYSTEM_CATALOG_URL is set. Skipping system CSV downloads."
+  exit 0
+fi
+
 SYSTEM_INGREDIENTS_URL="${SYSTEM_INGREDIENTS_URL:-YOUR_SYSTEM_INGREDIENTS_URL_HERE}"
 SYSTEM_PORTIONS_URL="${SYSTEM_PORTIONS_URL:-YOUR_SYSTEM_PORTIONS_URL_HERE}"
 

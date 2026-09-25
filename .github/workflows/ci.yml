@@ -33,6 +33,7 @@ jobs:
         env:
           SYSTEM_INGREDIENTS_URL: ${{ vars.SYSTEM_INGREDIENTS_URL }}
           SYSTEM_PORTIONS_URL: ${{ vars.SYSTEM_PORTIONS_URL }}
+          PREBUILT_SYSTEM_CATALOG_URL: ${{ vars.PREBUILT_SYSTEM_CATALOG_URL }}
         run: npm run build:catalog --workspace=@quomida/webapp
 
       - name: Run unit & domain tests
@@ -42,4 +43,5 @@ jobs:
         env:
           SYSTEM_INGREDIENTS_URL: ${{ vars.SYSTEM_INGREDIENTS_URL }}
           SYSTEM_PORTIONS_URL: ${{ vars.SYSTEM_PORTIONS_URL }}
+          PREBUILT_SYSTEM_CATALOG_URL: ${{ vars.PREBUILT_SYSTEM_CATALOG_URL }}
         run: npm run build

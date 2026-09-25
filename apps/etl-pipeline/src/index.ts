@@ -100,15 +100,37 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
   const systemOut = addIntermediate('system');
   if (!hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
-    const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
-    const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
-    if (fs.existsSync(systemIngredientsCsv)) {
-      const { ingredientsCount, portionsCount } = await parseSystemCSV(systemIngredientsCsv, systemPortionsCsv, systemOut);
-      console.log(`[ETL Pipeline] Loaded ${ingredientsCount} ingredients and ${portionsCount} portions from SYSTEM`);
+    
+    const prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
+    if (prebuiltUrl) {
+      console.log(`[ETL Pipeline] PREBUILT_SYSTEM_CATALOG_URL detected: ${prebuiltUrl}`);
+      try {
+        if (prebuiltUrl.startsWith('http://') || prebuiltUrl.startsWith('https://')) {
+          const res = await fetch(prebuiltUrl);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          fs.writeFileSync(systemOut, text);
+        } else {
+          const localPath = prebuiltUrl.startsWith('file://') ? prebuiltUrl.replace('file://', '') : prebuiltUrl;
+          fs.copyFileSync(path.resolve(currentDir, '../../', localPath), systemOut);
+        }
+        console.log(`[ETL Pipeline] Successfully loaded prebuilt system catalog.`);
+      } catch (e) {
+        console.error(`[ETL Pipeline] Failed to load prebuilt system catalog:`, e);
+        process.exit(1);
+      }
     } else {
-      console.warn(`[ETL Pipeline] System dataset not found. Skipping...`);
-      fs.writeFileSync(systemOut, ''); // Touch file to prevent resolver crash
+      const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
+      const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
+      if (fs.existsSync(systemIngredientsCsv)) {
+        const { ingredientsCount, portionsCount } = await parseSystemCSV(systemIngredientsCsv, systemPortionsCsv, systemOut);
+        console.log(`[ETL Pipeline] Loaded ${ingredientsCount} ingredients and ${portionsCount} portions from SYSTEM`);
+      } else {
+        console.warn(`[ETL Pipeline] System dataset not found. Skipping...`);
+        fs.writeFileSync(systemOut, ''); // Touch file to prevent resolver crash
+      }
     }
+    
     tracker.updateStage('SARA2');
     state = tracker.getState();
   } else {

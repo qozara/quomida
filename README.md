@@ -88,10 +88,14 @@ cp apps/etl-pipeline/.env.example apps/etl-pipeline/.env
 ```
 Inside `apps/etl-pipeline/.env`, set the variables to point to the local sample files:
 ```env
+# Option 1: Use local sample CSV templates
 SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
 SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
+
+# Option 2: Use a prebuilt, finalized system catalog (Bypasses CSV generation)
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
 ```
-*Note: When deploying to Vercel or Cloudflare Pages, simply configure these exact same environment variables in your deployment dashboard, pointing to the raw URLs where you host your production CSVs.*
+*Note: When deploying to Vercel or Cloudflare Pages, simply configure these exact same environment variables in your deployment dashboard, pointing to the raw URLs where you host your production CSVs or prebuilt catalog.*
 
 ### 3. Start Web Application
 
