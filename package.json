@@ -25,7 +25,8 @@
     "cli:login": "npm run login --workspace=@quomida/cli",
     "cli:logout": "npm run logout --workspace=@quomida/cli",
     "etl": "npm run build --workspace=@quomida/etl-pipeline && npx tsx apps/etl-pipeline/src/index.ts",
-    "etl:generate-system": "npm run generate-system-catalog --workspace=@quomida/etl-pipeline"
+    "etl:generate-system": "npm run generate-system-catalog --workspace=@quomida/etl-pipeline",
+    "etl:show-catalog-setup": "npm run show-catalog-setup --workspace=@quomida/etl-pipeline"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

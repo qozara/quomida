@@ -118,7 +118,22 @@ npm run build
 npm audit
 ```
 
-### 4. CLI Google OAuth & Live E2E Testing
+### 4. Maintainer Utility Scripts
+
+We provide root-level aliases to easily manage the project without manually targeting workspaces:
+
+```bash
+# Check how the ETL catalogs are currently configured
+npm run etl:show-catalog-setup
+
+# Generate CSV templates from the OpenFoodFacts database
+npm run etl:generate-system
+
+# Clean all downloaded datasets and generated ETL files
+npm run clean
+```
+
+### 5. CLI Google OAuth & Live E2E Testing
 
 You can authenticate and test synchronization against real Google Drive / Sheets directly from the command line:
 
