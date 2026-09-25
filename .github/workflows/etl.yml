@@ -45,8 +45,6 @@ jobs:
     env:
       CACHE_DATE: ''
     steps:
-      - uses: actions/checkout@v4
-
       - name: Maximize Build Space
         # This frees up ~30GB of disk space on the GitHub runner, essential for the 13GB OFF file
         if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
@@ -59,6 +57,8 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
+
+      - uses: actions/checkout@v4
 
       - name: Set Cache Date
         if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
