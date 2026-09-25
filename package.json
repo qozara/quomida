@@ -22,11 +22,6 @@
     "cli": "npm run start --workspace=@quomida/cli",
     "etl": "npm run build --workspace=@quomida/etl-pipeline && npx tsx apps/etl-pipeline/src/index.ts"
   },
-  "dependencies": {
-    "csv-parse": "^7.0.2",
-    "ndjson": "^2.0.0",
-    "tsx": "^4.19.2"
-  },
   "devDependencies": {
     "typescript": "^5.6.3",
     "vitest": "^5.0.0"
