@@ -96,9 +96,11 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     return f;
   };
 
+  const isSystemOnly = process.argv.includes('--system-only');
+
   // 1. SYSTEM
   const systemOut = addIntermediate('system');
-  if (!hasCompleted(state.stage, 'SYSTEM')) {
+  if (isSystemOnly || !hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
     
     const prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
