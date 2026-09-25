@@ -4,10 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAW_DIR="${SCRIPT_DIR}/../data/raw"
 
+# Load local .env if it exists
+if [ -f "${SCRIPT_DIR}/../.env" ]; then
+  set -a
+  source "${SCRIPT_DIR}/../.env"
+  set +a
+fi
+
 echo "==> Preparing SARA2 dataset directory..."
 mkdir -p "${RAW_DIR}/sara2"
 
-SARA2_URL="YOUR_SARA2_URL_HERE"
+SARA2_URL="${SARA2_URL:-YOUR_SARA2_URL_HERE}"
 
 if [[ "${SARA2_URL}" == "YOUR_"* ]]; then
   echo "[!] ERROR: URL for SARA2 is not configured."

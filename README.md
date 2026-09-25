@@ -78,7 +78,22 @@ Quomida uses a Bring Your Own Storage (BYOS) architecture, allowing users to syn
 npm install
 ```
 
-### 2. Start Web Application
+### 2. Configure Local Environment Variables
+
+To properly build the web application, you must provide the URLs to your foundational system catalogs. We provide sample templates to get you started quickly:
+
+```bash
+# Create .env for the ETL pipeline (which builds the internal catalog)
+cp apps/etl-pipeline/.env.example apps/etl-pipeline/.env
+```
+Inside `apps/etl-pipeline/.env`, set the variables to point to the local sample files:
+```env
+SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
+SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
+```
+*Note: When deploying to Vercel or Cloudflare Pages, simply configure these exact same environment variables in your deployment dashboard, pointing to the raw URLs where you host your production CSVs.*
+
+### 3. Start Web Application
 
 ```bash
 npm run dev

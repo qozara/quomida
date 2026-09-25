@@ -252,6 +252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let subLogs: any = null;
     let subIngs: any = null;
+    let subPortions: any = null;
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
@@ -287,9 +288,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Load Portions
-      const pDocs = await rxdb.portions.find().exec();
-      setPortions(pDocs.map((d: any) => d.toJSON()));
+      // Subscribe to Portions
+      subPortions = rxdb.portions.find().$.subscribe((docs: any[]) => {
+        setPortions(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
+      });
 
       // Subscribe to Custom Ingredients only (prevent loading millions of system items into memory)
       subIngs = dbService.getDatabaseInstance()!.base_ingredients.find({ selector: { source: 'custom' } }).$.subscribe((docs: any[]) => {
@@ -324,6 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       subLogs?.unsubscribe();
       subIngs?.unsubscribe();
+      subPortions?.unsubscribe();
     };
   }, [selectedDate, dbService]);
 

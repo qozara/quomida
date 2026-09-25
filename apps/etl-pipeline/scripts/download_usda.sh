@@ -4,6 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAW_DIR="${SCRIPT_DIR}/../data/raw/usda"
 
+# Load local .env if it exists
+if [ -f "${SCRIPT_DIR}/../.env" ]; then
+  set -a
+  source "${SCRIPT_DIR}/../.env"
+  set +a
+fi
+
 echo "==> Preparing USDA dataset directory..."
 mkdir -p "${RAW_DIR}"
 
@@ -11,7 +18,7 @@ mkdir -p "${RAW_DIR}"
 # TO THE MAINTAINER:
 # Insert the actual direct download URL for the USDA FoodData Central CSV.
 # ---------------------------------------------------------
-USDA_URL="YOUR_USDA_CSV_URL_HERE"
+USDA_URL="${USDA_URL:-YOUR_USDA_CSV_URL_HERE}"
 
 if [[ "${USDA_URL}" == "YOUR_"* ]]; then
   echo "[!] ERROR: URL for USDA is not configured."

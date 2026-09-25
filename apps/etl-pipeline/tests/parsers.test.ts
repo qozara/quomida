@@ -164,7 +164,11 @@ TB02,Feijão carioca cozido,76,4.8,13.6,0.5
       const zlib = require('zlib');
       fs.writeFileSync(jsonlGzPath, zlib.gzipSync(lines));
 
-      const count = await parseOpenFoodFactsJSONL(jsonlGzPath, outPath, tracker);
+      const count = await parseOpenFoodFactsJSONL(jsonlGzPath, {
+        format: 'ndjson',
+        outPath,
+        stateTracker: tracker
+      });
       expect(count).toBeGreaterThanOrEqual(2); 
 
       const items = readNdjson(outPath);

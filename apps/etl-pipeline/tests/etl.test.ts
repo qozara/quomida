@@ -93,7 +93,14 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
   it('generates catalog.json and catalog_meta.json in public directory with matching versions', async () => {
     // Pass a fake empty dataRawDir so it doesn't accidentally read the massive 10GB real dump during tests
     const emptyRawDir = path.join(tempDir, 'empty_raw');
-    fs.mkdirSync(emptyRawDir, { recursive: true });
+    const saraDir = path.join(emptyRawDir, 'sara2');
+    fs.mkdirSync(saraDir, { recursive: true });
+    
+    fs.writeFileSync(
+      path.join(saraDir, 'sara2.csv'),
+      'id,nombre,energia_kcal,proteinas,cho_disponibles,lipidos\nS100,Bife de chorizo,210,22.5,0,13.4\n',
+      'utf-8'
+    );
     
     await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, tempDir, reset: true });
 

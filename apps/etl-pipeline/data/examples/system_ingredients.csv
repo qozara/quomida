@@ -1,0 +1,12 @@
+id,name,source,lang,calories_100g,protein_100g,carbs_100g,fats_100g
+ing-vacambre,Matambre de Vaca,system,es,220,21.0,0,15.0
+ing-milanesa-carne,Milanesa de carne vacuna (al horno),system,es,215,23.5,12.0,8.0
+ing-empanada-carne,Empanada de carne (al horno),system,es,260,11.0,24.0,13.5
+ing-palta,Palta / Aguacate,system,es,160,2.0,8.5,14.7
+ing-frutilla,Frutilla / Fresa,system,es,32,0.7,7.7,0.3
+ing-choclo,Choclo / Elote amarillo,system,es,86,3.2,19.0,1.2
+ing-aceite-oliva,Aceite de oliva virgen extra,system,es,884,0,0,100
+ing-pechuga-pollo,Pechuga de pollo (cruda),system,es,165,31.0,0,3.6
+ing-arroz-blanco,Arroz blanco (crudo),system,es,365,7.1,80.0,0.7
+ing-huevo,Huevo entero (fresco),system,es,155,12.6,1.1,10.6
+ing-pan-masa-madre,Pan de masa madre,system,es,245,9.0,48.0,1.5

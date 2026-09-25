@@ -62,9 +62,11 @@ export function computeCatalogVersion(items: (BaseIngredient & { contentHash?: s
 export function resolveIngredients(items: RawIngredientItem[]): RawIngredientItem[] {
   const resolvedMap = new Map<string, RawIngredientItem>();
   for (const item of items) {
-    const key = item.barcode
-      ? `barcode:${item.barcode.trim()}`
-      : `name:${normalizeFoodName(item.name)}`;
+    const key = (item as any)._type === 'portion'
+      ? `portion:${item.id}`
+      : item.barcode
+        ? `barcode:${item.barcode.trim()}`
+        : `name:${normalizeFoodName(item.name)}`;
 
     const existing = resolvedMap.get(key);
     if (!existing) {
@@ -87,13 +89,19 @@ export function resolveIngredients(items: RawIngredientItem[]): RawIngredientIte
 export async function resolveAndExportNDJSON(
   inputFiles: string[],
   outPath: string,
-  metaPath: string
+  metaPath: string,
+  systemOutPath?: string,
+  systemMetaPath?: string
 ): Promise<CatalogMetaPayload> {
   const seenKeys = new Set<string>();
-  const catalogVersionItems: { id: string; hash: string }[] = [];
+  const externalCatalogItems: { id: string; hash: string }[] = [];
+  const systemCatalogItems: { id: string; hash: string }[] = [];
 
   const outStream = fs.createWriteStream(outPath, { flags: 'w' });
-  let exportedCount = 0;
+  const sysStream = systemOutPath ? fs.createWriteStream(systemOutPath, { flags: 'w' }) : null;
+  
+  let externalExportedCount = 0;
+  let systemExportedCount = 0;
 
   for (const file of inputFiles) {
     if (!fs.existsSync(file)) continue;
@@ -103,36 +111,65 @@ export async function resolveAndExportNDJSON(
 
     for await (const line of rl) {
       if (!line.trim()) continue;
-      const item: RawIngredientItem = JSON.parse(line);
+      const item: RawIngredientItem & { _type?: string } = JSON.parse(line);
 
-      const key = item.barcode
-        ? `barcode:${item.barcode.trim()}`
-        : `name:${normalizeFoodName(item.name)}`;
+      const key = item._type === 'portion'
+        ? `portion:${item.id}`
+        : item.barcode
+          ? `barcode:${item.barcode.trim()}`
+          : `name:${normalizeFoodName(item.name)}`;
 
       if (!seenKeys.has(key)) {
         seenKeys.add(key);
         
-        const sanitized = sanitizeIngredient(item);
-        const contentHash = computeContentHash(sanitized);
-        const finalItem = {
-          ...sanitized,
-          contentHash
-        };
+        let finalItem: any;
+        let contentHash = '';
+
+        if (item._type === 'portion') {
+          // Portions do not need full ingredient sanitization
+          finalItem = item;
+          contentHash = crypto.createHash('md5').update(`${item.id}|${item.name}|${(item as any).equivalent_weight_g}`, 'utf8').digest('hex');
+          finalItem.contentHash = contentHash;
+        } else {
+          const sanitized = sanitizeIngredient(item);
+          contentHash = computeContentHash(sanitized);
+          finalItem = {
+            ...sanitized,
+            contentHash
+          };
+        }
         
-        outStream.write(JSON.stringify(finalItem) + '\n');
-        catalogVersionItems.push({ id: finalItem.id, hash: contentHash });
-        exportedCount++;
+        const isSystem = item.originSource === 'SYSTEM' || item._type === 'portion';
+        
+        if (isSystem && sysStream) {
+          sysStream.write(JSON.stringify(finalItem) + '\n');
+          systemCatalogItems.push({ id: finalItem.id, hash: contentHash });
+          systemExportedCount++;
+        } else {
+          outStream.write(JSON.stringify(finalItem) + '\n');
+          externalCatalogItems.push({ id: finalItem.id, hash: contentHash });
+          externalExportedCount++;
+        }
       }
     }
   }
 
   await new Promise<void>((resolve) => {
-    outStream.end(() => resolve());
+    outStream.end(() => {
+      if (sysStream) {
+        sysStream.end(() => resolve());
+      } else {
+        resolve();
+      }
+    });
   });
 
-  console.log(`[ETL Pipeline] Exported ${exportedCount} items to ${outPath}`);
+  console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items to ${outPath}`);
+  if (systemOutPath) {
+    console.log(`[ETL Pipeline] Exported ${systemExportedCount} system items to ${systemOutPath}`);
+  }
 
-  // Extract sources from input files (e.g. 'system.ndjson' -> 'SYSTEM')
+  // Extract sources
   const sources = inputFiles
     .filter(file => fs.existsSync(file))
     .map(file => {
@@ -140,19 +177,31 @@ export async function resolveAndExportNDJSON(
       return filename.replace('.ndjson', '').toUpperCase();
     });
 
-  catalogVersionItems.sort((a, b) => a.id.localeCompare(b.id));
-  const composite = catalogVersionItems.map(item => `${item.id}:${item.hash}`).join(';');
-  const catalogVersion = crypto.createHash('md5').update(composite, 'utf8').digest('hex');
   const generatedAt = new Date().toISOString();
 
-  // Export meta
-  const meta: CatalogMetaPayload = { 
-    catalogVersion, 
+  // Meta for external
+  externalCatalogItems.sort((a, b) => a.id.localeCompare(b.id));
+  const externalVersion = crypto.createHash('md5').update(externalCatalogItems.map(item => `${item.id}:${item.hash}`).join(';'), 'utf8').digest('hex');
+  const externalMeta: CatalogMetaPayload = { 
+    catalogVersion: externalVersion, 
     generatedAt,
-    itemCount: exportedCount,
-    sources
+    itemCount: externalExportedCount,
+    sources: sources.filter(s => s !== 'SYSTEM')
   };
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+  fs.writeFileSync(metaPath, JSON.stringify(externalMeta, null, 2), 'utf-8');
 
-  return meta;
+  // Meta for system
+  if (systemMetaPath) {
+    systemCatalogItems.sort((a, b) => a.id.localeCompare(b.id));
+    const systemVersion = crypto.createHash('md5').update(systemCatalogItems.map(item => `${item.id}:${item.hash}`).join(';'), 'utf8').digest('hex');
+    const systemMeta: CatalogMetaPayload = { 
+      catalogVersion: systemVersion, 
+      generatedAt,
+      itemCount: systemExportedCount,
+      sources: ['SYSTEM']
+    };
+    fs.writeFileSync(systemMetaPath, JSON.stringify(systemMeta, null, 2), 'utf-8');
+  }
+
+  return externalMeta;
 }

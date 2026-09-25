@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build:catalog": "npm run build:system --workspace=@quomida/etl-pipeline",
+    "build": "npm run build:catalog && tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test"
   },

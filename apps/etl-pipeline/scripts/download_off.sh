@@ -3,8 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${SCRIPT_DIR}/../data/raw/openfoodfacts"
+
+# Load local .env if it exists
+if [ -f "${SCRIPT_DIR}/../.env" ]; then
+  set -a
+  source "${SCRIPT_DIR}/../.env"
+  set +a
+fi
+
 GZ_FILE="${TARGET_DIR}/openfoodfacts-products.jsonl.gz"
-DUMP_URL="https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz"
+DUMP_URL="${OPENFOODFACTS_URL:-https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz}"
 
 echo "==> Creating target directory: ${TARGET_DIR}"
 mkdir -p "${TARGET_DIR}"

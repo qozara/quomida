@@ -33,4 +33,7 @@ jobs:
         run: npm run test
 
       - name: Build monorepo packages and apps
+        env:
+          SYSTEM_INGREDIENTS_URL: ${{ vars.SYSTEM_INGREDIENTS_URL }}
+          SYSTEM_PORTIONS_URL: ${{ vars.SYSTEM_PORTIONS_URL }}
         run: npm run build

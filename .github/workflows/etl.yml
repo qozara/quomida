@@ -41,6 +41,9 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || vars.ENABLE_ETL_SCHEDULE == 'true'
+    env:
+      CACHE_DATE: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -57,6 +60,10 @@ jobs:
           remove-codeql: 'true'
           remove-docker-images: 'true'
 
+      - name: Set Cache Date
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        run: echo "CACHE_DATE=$(date +'%Y-%m')" >> $GITHUB_ENV
+
       - name: Cache Open Food Facts Dataset
         if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
         uses: actions/cache@v4
@@ -66,10 +73,6 @@ jobs:
           key: off-dataset-${{ runner.os }}-${{ env.CACHE_DATE }}
           restore-keys: |
             off-dataset-${{ runner.os }}-
-
-      - name: Set Cache Date
-        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
-        run: echo "CACHE_DATE=$(date +'%Y-%m')" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

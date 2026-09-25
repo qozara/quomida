@@ -4,10 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAW_DIR="${SCRIPT_DIR}/../data/raw"
 
+# Load local .env if it exists
+if [ -f "${SCRIPT_DIR}/../.env" ]; then
+  set -a
+  source "${SCRIPT_DIR}/../.env"
+  set +a
+fi
+
 echo "==> Preparing TBCA dataset directory..."
 mkdir -p "${RAW_DIR}/tbca"
 
-TBCA_URL="YOUR_TBCA_URL_HERE"
+TBCA_URL="${TBCA_URL:-YOUR_TBCA_URL_HERE}"
 
 if [[ "${TBCA_URL}" == "YOUR_"* ]]; then
   echo "[!] ERROR: URL for TBCA is not configured."

@@ -36,27 +36,48 @@ export const ALLOWED_COUNTRIES: Record<string, string> = {
   'united-states': 'en-US',
 };
 
+export interface OpenFoodFactsParseOptions {
+  format: 'ndjson' | 'csv';
+  outPath: string;
+  outPortionsPath?: string;
+  stateTracker?: StateTracker;
+}
+
 /**
  * Streams an Open Food Facts JSONL dump (compressed as .gz).
  * Tracks bytes read and skips lines based on state for resumability.
  */
 export async function parseOpenFoodFactsJSONL(
   filePath: string,
-  outPath: string,
-  stateTracker: StateTracker
+  options: OpenFoodFactsParseOptions
 ): Promise<number> {
   if (!fs.existsSync(filePath)) {
     return 0;
   }
 
+  const { format, outPath, outPortionsPath, stateTracker } = options;
+  const isCSV = format === 'csv';
+
   const fileStats = fs.statSync(filePath);
   const totalBytes = fileStats.size;
 
-  const state = stateTracker.getState();
-  const targetLine = state.processedLines['OPENFOODFACTS'] || 0;
+  let state, targetLine = 0;
+  if (stateTracker && !isCSV) {
+    state = stateTracker.getState();
+    targetLine = state.processedLines['OPENFOODFACTS'] || 0;
+  }
   let currentLine = 0;
   
-  const outStream = fs.createWriteStream(outPath, { flags: targetLine > 0 ? 'a' : 'w' });
+  const flags = targetLine > 0 ? 'a' : 'w';
+  const outStream = fs.createWriteStream(outPath, { flags });
+  const portionsStream = (isCSV && outPortionsPath) ? fs.createWriteStream(outPortionsPath, { flags }) : null;
+
+  if (isCSV && targetLine === 0) {
+    outStream.write('id,name,source,lang,calories_100g,protein_100g,carbs_100g,fats_100g\n');
+    if (portionsStream) {
+      portionsStream.write('id,base_food_id,name,equivalent_weight_g\n');
+    }
+  }
 
   let bytesRead = 0;
   const progressStream = new Transform({
@@ -76,7 +97,9 @@ export async function parseOpenFoodFactsJSONL(
       console.log(`[ETL Pipeline] [OPENFOODFACTS] ⏩ Fast-Forwarding... ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Checkpoint: ${targetLine} lines`);
     } else {
       console.log(`[ETL Pipeline] [OPENFOODFACTS] ${percentage}% (${mbRead}MB / ${mbTotal}MB) | Processed: ${currentLine} lines`);
-      stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
+      if (stateTracker) {
+        stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
+      }
     }
   }, 5000);
 
@@ -155,27 +178,55 @@ export async function parseOpenFoodFactsJSONL(
 
     const id = `ing-off-${code}`;
 
-    const item = {
-      id,
-      name: rawName.trim(),
-      source: 'system',
-      lang: matchedLang,
-      calories_100g: calories,
-      protein_100g: protein,
-      carbs_100g: carbs,
-      fats_100g: fats,
-      originSource: 'OPENFOODFACTS',
-      barcode: code,
-      originalId: code
-    };
+    if (isCSV) {
+      // Escape commas and quotes for CSV
+      const csvName = rawName.includes(',') || rawName.includes('"') 
+        ? `"${rawName.replace(/"/g, '""')}"` 
+        : rawName.trim();
+      
+      outStream.write(`${id},${csvName},system,${matchedLang},${calories},${protein},${carbs},${fats}\n`);
 
-    outStream.write(JSON.stringify(item) + '\n');
+      // Try to parse serving size for portions
+      if (portionsStream) {
+        let servingQty = parseFloatSafe(product.serving_quantity);
+        let servingSize = product.serving_size;
+        
+        if (servingQty > 0 && typeof servingSize === 'string' && servingSize.trim().length > 0) {
+          const csvPortionName = servingSize.includes(',') || servingSize.includes('"')
+            ? `"${servingSize.replace(/"/g, '""')}"`
+            : servingSize.trim();
+            
+          const portionId = `port-off-${code}-1`;
+          portionsStream.write(`${portionId},${id},${csvPortionName},${servingQty}\n`);
+        }
+      }
+    } else {
+      const item = {
+        id,
+        name: rawName.trim(),
+        source: 'system',
+        lang: matchedLang,
+        calories_100g: calories,
+        protein_100g: protein,
+        carbs_100g: carbs,
+        fats_100g: fats,
+        originSource: 'OPENFOODFACTS',
+        barcode: code,
+        originalId: code
+      };
+      outStream.write(JSON.stringify(item) + '\n');
+    }
   }
 
   clearInterval(logInterval);
-  stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
+  if (stateTracker && !isCSV) {
+    stateTracker.updateMetrics('OPENFOODFACTS', { lines: currentLine, bytes: bytesRead });
+  }
   
   return new Promise((resolve) => {
-    outStream.end(() => resolve(currentLine));
+    outStream.end(() => {
+      if (portionsStream) portionsStream.end(() => resolve(currentLine));
+      else resolve(currentLine);
+    });
   });
 }
