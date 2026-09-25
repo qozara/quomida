@@ -56,3 +56,4 @@ apps/webapp/src/generated/catalog_system.ndjson
 apps/webapp/src/generated/catalog_system_meta.json
 apps/webapp/src/data/catalog_system.ndjson
 apps/webapp/src/data/catalog_system_meta.json
+apps/etl-pipeline/data/generated/

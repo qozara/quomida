@@ -154,7 +154,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     }
     
     console.log('[ETL Pipeline] --generate-system-catalog flag detected. Scanning OpenFoodFacts...');
-    const outDir = path.join(dataDir, 'templates');
+    const outDir = path.join(dataDir, 'generated');
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }

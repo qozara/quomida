@@ -101,7 +101,7 @@ SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
 
 # Option 2: Fast-path using a finalized system catalog NDJSON (Skips CSV parsing)
 # PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
-# PREBUILT_SYSTEM_CATALOG_URL="file://./data/templates/catalog_system.ndjson"
+# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/catalog_system.ndjson"
 
 # External sources
 TBCA_URL="https://example.com/actual_tbca.csv"
@@ -142,7 +142,7 @@ If you want to generate a rich foundational catalog containing all items for Lat
    ```bash
    npm run generate-system-catalog --workspace=@quomida/etl-pipeline
    ```
-3. The script will output two CSV files in `apps/etl-pipeline/data/templates/`.
+3. The script will output two CSV files in `apps/etl-pipeline/data/generated/`.
 4. Upload these customized CSVs to your own hosting (or use them locally via `file://`) and configure `SYSTEM_INGREDIENTS_URL` and `SYSTEM_PORTIONS_URL`.
 
 ---
