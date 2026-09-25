@@ -117,7 +117,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
 
   if (process.argv.includes('--system-only')) {
     console.log('[ETL Pipeline] --system-only flag detected. Skipping remaining sources.');
-    tracker.updateStage('DONE');
+    tracker.updateStage('RESOLVER');
     state = tracker.getState();
   }
 
