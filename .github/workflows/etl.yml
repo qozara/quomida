@@ -84,6 +84,12 @@ jobs:
         run: npm ci
 
       - name: Run ETL Pipeline (Download & Parse)
+        env:
+          SARA2_URL: ${{ secrets.SARA2_URL }}
+          TBCA_URL: ${{ secrets.TBCA_URL }}
+          USDA_URL: ${{ secrets.USDA_URL }}
+          SYSTEM_INGREDIENTS_URL: ${{ secrets.SYSTEM_INGREDIENTS_URL }}
+          SYSTEM_PORTIONS_URL: ${{ secrets.SYSTEM_PORTIONS_URL }}
         run: |
           FLAGS=""
           if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
