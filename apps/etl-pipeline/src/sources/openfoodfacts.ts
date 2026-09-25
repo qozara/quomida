@@ -179,10 +179,11 @@ export async function parseOpenFoodFactsJSONL(
     const id = `ing-off-${code}`;
 
     if (isCSV) {
-      // Escape commas and quotes for CSV
-      const csvName = rawName.includes(',') || rawName.includes('"') 
-        ? `"${rawName.replace(/"/g, '""')}"` 
-        : rawName.trim();
+      // Strip newlines and escape commas/quotes for CSV
+      const cleanName = rawName.replace(/[\r\n]+/g, ' ').trim();
+      const csvName = cleanName.includes(',') || cleanName.includes('"') 
+        ? `"${cleanName.replace(/"/g, '""')}"` 
+        : cleanName;
       
       outStream.write(`${id},${csvName},system,${matchedLang},${calories},${protein},${carbs},${fats}\n`);
 
