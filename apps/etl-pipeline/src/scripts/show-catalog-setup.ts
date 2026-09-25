@@ -96,16 +96,33 @@ if (fs.existsSync(systemMetaPath)) {
 }
 console.log();
 
-const externalMetaPath = path.resolve(rootDir, 'apps/webapp/public/catalog_meta.json');
-if (fs.existsSync(externalMetaPath)) {
-  const meta = JSON.parse(fs.readFileSync(externalMetaPath, 'utf-8'));
+if (viteBase) {
+  const remoteMetaUrl = `${viteBase.replace(/\/$/, '')}/catalog_meta.json`;
   console.log(`✅ External Catalog (Fetched at Runtime)`);
-  console.log(`   File: apps/webapp/public/catalog.json`);
-  console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
-  console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
+  console.log(`   Source URL: ${remoteMetaUrl}`);
+  try {
+    const res = await fetch(remoteMetaUrl, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const meta = await res.json();
+    console.log(`   Status: \x1b[32mAccessible\x1b[0m - Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
+    console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
+  } catch (e: any) {
+    console.log(`   Status: \x1b[31mUnreachable\x1b[0m`);
+    console.log(`   \x1b[31mWARNING: Could not fetch external catalog from VITE_CATALOG_BASE_URL: ${e.message}\x1b[0m`);
+    console.log(`   \x1b[31mEnsure the CDN is deployed and the URL is correct.\x1b[0m`);
+  }
 } else {
-  console.log(`❌ External Catalog (Fetched at Runtime)`);
-  console.log(`   File: apps/webapp/public/catalog.json (Missing)`);
-  console.log(`   \x1b[33mNote: If VITE_CATALOG_BASE_URL points to a CDN, local files are not required for development.\x1b[0m`);
+  const externalMetaPath = path.resolve(rootDir, 'apps/webapp/public/catalog_meta.json');
+  if (fs.existsSync(externalMetaPath)) {
+    const meta = JSON.parse(fs.readFileSync(externalMetaPath, 'utf-8'));
+    console.log(`✅ External Catalog (Fetched at Runtime from Local Build)`);
+    console.log(`   File: apps/webapp/public/catalog.json`);
+    console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
+    console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
+  } else {
+    console.log(`❌ External Catalog (Fetched at Runtime from Local Build)`);
+    console.log(`   File: apps/webapp/public/catalog.json (Missing)`);
+    console.log(`   \x1b[33mNote: Webapp will load without the external catalog. Run 'npm run etl' to generate it locally.\x1b[0m`);
+  }
 }
 console.log();
