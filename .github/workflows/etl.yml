@@ -106,15 +106,16 @@ jobs:
           fi
           npm run etl -- $FLAGS
 
-      - name: Prepare for Cloudflare Pages Deployment
-        run: |
-          # Remove catalog.json from .gitignore so Wrangler includes it in the upload
-          sed -i '/catalog\.json/d' .gitignore || true
-          rm -f apps/webapp/public/.gitignore || true
-
-      - name: Deploy to Cloudflare Pages
+      - name: Upload Catalog to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/webapp/public --project-name=quomida-etl --branch=${{ github.head_ref || github.ref_name }}
+          command: r2 object put quomida-data/catalog.json --file=apps/webapp/public/catalog.json --content-type=application/json
+
+      - name: Upload Catalog Meta to Cloudflare R2
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 object put quomida-data/catalog_meta.json --file=apps/webapp/public/catalog_meta.json --content-type=application/json
