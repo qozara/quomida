@@ -86,13 +86,29 @@ if (fs.existsSync(systemMetaPath)) {
   console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
   console.log(`   Contents: \x1b[33m${meta.itemCount || meta.items?.length || 0} items\x1b[0m`);
   if ((meta.itemCount || meta.items?.length || 0) === 0) {
-    console.log(`   \x1b[31mWARNING: System catalog is empty! Webapp will load with zero built-in ingredients.\x1b[0m`);
-    console.log(`   \x1b[31mPlease configure PREBUILT_SYSTEM_CATALOG_URL or SYSTEM_INGREDIENTS_URL.\x1b[0m`);
+    console.log(`   \x1b[31mWARNING: Currently generated system catalog is empty!\x1b[0m`);
+  }
+  
+  console.log(`   Next Build Plan:`);
+  if (process.env.PREBUILT_SYSTEM_CATALOG_URL && !process.env.PREBUILT_SYSTEM_CATALOG_URL.startsWith('YOUR_')) {
+    console.log(`   \x1b[32m-> Will be replaced by prebuilt URL: ${process.env.PREBUILT_SYSTEM_CATALOG_URL}\x1b[0m`);
+  } else if (process.env.SYSTEM_INGREDIENTS_URL && !process.env.SYSTEM_INGREDIENTS_URL.startsWith('YOUR_')) {
+    console.log(`   \x1b[32m-> Will be rebuilt from configured CSV templates.\x1b[0m`);
+  } else {
+    console.log(`   \x1b[31m-> WARNING: No URLs configured. The next build will yield 0 system ingredients!\x1b[0m`);
   }
 } else {
   console.log(`❌ System Catalog (Built-in to Webapp)`);
   console.log(`   File: apps/webapp/src/generated/catalog_system.ndjson (Missing)`);
-  console.log(`   \x1b[31mWARNING: App will fail to build. Run 'npm run etl:generate-system' or configure system URLs.\x1b[0m`);
+  console.log(`   \x1b[33mNote: File will be generated automatically during the build process.\x1b[0m`);
+  console.log(`   Next Build Plan:`);
+  if (process.env.PREBUILT_SYSTEM_CATALOG_URL && !process.env.PREBUILT_SYSTEM_CATALOG_URL.startsWith('YOUR_')) {
+    console.log(`   \x1b[32m-> Will be built from prebuilt URL: ${process.env.PREBUILT_SYSTEM_CATALOG_URL}\x1b[0m`);
+  } else if (process.env.SYSTEM_INGREDIENTS_URL && !process.env.SYSTEM_INGREDIENTS_URL.startsWith('YOUR_')) {
+    console.log(`   \x1b[32m-> Will be built from configured CSV templates.\x1b[0m`);
+  } else {
+    console.log(`   \x1b[31m-> WARNING: No URLs configured. The resulting build will have 0 system ingredients!\x1b[0m`);
+  }
 }
 console.log();
 
