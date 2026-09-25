@@ -4,7 +4,7 @@ import readline from 'readline';
 
 const rootDir = path.resolve(new URL('.', import.meta.url).pathname, '../../');
 const dataDir = path.join(rootDir, 'data');
-const rawOffDir = path.join(dataDir, 'raw', 'openfoodfacts');
+const isAll = process.argv.includes('--all');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -12,8 +12,13 @@ const rl = readline.createInterface({
 });
 
 console.warn('\n[!] WARNING [!]');
-console.warn('You are about to delete ALL downloaded datasets, intermediate parsing files, and generated templates.');
-console.warn('This includes the ~13GB OpenFoodFacts dataset. You will need to re-download it to regenerate templates.\n');
+if (isAll) {
+  console.warn('You are about to delete ALL downloaded datasets, intermediate parsing files, and generated templates.');
+  console.warn('This includes the ~13GB OpenFoodFacts dataset. You will need to re-download it to regenerate templates.\n');
+} else {
+  console.warn('You are about to delete intermediate parsing files and generated templates.');
+  console.warn('Downloaded datasets (like OpenFoodFacts) will be PRESERVED. Use --all to delete everything.\n');
+}
 
 rl.question('Are you sure you want to proceed? (y/N): ', (answer) => {
   if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
@@ -26,18 +31,20 @@ rl.question('Are you sure you want to proceed? (y/N): ', (answer) => {
       console.log(' - Deleted data/temp/');
     }
 
-    // Delete raw directory
-    const rawDir = path.join(dataDir, 'raw');
-    if (fs.existsSync(rawDir)) {
-      fs.rmSync(rawDir, { recursive: true, force: true });
-      console.log(' - Deleted data/raw/');
+    if (isAll) {
+      // Delete raw directory
+      const rawDir = path.join(dataDir, 'raw');
+      if (fs.existsSync(rawDir)) {
+        fs.rmSync(rawDir, { recursive: true, force: true });
+        console.log(' - Deleted data/raw/');
+      }
     }
 
-    // Delete templates directory
-    const templatesDir = path.join(dataDir, 'templates');
-    if (fs.existsSync(templatesDir)) {
-      fs.rmSync(templatesDir, { recursive: true, force: true });
-      console.log(' - Deleted data/templates/');
+    // Delete generated directory
+    const generatedDir = path.join(dataDir, 'generated');
+    if (fs.existsSync(generatedDir)) {
+      fs.rmSync(generatedDir, { recursive: true, force: true });
+      console.log(' - Deleted data/generated/');
     }
 
     // Delete state file
