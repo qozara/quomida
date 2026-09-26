@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
 import { resolveAndExportNDJSON } from './resolver.js';
@@ -35,6 +37,7 @@ export interface CatalogMetaPayload {
   generatedAt: string;
   itemCount: number;
   sources: string[];
+  fileSizeBytes: number;
 }
 
 
@@ -103,8 +106,11 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
   if (isSystemOnly || !hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
     
-    const prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
+    let prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
     if (prebuiltUrl) {
+      if (prebuiltUrl.startsWith('http') && !prebuiltUrl.endsWith('.ndjson')) {
+        prebuiltUrl = prebuiltUrl.endsWith('/') ? prebuiltUrl + 'catalog_system.ndjson' : prebuiltUrl + '/catalog_system.ndjson';
+      }
       console.log(`[ETL Pipeline] PREBUILT_SYSTEM_CATALOG_URL detected: ${prebuiltUrl}`);
       try {
         if (prebuiltUrl.startsWith('http://') || prebuiltUrl.startsWith('https://')) {

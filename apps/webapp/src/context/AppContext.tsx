@@ -68,6 +68,7 @@ interface AppContextType {
   migrateSync: () => Promise<void>;
   catalogVersion: string | null;
   catalogGeneratedAt: string | null;
+  catalogFileSizeBytes: number | null;
   isHydratingCatalog: boolean;
   hydrationProgress: { status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number };
   abortCatalogUpdate: () => void;
@@ -113,6 +114,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [hydrationProgress, setHydrationProgress] = useState<{ status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number }>({ status: 'idle', percentage: 0, loadedBytes: 0, itemsProcessed: 0 });
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
   const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
+  const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
   const syncLock = React.useRef(false);
   const hydrationAbortController = React.useRef<AbortController | null>(null);
 
@@ -151,6 +153,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (res.generatedAt) {
         setCatalogGeneratedAt(res.generatedAt);
+      }
+      if (res.fileSizeBytes) {
+        setCatalogFileSizeBytes(res.fileSizeBytes);
       }
       setHydrationProgress(prev => ({ ...prev, status: res.status === 'ERROR' ? 'error' : 'idle' }));
       return res;
@@ -309,6 +314,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
         if (v) setCatalogGeneratedAt(v);
+      });
+      dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
+        if (v) setCatalogFileSizeBytes(Number(v));
       });
       refreshCatalog().catch((err) => {
         console.warn('[CatalogHydration] Background boot hydration notice:', err);
@@ -557,6 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearLocalDatabase: clearDatabase,
         catalogVersion,
         catalogGeneratedAt,
+        catalogFileSizeBytes,
         isHydratingCatalog,
         hydrationProgress,
         abortCatalogUpdate,
