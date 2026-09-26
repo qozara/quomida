@@ -15,7 +15,6 @@
   "dependencies": {
     "@quomida/domain-core": "*",
     "csv-parse": "^7.0.2",
-    "dotenv": "^18.0.4",
     "ndjson": "^2.0.0",
     "tsx": "^4.19.2"
   },

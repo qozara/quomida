@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
 const rootDir = path.resolve(currentDir, '../../../../');
-import 'dotenv/config';
+import '../config/env.js';
 
 console.log('\n🥗 Quomida - Catalog Configuration Check\n');
 
