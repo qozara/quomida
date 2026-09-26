@@ -1,7 +1,8 @@
-import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import 'dotenv/config';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
 import { resolveAndExportNDJSON } from './resolver.js';

@@ -5,22 +5,7 @@ import { fileURLToPath } from 'url';
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
 const rootDir = path.resolve(currentDir, '../../../../');
-const envPath = path.resolve(rootDir, 'apps/etl-pipeline/.env');
-
-// Read .env manually
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf-8');
-  envContent.split('\n').forEach(line => {
-    const match = line.match(/^([^#\s=]+)=(.*)$/);
-    if (match) {
-      const key = match[1];
-      const value = match[2].replace(/^["']|["']$/g, ''); // strip quotes
-      if (!process.env[key]) {
-        process.env[key] = value;
-      }
-    }
-  });
-}
+import 'dotenv/config';
 
 console.log('\n🥗 Quomida - Catalog Configuration Check\n');
 
