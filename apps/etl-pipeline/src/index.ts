@@ -36,6 +36,7 @@ export interface CatalogMetaPayload {
   generatedAt: string;
   itemCount: number;
   sources: string[];
+  fileSizeBytes: number;
 }
 
 

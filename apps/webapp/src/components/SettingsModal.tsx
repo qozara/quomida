@@ -20,6 +20,7 @@ export const SettingsModal: React.FC = () => {
     setIsStorageSettingsOpen,
     catalogVersion,
     catalogGeneratedAt,
+    catalogFileSizeBytes,
     isHydratingCatalog,
     hydrationProgress,
     abortCatalogUpdate,
@@ -319,10 +320,12 @@ export const SettingsModal: React.FC = () => {
           <span className="text-[10px] text-slate-600 font-mono uppercase">
             External: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
             {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
+            {catalogFileSizeBytes ? ` • ${(catalogFileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : ''}
           </span>
           <span className="text-[10px] text-slate-600 font-mono uppercase">
             System: {systemMeta?.catalogVersion ? systemMeta.catalogVersion.substring(0, 8) : 'None'}
             {systemMeta?.generatedAt ? ` • ${new Date(systemMeta.generatedAt).toLocaleDateString()}` : ''}
+            {(systemMeta as any)?.fileSizeBytes ? ` • ${((systemMeta as any).fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : ''}
           </span>
         </div>
 

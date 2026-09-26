@@ -6,6 +6,7 @@ export interface HydrationResult {
   status: 'UP_TO_DATE' | 'UPDATED' | 'SKIPPED' | 'ERROR' | 'CANCELLED';
   version?: string;
   generatedAt?: string;
+  fileSizeBytes?: number;
   itemsUpserted: number;
   error?: string;
 }
@@ -133,13 +134,14 @@ export class CatalogHydrationService {
 
     const remoteVersion = meta?.catalogVersion;
     const remoteGeneratedAt = meta?.generatedAt;
+    const remoteFileSizeBytes = meta?.fileSizeBytes;
 
     if (!remoteVersion) return { status: 'ERROR', itemsUpserted: 0, error: 'Catalog metadata is missing catalogVersion property' };
 
     // 2. Compare versions
     const localVersion = await this.dbService.getMetadata('lastIngestedCatalogVersion');
     if (!options?.force && localVersion === remoteVersion) {
-      return { status: 'UP_TO_DATE', version: remoteVersion, generatedAt: remoteGeneratedAt, itemsUpserted: 0 };
+      return { status: 'UP_TO_DATE', version: remoteVersion, generatedAt: remoteGeneratedAt, fileSizeBytes: remoteFileSizeBytes, itemsUpserted: 0 };
     }
 
     // 3. Fetch stream with auto-resume support
@@ -301,11 +303,15 @@ export class CatalogHydrationService {
     if (remoteGeneratedAt) {
       await this.dbService.setMetadata('lastIngestedCatalogGeneratedAt', remoteGeneratedAt);
     }
+    if (remoteFileSizeBytes) {
+      await this.dbService.setMetadata('lastIngestedCatalogFileSizeBytes', String(remoteFileSizeBytes));
+    }
 
     return {
       status: 'UPDATED',
       version: remoteVersion,
       generatedAt: remoteGeneratedAt,
+      fileSizeBytes: remoteFileSizeBytes,
       itemsUpserted: itemsUpsertedCount
     };
   }

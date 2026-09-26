@@ -186,7 +186,8 @@ export async function resolveAndExportNDJSON(
     catalogVersion: externalVersion, 
     generatedAt,
     itemCount: externalExportedCount,
-    sources: sources.filter(s => s !== 'SYSTEM')
+    sources: sources.filter(s => s !== 'SYSTEM'),
+    fileSizeBytes: fs.statSync(outPath).size
   };
   fs.writeFileSync(metaPath, JSON.stringify(externalMeta, null, 2), 'utf-8');
 
@@ -198,7 +199,8 @@ export async function resolveAndExportNDJSON(
       catalogVersion: systemVersion, 
       generatedAt,
       itemCount: systemExportedCount,
-      sources: ['SYSTEM']
+      sources: ['SYSTEM'],
+      fileSizeBytes: systemOutPath ? fs.statSync(systemOutPath).size : 0
     };
     fs.writeFileSync(systemMetaPath, JSON.stringify(systemMeta, null, 2), 'utf-8');
   }
