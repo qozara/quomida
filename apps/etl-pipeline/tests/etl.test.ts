@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { runETL, buildCatalogPayload, sanitizeIngredient, computeContentHash, computeCatalogVersion } from '../src/index.js';
+import { runETL, sanitizeIngredient, computeContentHash, computeCatalogVersion } from '../src/index.js';
 import type { BaseIngredient } from '@quomida/domain-core';
 
 describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
