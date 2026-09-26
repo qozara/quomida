@@ -35,7 +35,6 @@ interface AppContextType {
   userSettings: UserSettings;
   updateUserSettings: (newSettings: Partial<UserSettings>) => Promise<void>;
   ingredients: BaseIngredient[];
-  portions: Portion[];
   dailyLogs: DailyLog[];
   syncStatus: SyncStatus;
   uxSyncState: UXSyncState;
@@ -55,6 +54,7 @@ interface AppContextType {
   ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
   addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>) => Promise<void>;
+  removeCustomIngredient: (id: string) => Promise<void>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
   isCatalogOpen: boolean;
@@ -100,7 +100,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('dark');
   const [userSettings, setUserSettings] = useState<UserSettings>(defaultSettings);
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
-  const [portions, setPortions] = useState<Portion[]>([]);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(new Date().toLocaleTimeString());
@@ -257,7 +256,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let subLogs: any = null;
     let subIngs: any = null;
-    let subPortions: any = null;
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
@@ -293,10 +291,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Subscribe to Portions
-      subPortions = rxdb.portions.find().$.subscribe((docs: any[]) => {
-        setPortions(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
-      });
 
       // Subscribe to Custom Ingredients only (prevent loading millions of system items into memory)
       subIngs = dbService.getDatabaseInstance()!.base_ingredients.find({ selector: { source: 'custom' } }).$.subscribe((docs: any[]) => {
@@ -334,7 +328,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       subLogs?.unsubscribe();
       subIngs?.unsubscribe();
-      subPortions?.unsubscribe();
     };
   }, [selectedDate, dbService]);
 
@@ -480,7 +473,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     quantity: number,
     portionName: string
   ) => {
-    const weightGrams = convertPortionToGrams(quantity, portionName, portions);
+    let relevantPortions: Portion[] = [];
+    if (dbService) {
+      const rxdb = dbService.getDatabaseInstance();
+      if (rxdb) {
+        const pdocs = await rxdb.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
+        relevantPortions = pdocs.map((d: any) => d.toJSON ? d.toJSON() : d);
+      }
+    }
+    const weightGrams = convertPortionToGrams(quantity, portionName, relevantPortions);
     const rawMacros = calculateItemMacros(ingredient, weightGrams);
     const macrosSnapshot = createMacroSnapshot(rawMacros);
 
@@ -506,6 +507,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>) => {
     await dbService.saveCustomFood(ingData);
     forceSync().catch(console.error);
+  };
+
+  const removeCustomIngredient = async (id: string) => {
+    const rxdb = dbService.getDatabaseInstance();
+    if (rxdb) {
+      const doc = await rxdb.base_ingredients.findOne(id).exec();
+      if (doc && doc.source === 'custom') {
+        await doc.remove();
+        forceSync().catch(console.error);
+      }
+    }
   };
 
   const hasActiveAdapter = Boolean(
@@ -537,7 +549,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userSettings,
         updateUserSettings,
         ingredients,
-        portions,
         dailyLogs,
         syncStatus,
         uxSyncState,
@@ -554,6 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logFoodItem,
         deleteLogItem,
         addCustomIngredient,
+        removeCustomIngredient,
         isSettingsOpen,
         setIsSettingsOpen,
         isCatalogOpen,

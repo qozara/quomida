@@ -15,15 +15,22 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   defaultMealType,
   onClose
 }) => {
-  const { portions, logFoodItem, t } = useApp();
+  const { db, logFoodItem, t } = useApp();
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedPortionName, setSelectedPortionName] = useState<string>('g');
+  const [availablePortions, setAvailablePortions] = useState<any[]>([]);
 
-  // Filter available portions for this ingredient
-  const availablePortions = ingredient
-    ? portions.filter((p) => p.base_food_id === ingredient.id)
-    : [];
+  // Fetch available portions dynamically
+  useEffect(() => {
+    if (ingredient && db) {
+      db.portions.find({ selector: { base_food_id: ingredient.id } }).exec().then((docs: any[]) => {
+        setAvailablePortions(docs.map((d: any) => d.toJSON ? d.toJSON() : d));
+      });
+    } else {
+      setAvailablePortions([]);
+    }
+  }, [ingredient, db]);
 
   useEffect(() => {
     if (availablePortions.length > 0) {

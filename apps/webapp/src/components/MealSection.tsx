@@ -75,7 +75,7 @@ export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpe
               >
                 <div>
                   <div className="text-sm font-medium text-slate-200">
-                    {getIngredientName(log.food_reference_id)}
+                    {log.food_name || getIngredientName(log.food_reference_id)}
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">
                     {log.quantity} {log.portion_name} • P: {log.macros.protein}g | C: {log.macros.carbs}g | F: {log.macros.fats}g
