@@ -98,7 +98,7 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     
     fs.writeFileSync(
       path.join(saraDir, 'sara2.csv'),
-      'id,nombre,energia_kcal,proteinas,cho_disponibles,lipidos\nS100,Bife de chorizo,210,22.5,0,13.4\n',
+      'id,nombre,energia_kcal,proteinas,cho_disponibles,lipidos\nS100,Alimento Test Bife Magico,210,22.5,0,13.4\n',
       'utf-8'
     );
     
