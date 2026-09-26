@@ -23,7 +23,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
 
   // Fetch available portions dynamically
   useEffect(() => {
-    if (ingredient) {
+    if (ingredient && db) {
       db.portions.find({ selector: { base_food_id: ingredient.id } }).exec().then((docs: any[]) => {
         setAvailablePortions(docs.map((d: any) => d.toJSON ? d.toJSON() : d));
       });

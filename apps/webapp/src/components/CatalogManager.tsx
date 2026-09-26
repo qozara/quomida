@@ -28,6 +28,7 @@ export const CatalogManager: React.FC = () => {
     
     let active = true;
     const fetchSearch = async () => {
+      if (!db) return;
       setIsSearching(true);
       try {
         const docs = await db.base_ingredients.find({
