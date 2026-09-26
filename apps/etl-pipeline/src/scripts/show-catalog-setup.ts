@@ -3,7 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const currentFile = fileURLToPath(import.meta.url);
-const rootDir = path.resolve(path.dirname(currentFile), '../../../../');
+const currentDir = path.dirname(currentFile);
+const rootDir = path.resolve(currentDir, '../../../../');
 const envPath = path.resolve(rootDir, 'apps/etl-pipeline/.env');
 
 // Read .env manually
@@ -37,7 +38,38 @@ function checkVar(name: string, description: string) {
 console.log('--- FAST-PATH SYSTEM CATALOG (Prebuilt) ---');
 checkVar('PREBUILT_SYSTEM_CATALOG_URL', 'Prebuilt System Catalog NDJSON');
 if (process.env.PREBUILT_SYSTEM_CATALOG_URL && !process.env.PREBUILT_SYSTEM_CATALOG_URL.startsWith('YOUR_')) {
-  console.log('   ℹ️  Note: Because PREBUILT_SYSTEM_CATALOG_URL is set, CSV generation will be bypassed.\n');
+  console.log('   ℹ️  Note: Because PREBUILT_SYSTEM_CATALOG_URL is set, CSV generation will be bypassed.');
+  
+  let prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
+  if (prebuiltUrl.startsWith('http') && !prebuiltUrl.endsWith('.ndjson')) {
+    prebuiltUrl = prebuiltUrl.endsWith('/') ? prebuiltUrl + 'catalog_system.ndjson' : prebuiltUrl + '/catalog_system.ndjson';
+  }
+
+  try {
+    if (prebuiltUrl.startsWith('http://') || prebuiltUrl.startsWith('https://')) {
+      const headRes = await fetch(prebuiltUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+      const contentLength = headRes.headers.get('content-length');
+      if (contentLength) {
+        const sizeBytes = parseInt(contentLength, 10);
+        console.log(`   Size: ${(sizeBytes / (1024 * 1024)).toFixed(2)} MB (${sizeBytes} bytes)\n`);
+      } else {
+        console.log(`   Size: Unknown (No content-length header)\n`);
+      }
+    } else {
+      const localPath = prebuiltUrl.startsWith('file://') ? prebuiltUrl.replace('file://', '') : prebuiltUrl;
+      const absPath = path.resolve(currentDir, '../../', localPath);
+      if (fs.existsSync(absPath)) {
+        const sizeBytes = fs.statSync(absPath).size;
+        console.log(`   Size: ${(sizeBytes / (1024 * 1024)).toFixed(2)} MB (${sizeBytes} bytes)\n`);
+      } else {
+        console.log(`   Size: Unknown (File not found locally)\n`);
+      }
+    }
+  } catch (e: any) {
+    console.log(`   Size: Error fetching size (${e.message})\n`);
+  }
+} else {
+  console.log();
 }
 
 console.log('--- SYSTEM CATALOG (CSV Templates) ---');
@@ -85,6 +117,9 @@ if (fs.existsSync(systemMetaPath)) {
   console.log(`   File: apps/webapp/src/generated/catalog_system.ndjson`);
   console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
   console.log(`   Contents: \x1b[33m${meta.itemCount || meta.items?.length || 0} items\x1b[0m`);
+  if (meta.fileSizeBytes) {
+    console.log(`   Size: ${(meta.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB (${meta.fileSizeBytes} bytes)`);
+  }
   if ((meta.itemCount || meta.items?.length || 0) === 0) {
     console.log(`   \x1b[31mWARNING: Currently generated system catalog is empty!\x1b[0m`);
   }
@@ -122,6 +157,9 @@ if (viteBase) {
     const meta = await res.json();
     console.log(`   Status: \x1b[32mAccessible\x1b[0m - Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
     console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
+    if (meta.fileSizeBytes) {
+      console.log(`   Size: ${(meta.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB (${meta.fileSizeBytes} bytes)`);
+    }
   } catch (e: any) {
     console.log(`   Status: \x1b[31mUnreachable\x1b[0m`);
     console.log(`   \x1b[31mWARNING: Could not fetch external catalog from VITE_CATALOG_BASE_URL: ${e.message}\x1b[0m`);
@@ -135,6 +173,9 @@ if (viteBase) {
     console.log(`   File: apps/webapp/public/catalog.json`);
     console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
     console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
+    if (meta.fileSizeBytes) {
+      console.log(`   Size: ${(meta.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB (${meta.fileSizeBytes} bytes)`);
+    }
   } else {
     console.log(`❌ External Catalog (Fetched at Runtime from Local Build)`);
     console.log(`   File: apps/webapp/public/catalog.json (Missing)`);

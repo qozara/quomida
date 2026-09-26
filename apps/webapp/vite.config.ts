@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => {
         display: 'standalone'
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB limit
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         navigateFallback: 'index.html',
         runtimeCaching: [
