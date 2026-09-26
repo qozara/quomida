@@ -14,9 +14,10 @@ The pipeline is completely decoupled from the web application runtime, allowing 
 
 ## 🏗️ Architecture: Two-File Delta Distribution
 
-To optimize client bandwidth and avoid downloading megabytes of static JSON on every application load, the pipeline outputs two assets:
+To optimize client bandwidth and avoid downloading megabytes of static JSON on every application load, the pipeline outputs assets into two separate tiers:
 
-1. **`catalog_meta.json`**: A lightweight manifest (~50 bytes) containing:
+1. **`catalog_system.ndjson`**: Bundled directly into the web application at build time. It contains all foundational data (seeds and portions) and guarantees the web app is immediately functional on first boot, even without network access.
+2. **`catalog_meta.json`**: A lightweight manifest (~50 bytes) for external data containing:
    ```json
    {
      "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
@@ -43,7 +44,35 @@ To optimize client bandwidth and avoid downloading megabytes of static JSON on e
      ]
    }
    ```
-3. **`seed_v1.json`**: Also outputs an offline bundle fallback to `apps/webapp/src/assets/seed_v1.json` for first-time offline application boots.
+
+*Note: The resolver actively prevents duplication by dropping any external dataset item that shares a normalized name with a foundational system item.*
+
+---
+
+## 🥗 Supported Nutritional Data Sources
+
+The ingestion pipeline supports regional Latin American food tables and global packaged food dumps:
+
+1. **System Seeds**: Core ingredients and portions downloaded via `system_ingredients.csv` and `system_portions.csv`.
+2. **ARGENFOODS (Argentina)**: National food composition database (`data/raw/argenfoods/*.csv`), tagged with `lang: "es-AR"`.
+3. **SARA 2 (Argentina)**: Sistema de Análisis y Registro de Alimentos (`data/raw/sara2/*.csv`), handling $CHO_{disponibles}$ and trace markers (`lang: "es-AR"`).
+4. **TBCA (Brazil)**: Tabela Brasileira de Composição de Alimentos (`data/raw/tbca/*.csv`), tagged with `lang: "pt-BR"`.
+5. **Open Food Facts (OFF)**: Packaged goods JSONL dump (`data/raw/openfoodfacts/*.jsonl`), filtered for `en:argentina` and `en:brazil`.
+
+### 🔄 Conflict Resolution & Deduplication Hierarchy
+
+When compiling items, the resolver applies a strict priority hierarchy:
+$$\text{SYSTEM} > \text{ARGENFOODS} > \text{SARA 2} > \text{TBCA} > \text{Open Food Facts}$$
+
+- **Generic Items**: Grouped by normalized name (lowercased, accents removed, excess whitespace collapsed). Collisions retain the higher-priority source.
+- **Packaged Items (OFF)**: Identified by barcode/EAN (`ing-off-<barcode>`) to prevent merging distinct commercial brands or overwriting generic whole foods.
+
+### 📥 Downloading Open Food Facts Dump
+
+An automated script is provided to download and decompress the latest Open Food Facts JSONL dump:
+```bash
+./apps/etl-pipeline/scripts/download_off.sh
+```
 
 ---
 
@@ -56,17 +85,65 @@ Security is enforced at the compilation level to eliminate runtime overhead in c
 
 ---
 
-## ⚙️ Running Locally
+## 🚀 Getting Started
+
+### 1. Configure the Environment
+The ETL pipeline requires a `.env` file to fetch the foundational system catalog. You can create your own CSVs (see section 5), or use the provided local samples to get started quickly.
 
 ```bash
-# Run the ETL compilation script
-npm run etl
+cp apps/etl-pipeline/.env.example apps/etl-pipeline/.env
+```
+Inside `.env`, configure the URLs. You can point them to remote HTTP endpoints or directly to local files via `file://`:
+```env
+# Option 1: Using local sample CSV datasets (Requires CSV parsing)
+SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
+SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
+
+# Option 2: Fast-path using a finalized system catalog NDJSON (Skips CSV parsing)
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
+# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/catalog_system.ndjson"
+
+# External sources
+TBCA_URL="https://example.com/actual_tbca.csv"
+SARA2_URL="https://example.com/actual_sara2.csv"
 ```
 
-Build outputs:
-- `apps/webapp/public/catalog.json` (gitignored)
-- `apps/webapp/public/catalog_meta.json` (gitignored)
-- `apps/webapp/src/assets/seed_v1.json`
+### 2. Run the Full Pipeline
+
+To process all remote datasets (USDA, SARA2, TBCA, etc.) and generate both system and external catalogs:
+
+```bash
+npm run start --workspace=@quomida/etl-pipeline -- --with-off --with-system
+```
+
+*(Note: The `--with-off` flag downloads the 13GB OpenFoodFacts dataset. It takes time but is cached locally in `data/raw/`)*
+
+### 3. Build-Time System Generation
+
+The web application's `prebuild` hook automatically runs this command to ensure `catalog_system.ndjson` is built into the app before Vite bundles it:
+```bash
+npm run build:system --workspace=@quomida/etl-pipeline
+```
+
+### 4. Cleaning Cached Data
+
+If you need to reset the pipeline (e.g. to redownload OpenFoodFacts or flush the state tracking):
+```bash
+npm run clean --workspace=@quomida/etl-pipeline
+```
+*Note: This script will prompt you for confirmation because it deletes the 13GB downloaded OpenFoodFacts dataset and all intermediate JSONL files.*
+
+### 5. Generate a Custom System Catalog (Advanced)
+
+If you want to generate a rich foundational catalog containing all items for Latin America and Spain, you can instruct the pipeline to scan OpenFoodFacts and output clean **CSV** templates that you can edit in Excel or Google Sheets.
+
+1. Ensure you have downloaded Open Food Facts at least once (`npm run start --workspace=@quomida/etl-pipeline -- --with-off`).
+2. Run the generator:
+   ```bash
+   npm run generate-system-catalog --workspace=@quomida/etl-pipeline
+   ```
+3. The script will output two CSV files in `apps/etl-pipeline/data/generated/`.
+4. Upload these customized CSVs to your own hosting (or use them locally via `file://`) and configure `SYSTEM_INGREDIENTS_URL` and `SYSTEM_PORTIONS_URL`.
 
 ---
 

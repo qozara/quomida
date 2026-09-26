@@ -1,8 +1,24 @@
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
+import type { RawIngredientItem } from './types.js';
+import { resolveAndExportNDJSON } from './resolver.js';
+import { parseSara2CSV } from './sources/sara2.js';
+import { parseTbcaCSV } from './sources/tbca.js';
+import { parseUsdaCSV } from './sources/usda.js';
+import { parseOpenFoodFactsJSONL } from './sources/openfoodfacts.js';
+import { parseSystemCSV } from './sources/system.js';
+import { StateTracker } from './utils/StateTracker.js';
+
+export * from './types.js';
+export * from './resolver.js';
+export * from './utils/parserUtils.js';
+export * from './sources/sara2.js';
+export * from './sources/tbca.js';
+export * from './sources/usda.js';
+export * from './sources/openfoodfacts.js';
+export * from './sources/system.js';
 
 export interface CatalogItem extends BaseIngredient {
   contentHash: string;
@@ -17,160 +33,228 @@ export interface CatalogPayload {
 export interface CatalogMetaPayload {
   catalogVersion: string;
   generatedAt: string;
+  itemCount: number;
+  sources: string[];
 }
 
-const seedIngredients: BaseIngredient[] = [
-  // Local cuts & preparations (ARGENFOODS / LATINFOODS)
-  { id: 'ing-vacambre', name: 'Vacío vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 175, protein_100g: 20.5, carbs_100g: 0, fats_100g: 10.5 },
-  { id: 'ing-asado-tira', name: 'Asado de tira (crudo)', source: 'system', lang: 'es', calories_100g: 250, protein_100g: 18.0, carbs_100g: 0, fats_100g: 19.5 },
-  { id: 'ing-peceto', name: 'Peceto vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 120, protein_100g: 22.0, carbs_100g: 0, fats_100g: 3.5 },
-  { id: 'ing-matambre', name: 'Matambre vacuno (crudo)', source: 'system', lang: 'es', calories_100g: 210, protein_100g: 19.0, carbs_100g: 0, fats_100g: 14.8 },
-  { id: 'ing-entranha', name: 'Entraña vacuna (cruda)', source: 'system', lang: 'es', calories_100g: 190, protein_100g: 21.0, carbs_100g: 0, fats_100g: 11.5 },
-  { id: 'ing-milanesa-carne', name: 'Milanesa de carne vacuna (al horno)', source: 'system', lang: 'es', calories_100g: 215, protein_100g: 23.5, carbs_100g: 12.0, fats_100g: 8.0 },
-  { id: 'ing-empanada-carne', name: 'Empanada de carne (al horno)', source: 'system', lang: 'es', calories_100g: 260, protein_100g: 11.0, carbs_100g: 24.0, fats_100g: 13.5 },
-  { id: 'ing-palta', name: 'Palta / Aguacate', source: 'system', lang: 'es', calories_100g: 160, protein_100g: 2.0, carbs_100g: 8.5, fats_100g: 14.7 },
-  { id: 'ing-frutilla', name: 'Frutilla / Fresa', source: 'system', lang: 'es', calories_100g: 32, protein_100g: 0.7, carbs_100g: 7.7, fats_100g: 0.3 },
-  { id: 'ing-choclo', name: 'Choclo / Elote amarillo', source: 'system', lang: 'es', calories_100g: 86, protein_100g: 3.2, carbs_100g: 19.0, fats_100g: 1.2 },
 
-  // Base Universal Ingredients (USDA FoodData Central)
-  { id: 'ing-aceite-oliva', name: 'Aceite de oliva virgen extra', source: 'system', lang: 'es', calories_100g: 884, protein_100g: 0, carbs_100g: 0, fats_100g: 100 },
-  { id: 'ing-pechuga-pollo', name: 'Pechuga de pollo (cruda)', source: 'system', lang: 'es', calories_100g: 165, protein_100g: 31.0, carbs_100g: 0, fats_100g: 3.6 },
-  { id: 'ing-arroz-blanco', name: 'Arroz blanco (crudo)', source: 'system', lang: 'es', calories_100g: 365, protein_100g: 7.1, carbs_100g: 80.0, fats_100g: 0.7 },
-  { id: 'ing-huevo', name: 'Huevo entero (fresco)', source: 'system', lang: 'es', calories_100g: 155, protein_100g: 12.6, carbs_100g: 1.1, fats_100g: 10.6 },
-  { id: 'ing-pan-masa-madre', name: 'Pan de masa madre', source: 'system', lang: 'es', calories_100g: 245, protein_100g: 9.0, carbs_100g: 48.0, fats_100g: 1.5 }
-];
-
-const seedPortions: Portion[] = [
-  { id: 'port-vacambre-1', base_food_id: 'ing-vacambre', name: '1 porción mediana', equivalent_weight_g: 200 },
-  { id: 'port-milanesa-1', base_food_id: 'ing-milanesa-carne', name: '1 unidad (120g)', equivalent_weight_g: 120 },
-  { id: 'port-empanada-1', base_food_id: 'ing-empanada-carne', name: '1 unidad (90g)', equivalent_weight_g: 90 },
-  { id: 'port-palta-1', base_food_id: 'ing-palta', name: '1/2 unidad mediana', equivalent_weight_g: 80 },
-  { id: 'port-huevo-1', base_food_id: 'ing-huevo', name: '1 huevo mediano (50g)', equivalent_weight_g: 50 },
-  { id: 'port-aceite-1', base_food_id: 'ing-aceite-oliva', name: '1 cucharada (15ml)', equivalent_weight_g: 14 }
-];
-
-/**
- * Sanitizes input food records to prevent XSS and malformed numerical entries.
- */
-export function sanitizeIngredient(raw: BaseIngredient): BaseIngredient {
-  const sanitizedName = (raw.name || '')
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<[^>]*>?/gm, '')
-    .trim();
-
-  const calories = Math.max(0, Number.isFinite(raw.calories_100g) ? raw.calories_100g : 0);
-  const protein = Math.max(0, Number.isFinite(raw.protein_100g) ? raw.protein_100g : 0);
-  const carbs = Math.max(0, Number.isFinite(raw.carbs_100g) ? raw.carbs_100g : 0);
-  const fats = Math.max(0, Number.isFinite(raw.fats_100g) ? raw.fats_100g : 0);
-
-  return {
-    ...raw,
-    id: String(raw.id).trim(),
-    name: sanitizedName,
-    source: 'system',
-    lang: raw.lang || 'es',
-    calories_100g: calories,
-    protein_100g: protein,
-    carbs_100g: carbs,
-    fats_100g: fats
-  };
-}
-
-/**
- * Computes an MD5 content hash for a single food item based on its nutritional profile and name.
- */
-export function computeContentHash(ingredient: BaseIngredient): string {
-  const payload = [
-    ingredient.name,
-    ingredient.calories_100g,
-    ingredient.protein_100g,
-    ingredient.carbs_100g,
-    ingredient.fats_100g,
-    ingredient.lang
-  ].join('|');
-
-  return crypto.createHash('md5').update(payload, 'utf8').digest('hex');
-}
-
-/**
- * Computes a deterministic catalog version hash across all ingredients.
- */
-export function computeCatalogVersion(items: (BaseIngredient & { contentHash?: string })[]): string {
-  const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
-  const composite = sorted
-    .map((item) => `${item.id}:${item.contentHash || computeContentHash(item)}`)
-    .join(';');
-
-  return crypto.createHash('md5').update(composite, 'utf8').digest('hex');
-}
-
-/**
- * Builds the full versioned catalog payload.
- */
-export function buildCatalogPayload(ingredients: BaseIngredient[] = seedIngredients): {
-  catalog: CatalogPayload;
-  meta: CatalogMetaPayload;
-} {
-  const sanitizedItems: CatalogItem[] = ingredients.map((raw) => {
-    const sanitized = sanitizeIngredient(raw);
-    const contentHash = computeContentHash(sanitized);
-    return {
-      ...sanitized,
-      contentHash
-    };
-  });
-
-  const catalogVersion = computeCatalogVersion(sanitizedItems);
-  const generatedAt = new Date().toISOString();
-
-  const catalog: CatalogPayload = {
-    catalogVersion,
-    generatedAt,
-    items: sanitizedItems
-  };
-
-  const meta: CatalogMetaPayload = {
-    catalogVersion,
-    generatedAt
-  };
-
-  return { catalog, meta };
-}
 
 export interface RunETLOptions {
   publicDir?: string;
   assetsDir?: string;
+  dataRawDir?: string;
+  tempDir?: string;
+  reset?: boolean;
 }
 
-export function runETL(options?: RunETLOptions) {
+function findDataFile(dirPath: string, extension: string): string | null {
+  if (!fs.existsSync(dirPath)) {
+    console.warn(`[ETL Warning] Directory not found: ${dirPath}`);
+    return null;
+  }
+  const files = fs.readdirSync(dirPath);
+  const match = files.find((f) => f.endsWith(extension) && !f.startsWith('.'));
+  
+  if (!match) {
+    console.warn(`[ETL Warning] No ${extension} file found in ${dirPath}. Please place the raw dataset here.`);
+    return null;
+  }
+  return path.join(dirPath, match);
+}
+
+const STAGES = ['INIT', 'SYSTEM', 'SARA2', 'TBCA', 'USDA', 'OPENFOODFACTS', 'RESOLVER', 'EXPORT', 'DONE'];
+
+function hasCompleted(currentStage: string, targetStage: string): boolean {
+  return STAGES.indexOf(currentStage) > STAGES.indexOf(targetStage);
+}
+
+export async function runETL(options?: RunETLOptions): Promise<void> {
   const currentFile = fileURLToPath(import.meta.url);
   const currentDir = path.dirname(currentFile);
-
+  
   const publicDir = options?.publicDir || path.resolve(currentDir, '../../webapp/public');
-  const assetsDir = options?.assetsDir || path.resolve(currentDir, '../../webapp/src/assets');
+  const dataRawDir = options?.dataRawDir || path.resolve(currentDir, '../data/raw');
+  const tempDir = options?.tempDir || path.resolve(currentDir, '../data/temp');
+  const dataDir = path.resolve(currentDir, '../data');
 
-  console.log('[ETL Pipeline] Transforming regional food datasets (ARGENFOODS/LATINFOODS/USDA)...');
-
-  const { catalog, meta } = buildCatalogPayload(seedIngredients);
-
-  // 1. Output catalog.json and catalog_meta.json to webapp/public/
-  if (!fs.existsSync(publicDir)) {
-    fs.mkdirSync(publicDir, { recursive: true });
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
   }
-  const catalogPath = path.join(publicDir, 'catalog.json');
-  const metaPath = path.join(publicDir, 'catalog_meta.json');
 
-  fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf-8');
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
-  console.log(`[ETL Pipeline] Generated versioned catalog (${catalog.catalogVersion}) at ${catalogPath}`);
-  console.log(`[ETL Pipeline] Generated catalog metadata at ${metaPath}`);
+  const tracker = new StateTracker(tempDir);
+  if (options?.reset || process.argv.includes('--reset')) {
+    tracker.reset();
+  }
 
-  // 2. Generate _headers file for Cloudflare Pages to allow CORS from WebApp
-  const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
-  const headersPath = path.join(publicDir, '_headers');
-  fs.writeFileSync(headersPath, headersContent, 'utf-8');
-  console.log(`[ETL Pipeline] Generated CORS _headers for Cloudflare Pages at ${headersPath}`);
+  let state = tracker.getState();
+  console.log(`[ETL Pipeline] Starting... Resuming from stage: ${state.stage}`);
+
+  const intermediateFiles: string[] = [];
+  const addIntermediate = (name: string) => {
+    const f = path.join(tempDir, `${name}.ndjson`);
+    intermediateFiles.push(f);
+    return f;
+  };
+
+  const isSystemOnly = process.argv.includes('--system-only');
+
+  // 1. SYSTEM
+  const systemOut = addIntermediate('system');
+  if (isSystemOnly || !hasCompleted(state.stage, 'SYSTEM')) {
+    console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
+    
+    const prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
+    if (prebuiltUrl) {
+      console.log(`[ETL Pipeline] PREBUILT_SYSTEM_CATALOG_URL detected: ${prebuiltUrl}`);
+      try {
+        if (prebuiltUrl.startsWith('http://') || prebuiltUrl.startsWith('https://')) {
+          const res = await fetch(prebuiltUrl);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          fs.writeFileSync(systemOut, text);
+        } else {
+          const localPath = prebuiltUrl.startsWith('file://') ? prebuiltUrl.replace('file://', '') : prebuiltUrl;
+          fs.copyFileSync(path.resolve(currentDir, '../../', localPath), systemOut);
+        }
+        console.log(`[ETL Pipeline] Successfully loaded prebuilt system catalog.`);
+      } catch (e) {
+        console.error(`[ETL Pipeline] Failed to load prebuilt system catalog:`, e);
+        process.exit(1);
+      }
+    } else {
+      const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
+      const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
+      if (fs.existsSync(systemIngredientsCsv)) {
+        const { ingredientsCount, portionsCount } = await parseSystemCSV(systemIngredientsCsv, systemPortionsCsv, systemOut);
+        console.log(`[ETL Pipeline] Loaded ${ingredientsCount} ingredients and ${portionsCount} portions from SYSTEM`);
+      } else {
+        console.warn(`[ETL Pipeline] System dataset not found. Skipping...`);
+        fs.writeFileSync(systemOut, ''); // Touch file to prevent resolver crash
+      }
+    }
+    
+    tracker.updateStage('SARA2');
+    state = tracker.getState();
+  } else {
+    console.log('[ETL Pipeline] Skipped SYSTEM (already processed)');
+  }
+
+  if (process.argv.includes('--system-only')) {
+    console.log('[ETL Pipeline] --system-only flag detected. Skipping remaining sources.');
+    tracker.updateStage('RESOLVER');
+    state = tracker.getState();
+  }
+
+  if (process.argv.includes('--generate-system-catalog')) {
+    const offGzPath = path.join(dataRawDir, 'openfoodfacts/openfoodfacts-products.jsonl.gz');
+    if (!fs.existsSync(offGzPath)) {
+      console.error('[ETL Pipeline] ERROR: OpenFoodFacts raw data not found.');
+      console.error('  Please run `npm run start -- --with-off` first to download the 13GB dataset.');
+      process.exit(1);
+    }
+    
+    console.log('[ETL Pipeline] --generate-system-catalog flag detected. Scanning OpenFoodFacts...');
+    const outDir = path.join(dataDir, 'generated');
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+    
+    const ingredientsCsvPath = path.join(outDir, 'system_ingredients.csv');
+    const portionsCsvPath = path.join(outDir, 'system_portions.csv');
+    
+    await parseOpenFoodFactsJSONL(offGzPath, {
+      format: 'csv',
+      outPath: ingredientsCsvPath,
+      outPortionsPath: portionsCsvPath
+    });
+    
+    console.log(`[ETL Pipeline] Successfully generated CSV templates in ${outDir}`);
+    process.exit(0);
+  }
+
+  // 2. SARA 2
+  const saraOut = addIntermediate('sara2');
+  if (!hasCompleted(state.stage, 'SARA2')) {
+    console.log(`\n[ETL Pipeline] --- Processing SARA 2 ---`);
+    const saraCsv = findDataFile(path.join(dataRawDir, 'sara2'), '.csv');
+    if (saraCsv) {
+      const count = await parseSara2CSV(saraCsv, saraOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from SARA 2`);
+    }
+    tracker.updateStage('TBCA');
+    state = tracker.getState();
+  }
+
+  // 4. TBCA
+  const tbcaOut = addIntermediate('tbca');
+  if (!hasCompleted(state.stage, 'TBCA')) {
+    console.log(`\n[ETL Pipeline] --- Processing TBCA ---`);
+    const tbcaCsv = findDataFile(path.join(dataRawDir, 'tbca'), '.csv');
+    if (tbcaCsv) {
+      const count = await parseTbcaCSV(tbcaCsv, tbcaOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from TBCA`);
+    }
+    tracker.updateStage('USDA');
+    state = tracker.getState();
+  }
+
+  // 5. USDA
+  const usdaOut = addIntermediate('usda');
+  if (!hasCompleted(state.stage, 'USDA')) {
+    console.log(`\n[ETL Pipeline] --- Processing USDA ---`);
+    const usdaCsv = findDataFile(path.join(dataRawDir, 'usda'), '.csv');
+    if (usdaCsv) {
+      const count = await parseUsdaCSV(usdaCsv, usdaOut);
+      console.log(`[ETL Pipeline] Loaded ${count} items from USDA`);
+    }
+    tracker.updateStage('OPENFOODFACTS');
+    state = tracker.getState();
+  }
+
+  // 6. Open Food Facts
+  const offOut = addIntermediate('openfoodfacts');
+  if (!hasCompleted(state.stage, 'OPENFOODFACTS')) {
+    console.log(`\n[ETL Pipeline] --- Processing Open Food Facts ---`);
+    const offJsonlGz = findDataFile(path.join(dataRawDir, 'openfoodfacts'), '.jsonl.gz');
+    if (offJsonlGz) {
+      const count = await parseOpenFoodFactsJSONL(offJsonlGz, {
+        format: 'ndjson',
+        outPath: offOut,
+        stateTracker: tracker
+      });
+      console.log(`[ETL Pipeline] Loaded ${count} items from Open Food Facts`);
+    }
+    tracker.updateStage('RESOLVER');
+    state = tracker.getState();
+  }
+
+  // 6. Resolution & Export
+  if (!hasCompleted(state.stage, 'RESOLVER')) {
+    console.log(`\n[ETL Pipeline] --- Deduplication & Export ---`);
+    if (!fs.existsSync(publicDir)) {
+      fs.mkdirSync(publicDir, { recursive: true });
+    }
+    const catalogPath = path.join(publicDir, 'catalog.json');
+    const metaPath = path.join(publicDir, 'catalog_meta.json');
+    
+    const dataDir = path.resolve(currentDir, '../../webapp/src/generated');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    const systemCatalogPath = path.join(dataDir, 'catalog_system.ndjson');
+    const systemMetaPath = path.join(dataDir, 'catalog_system_meta.json');
+    
+    await resolveAndExportNDJSON(intermediateFiles, catalogPath, metaPath, systemCatalogPath, systemMetaPath);
+
+    // Generate _headers file for Cloudflare Pages
+    const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
+    const headersPath = path.join(publicDir, '_headers');
+    fs.writeFileSync(headersPath, headersContent, 'utf-8');
+
+    tracker.updateStage('DONE');
+  }
+
+  console.log('[ETL Pipeline] Success!');
 }
 
 // Auto-run if executed directly
@@ -180,5 +264,42 @@ const isDirectExecution = process.argv[1] && (
 );
 
 if (isDirectExecution) {
-  runETL();
+  import('child_process').then(({ execSync }) => {
+    const currentFile = fileURLToPath(import.meta.url);
+    const currentDir = path.dirname(currentFile);
+    const scriptDir = path.resolve(currentDir, '../scripts');
+
+    if (process.argv.includes('--with-sara2')) {
+      console.log('[ETL Pipeline CLI] --with-sara2 flag detected. Running SARA2 download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_sara2.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-tbca')) {
+      console.log('[ETL Pipeline CLI] --with-tbca flag detected. Running TBCA download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_tbca.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-usda')) {
+      console.log('[ETL Pipeline CLI] --with-usda flag detected. Running USDA download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_usda.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-off')) {
+      console.log('[ETL Pipeline CLI] --with-off flag detected. Running Open Food Facts download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_off.sh')}"`, { stdio: 'inherit' });
+    }
+
+    if (process.argv.includes('--with-system') || process.argv.includes('--system-only')) {
+      console.log('[ETL Pipeline CLI] Running SYSTEM download script...');
+      execSync(`bash "${path.join(scriptDir, 'download_system.sh')}"`, { stdio: 'inherit' });
+    }
+
+    runETL().catch((err) => {
+      console.error('[ETL Pipeline] Fatal error:', err);
+      process.exit(1);
+    });
+  }).catch(err => {
+    console.error('[ETL Pipeline] Fatal error importing child_process:', err);
+    process.exit(1);
+  });
 }

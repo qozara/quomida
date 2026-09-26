@@ -1,4 +1,4 @@
-# 15. Decoupled Catalog Hydration & Two-File Delta Synchronization
+# 15. Decoupled Catalog Hydration & Multi-Tier Delta Synchronization
 
 * Status: accepted
 * Date: 2026-09-20
@@ -18,15 +18,17 @@ As the food database scales to tens of thousands of items:
 
 We have implemented a **Decoupled Catalog Hydration Architecture** using a **Two-File Delta Synchronization Pattern**:
 
-1. **Two-File Distribution Strategy**:
-   - The ETL pipeline (`apps/etl-pipeline`) outputs two separate assets:
-     - `catalog_meta.json`: A lightweight manifest (~50 bytes) containing `{ "catalogVersion": "...", "generatedAt": "..." }`.
-     - `catalog.json`: The complete, versioned payload containing all validated food items.
-   - The client `CatalogHydrationService` always checks `catalog_meta.json` first (with cache-busting). It **only** downloads the larger `catalog.json` if the remote version differs from the version stored in the local `system_metadata` RxDB collection.
+1. **Multi-Tier Distribution Strategy**:
+   - The ETL pipeline (`apps/etl-pipeline`) outputs assets into two separate tiers:
+     - **Local Bundled Tier**: `catalog_system.ndjson` is generated dynamically into `src/generated/` via a pre-build hook (`npm run prebuild`). It contains foundational core ingredients and portions, ensuring it is bundled natively by Vite (via `?raw` string imports). It is explicitly ignored by Git.
+     - **External Remote Tier**: `catalog_meta.json` (a lightweight manifest) and `catalog.json` (the complete versioned payload of external datasets like SARA2 and TBCA).
+   - The client `CatalogHydrationService` guarantees instant offline functionality by synchronously parsing and hydrating the bundled `catalog_system.ndjson` directly into RxDB before any network calls.
+   - Afterwards, it checks the external `catalog_meta.json` and only downloads the larger `catalog.json` if the remote version differs from the local `system_metadata`.
 
 2. **Client-Side In-Memory Delta Upsert**:
-   - When a new catalog is downloaded, `CatalogHydrationService` queries RxDB for existing items with `source: 'system'` only.
+   - When a new remote catalog is downloaded, `CatalogHydrationService` queries RxDB for existing items.
    - It performs an in-memory diff against existing items and executes `bulkUpsert` only for new or modified records.
+   - The ETL resolver strictly deduplicates across tiers, dropping any external dataset items that share a normalized name with a foundational system item.
    - Custom ingredients created by the user (`source: 'custom'`) are strictly excluded from comparison and updates, guaranteeing zero data loss or collision.
 
 3. **Shift-Left Security Boundary**:
@@ -51,4 +53,5 @@ We have implemented a **Decoupled Catalog Hydration Architecture** using a **Two
   - **Infrastructure Portability**: Can switch static hosting providers simply by updating `VITE_CATALOG_BASE_URL`.
   - **Offline Resilience**: Web application functions completely offline using existing RxDB records or initial bundled seeds.
 - **Cons**:
-  - Requires maintaining two files (`catalog_meta.json` and `catalog.json`) in the ETL pipeline output.
+  - Requires maintaining three files (`catalog_system.ndjson`, `catalog_meta.json`, and `catalog.json`) in the ETL pipeline output.
+  - Requires managing a prebuild hook to ensure the system catalog dummy is generated before Vite builds the webapp.

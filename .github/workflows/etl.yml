@@ -16,12 +16,63 @@ on:
     # Run every 6 months (Jan 1st and Jul 1st at midnight)
     - cron: '0 0 1 1,7 *'
   workflow_dispatch:
+    inputs:
+      include_openfoodfacts:
+        description: 'Download & process Open Food Facts (13GB .gz)'
+        required: true
+        type: boolean
+        default: false
+      include_sara2:
+        description: 'Download & process SARA2 CSV'
+        required: true
+        type: boolean
+        default: true
+      include_tbca:
+        description: 'Download & process TBCA CSV'
+        required: true
+        type: boolean
+        default: true
+      include_usda:
+        description: 'Download & process USDA FoodData Central CSV'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || vars.ENABLE_ETL_SCHEDULE == 'true'
+    env:
+      CACHE_DATE: ''
     steps:
+      - name: Maximize Build Space
+        # This frees up ~30GB of disk space on the GitHub runner, essential for the 13GB OFF file
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
       - uses: actions/checkout@v4
+
+      - name: Set Cache Date
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        run: echo "CACHE_DATE=$(date +'%Y-%m')" >> $GITHUB_ENV
+
+      - name: Cache Open Food Facts Dataset
+        if: ${{ github.event.inputs.include_openfoodfacts == 'true' || github.event_name == 'schedule' }}
+        uses: actions/cache@v4
+        with:
+          path: apps/etl-pipeline/data/raw/openfoodfacts/openfoodfacts-products.jsonl.gz
+          # Cache keyed by month so we download a fresh copy monthly
+          key: off-dataset-${{ runner.os }}-${{ env.CACHE_DATE }}
+          restore-keys: |
+            off-dataset-${{ runner.os }}-
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,12 +83,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ETL Pipeline
-        run: npm run etl
+      - name: Run ETL Pipeline (Download & Parse)
+        env:
+          SARA2_URL: ${{ secrets.SARA2_URL }}
+          TBCA_URL: ${{ secrets.TBCA_URL }}
+          USDA_URL: ${{ secrets.USDA_URL }}
+          SYSTEM_INGREDIENTS_URL: ${{ secrets.SYSTEM_INGREDIENTS_URL }}
+          SYSTEM_PORTIONS_URL: ${{ secrets.SYSTEM_PORTIONS_URL }}
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            FLAGS="$FLAGS --with-off"
+          fi
+          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+            FLAGS="$FLAGS --with-sara2"
+          fi
+          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+            FLAGS="$FLAGS --with-tbca"
+          fi
+          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+            FLAGS="$FLAGS --with-usda"
+          fi
+          npm run etl -- $FLAGS
 
-      - name: Deploy to Cloudflare Pages
+      - name: Upload Catalog to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/webapp/public --project-name=quomida-etl --branch=${{ github.head_ref || github.ref_name }}
+          command: r2 object put quomida-data/catalog.json --file=apps/webapp/public/catalog.json --content-type=application/json
+
+      - name: Upload Catalog Meta to Cloudflare R2
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 object put quomida-data/catalog_meta.json --file=apps/webapp/public/catalog_meta.json --content-type=application/json

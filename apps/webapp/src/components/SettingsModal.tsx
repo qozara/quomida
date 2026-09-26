@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw } from 'lucide-react';
 
+import systemMeta from '../generated/catalog_system_meta.json';
+
 export const SettingsModal: React.FC = () => {
   const {
     locale,
@@ -19,6 +21,8 @@ export const SettingsModal: React.FC = () => {
     catalogVersion,
     catalogGeneratedAt,
     isHydratingCatalog,
+    hydrationProgress,
+    abortCatalogUpdate,
     refreshCatalog,
     t
   } = useApp();
@@ -257,20 +261,44 @@ export const SettingsModal: React.FC = () => {
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleCheckCatalogUpdates}
-              disabled={isHydratingCatalog}
-              className="w-full min-h-[44px] py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
-              aria-label={(t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
-            >
-              <RefreshCw className={`w-4 h-4 ${isHydratingCatalog ? 'animate-spin' : ''}`} />
-              <span>
-                {isHydratingCatalog
-                  ? (t.settings as any).checkingCatalog || 'Checking for updates...'
-                  : (t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
-              </span>
-            </button>
+            {isHydratingCatalog && hydrationProgress.status === 'syncing' ? (
+              <div className="w-full flex flex-col gap-2 p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                <div className="flex justify-between items-center text-xs text-slate-300 font-medium">
+                  <span>Downloading catalog...</span>
+                  <span>{hydrationProgress.percentage}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2">
+                  <div 
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${hydrationProgress.percentage}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1">
+                  <span>{hydrationProgress.itemsProcessed} items processed</span>
+                  <button 
+                    onClick={() => abortCatalogUpdate()}
+                    className="text-rose-400 hover:text-rose-300 font-semibold"
+                  >
+                    Cancel Update
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCheckCatalogUpdates}
+                disabled={isHydratingCatalog}
+                className="w-full min-h-[44px] py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+                aria-label={(t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
+              >
+                <RefreshCw className={`w-4 h-4 ${isHydratingCatalog ? 'animate-spin' : ''}`} />
+                <span>
+                  {isHydratingCatalog
+                    ? (t.settings as any).checkingCatalog || 'Checking for updates...'
+                    : (t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
+                </span>
+              </button>
+            )}
 
             {catalogFeedback && (
               <div
@@ -289,8 +317,12 @@ export const SettingsModal: React.FC = () => {
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
           </span>
           <span className="text-[10px] text-slate-600 font-mono uppercase">
-            Catalog: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
+            External: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
             {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
+          </span>
+          <span className="text-[10px] text-slate-600 font-mono uppercase">
+            System: {systemMeta?.catalogVersion ? systemMeta.catalogVersion.substring(0, 8) : 'None'}
+            {systemMeta?.generatedAt ? ` • ${new Date(systemMeta.generatedAt).toLocaleDateString()}` : ''}
           </span>
         </div>
 

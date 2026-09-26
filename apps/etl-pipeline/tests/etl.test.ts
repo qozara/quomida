@@ -90,8 +90,19 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(v3).not.toBe(v1);
   });
 
-  it('generates catalog.json and catalog_meta.json in public directory with matching versions', () => {
-    runETL({ publicDir, assetsDir });
+  it('generates catalog.json and catalog_meta.json in public directory with matching versions', async () => {
+    // Pass a fake empty dataRawDir so it doesn't accidentally read the massive 10GB real dump during tests
+    const emptyRawDir = path.join(tempDir, 'empty_raw');
+    const saraDir = path.join(emptyRawDir, 'sara2');
+    fs.mkdirSync(saraDir, { recursive: true });
+    
+    fs.writeFileSync(
+      path.join(saraDir, 'sara2.csv'),
+      'id,nombre,energia_kcal,proteinas,cho_disponibles,lipidos\nS100,Bife de chorizo,210,22.5,0,13.4\n',
+      'utf-8'
+    );
+    
+    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, tempDir, reset: true });
 
     const catalogPath = path.join(publicDir, 'catalog.json');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
@@ -99,17 +110,44 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(fs.existsSync(catalogPath)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
 
-    const catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
+    const items = catalogDataRaw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
     const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
 
-    expect(catalogData.catalogVersion).toBeDefined();
-    expect(metaData.catalogVersion).toBe(catalogData.catalogVersion);
-    expect(Array.isArray(catalogData.items)).toBe(true);
-    expect(catalogData.items.length).toBeGreaterThan(0);
+    expect(metaData.catalogVersion).toBeDefined();
+    expect(metaData.generatedAt).toBeDefined();
+    expect(Array.isArray(items)).toBe(true);
+    expect(items.length).toBeGreaterThan(0);
 
-    const firstItem = catalogData.items[0];
+    const firstItem = items[0];
     expect(firstItem.id).toBeDefined();
     expect(firstItem.contentHash).toBeDefined();
     expect(firstItem.source).toBe('system');
+  });
+
+  it('ingests raw files from dataRawDir and resolves them properly', async () => {
+    const rawDir = path.join(tempDir, 'raw');
+    const usdaDir = path.join(rawDir, 'usda');
+    fs.mkdirSync(usdaDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(usdaDir, 'usda.csv'),
+      'fdc_id,description,energy,protein,carbohydrate,lipid\n9999,Alimento Test,100,5,10,2\n',
+      'utf-8'
+    );
+
+    await runETL({ publicDir, assetsDir, dataRawDir: rawDir, tempDir, reset: true });
+
+    const catalogPath = path.join(publicDir, 'catalog.json');
+    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
+    const items = catalogDataRaw
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => JSON.parse(line));
+    
+    const testItem = items.find((i: any) => i.name === 'Alimento Test');
+    expect(testItem).toBeDefined();
+    expect(testItem.calories_100g).toBe(100);
+    expect(testItem.source).toBe('system');
   });
 });

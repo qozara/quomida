@@ -78,7 +78,26 @@ Quomida uses a Bring Your Own Storage (BYOS) architecture, allowing users to syn
 npm install
 ```
 
-### 2. Start Web Application
+### 2. Configure Local Environment Variables
+
+To properly build the web application, you must provide the URLs to your foundational system catalogs. We provide sample templates to get you started quickly:
+
+```bash
+# Create .env for the ETL pipeline (which builds the internal catalog)
+cp apps/etl-pipeline/.env.example apps/etl-pipeline/.env
+```
+Inside `apps/etl-pipeline/.env`, set the variables to point to the local sample files:
+```env
+# Option 1: Use local sample CSV templates
+SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
+SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
+
+# Option 2: Use a prebuilt, finalized system catalog (Bypasses CSV generation)
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
+```
+*Note: When deploying to Vercel or Cloudflare Pages, simply configure these exact same environment variables in your deployment dashboard, pointing to the raw URLs where you host your production CSVs or prebuilt catalog.*
+
+### 3. Start Web Application
 
 ```bash
 npm run dev
@@ -99,7 +118,22 @@ npm run build
 npm audit
 ```
 
-### 4. CLI Google OAuth & Live E2E Testing
+### 4. Maintainer Utility Scripts
+
+We provide root-level aliases to easily manage the project without manually targeting workspaces:
+
+```bash
+# Check how the ETL catalogs are currently configured
+npm run etl:show-catalog-setup
+
+# Generate CSV templates from the OpenFoodFacts database
+npm run etl:generate-system
+
+# Clean all downloaded datasets and generated ETL files
+npm run clean
+```
+
+### 5. CLI Google OAuth & Live E2E Testing
 
 You can authenticate and test synchronization against real Google Drive / Sheets directly from the command line:
 

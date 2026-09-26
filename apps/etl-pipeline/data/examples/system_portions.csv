@@ -1,0 +1,7 @@
+id,base_food_id,name,equivalent_weight_g
+port-vacambre-1,ing-vacambre,1 porción mediana,200
+port-milanesa-1,ing-milanesa-carne,1 unidad (120g),120
+port-empanada-1,ing-empanada-carne,1 unidad (90g),90
+port-palta-1,ing-palta,1/2 unidad mediana,80
+port-huevo-1,ing-huevo,1 huevo mediano (50g),50
+port-aceite-1,ing-aceite-oliva,1 cucharada (15ml),14
