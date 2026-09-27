@@ -240,7 +240,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     if (!fs.existsSync(publicDir)) {
       fs.mkdirSync(publicDir, { recursive: true });
     }
-    const catalogPath = path.join(publicDir, 'catalog.json');
+    const catalogPath = path.join(publicDir, 'catalog.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
     
     const dataDir = path.resolve(currentDir, '../../webapp/src/generated');

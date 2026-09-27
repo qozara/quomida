@@ -1,6 +1,7 @@
 import fs from 'fs';
 import readline from 'readline';
 import crypto from 'crypto';
+import { DatabaseSync } from 'node:sqlite';
 import { normalizeFoodName } from './utils/parserUtils.js';
 import type { DataSourceOrigin, RawIngredientItem } from './types.js';
 import type { CatalogItem, CatalogPayload, CatalogMetaPayload } from './index.js';
@@ -88,7 +89,7 @@ export function resolveIngredients(items: RawIngredientItem[]): RawIngredientIte
  */
 export async function resolveAndExportNDJSON(
   inputFiles: string[],
-  outPath: string,
+  outPath: string, // This is now a .sqlite path
   metaPath: string,
   systemOutPath?: string,
   systemMetaPath?: string
@@ -97,7 +98,31 @@ export async function resolveAndExportNDJSON(
   const externalCatalogItems: { id: string; hash: string }[] = [];
   const systemCatalogItems: { id: string; hash: string }[] = [];
 
-  const outStream = fs.createWriteStream(outPath, { flags: 'w' });
+  if (fs.existsSync(outPath)) {
+    fs.unlinkSync(outPath);
+  }
+  const db = new DatabaseSync(outPath);
+  db.exec(`
+    PRAGMA page_size = 4096;
+    PRAGMA journal_mode = OFF;
+    PRAGMA synchronous = OFF;
+    CREATE TABLE base_ingredients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      source TEXT NOT NULL,
+      lang TEXT NOT NULL,
+      calories_100g REAL NOT NULL,
+      protein_100g REAL NOT NULL,
+      carbs_100g REAL NOT NULL,
+      fats_100g REAL NOT NULL,
+      contentHash TEXT NOT NULL
+    );
+  `);
+  const insertStmt = db.prepare(`
+    INSERT INTO base_ingredients (id, name, source, lang, calories_100g, protein_100g, carbs_100g, fats_100g, contentHash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
   const sysStream = systemOutPath ? fs.createWriteStream(systemOutPath, { flags: 'w' }) : null;
   
   let externalExportedCount = 0;
@@ -146,7 +171,17 @@ export async function resolveAndExportNDJSON(
           systemCatalogItems.push({ id: finalItem.id, hash: contentHash });
           systemExportedCount++;
         } else {
-          outStream.write(JSON.stringify(finalItem) + '\n');
+          insertStmt.run(
+            finalItem.id,
+            finalItem.name,
+            finalItem.source,
+            finalItem.lang,
+            finalItem.calories_100g,
+            finalItem.protein_100g,
+            finalItem.carbs_100g,
+            finalItem.fats_100g,
+            finalItem.contentHash
+          );
           externalCatalogItems.push({ id: finalItem.id, hash: contentHash });
           externalExportedCount++;
         }
@@ -154,15 +189,12 @@ export async function resolveAndExportNDJSON(
     }
   }
 
-  await new Promise<void>((resolve) => {
-    outStream.end(() => {
-      if (sysStream) {
-        sysStream.end(() => resolve());
-      } else {
-        resolve();
-      }
-    });
-  });
+  if (sysStream) {
+    await new Promise<void>((resolve) => sysStream.end(() => resolve()));
+  }
+
+  db.exec(`CREATE INDEX idx_name ON base_ingredients(name);`);
+  db.close();
 
   console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items to ${outPath}`);
   if (systemOutPath) {
