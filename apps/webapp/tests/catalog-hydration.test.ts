@@ -50,42 +50,23 @@ describe('CatalogHydrationService [APP-206]', () => {
     expect(metaCalls.length).toBe(1);
   });
 
-  it('downloads catalog and updates database when a newer version is available', async () => {
+  it('downloads catalog metadata and updates version when a newer version is available', async () => {
     await service.setMetadata('lastIngestedCatalogVersion', 'v1.0.0');
 
     const metaResponse = { catalogVersion: 'v1.0.1', generatedAt: '2026-09-20T12:00:00Z' };
-    const catalogNdjson = JSON.stringify({
-      id: 'ing-new-apple',
-      name: 'Golden Apple',
-      source: 'system',
-      lang: 'en',
-      calories_100g: 60,
-      protein_100g: 0.5,
-      carbs_100g: 15,
-      fats_100g: 0.1,
-      contentHash: 'mockhash123'
-    }) + '\n';
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
-      if (String(url).includes('catalog.json')) return new Response(catalogNdjson, { status: 200 });
       return new Response('{}', { status: 200 });
     });
 
     const result = await hydrationService.hydrate();
     expect(result.status).toBe('UPDATED');
     expect(result.version).toBe('v1.0.1');
-    expect(result.itemsUpserted).toBe(1);
 
     // Verify lastIngestedCatalogVersion was saved
     const updatedVersion = await service.getMetadata('lastIngestedCatalogVersion');
     expect(updatedVersion).toBe('v1.0.1');
-
-    // Verify item exists in database
-    const db = service.getDatabaseInstance()!;
-    const item = await db.base_ingredients.findOne('ing-new-apple').exec();
-    expect(item).not.toBeNull();
-    expect(item?.name).toBe('Golden Apple');
   });
 
   it('never modifies or compares against user-created custom ingredients', async () => {
@@ -99,23 +80,11 @@ describe('CatalogHydrationService [APP-206]', () => {
       fats_100g: 10
     });
 
-    // 2. Remote catalog includes system food updates
+    // 2. Hydrate
     const metaResponse = { catalogVersion: 'v2.0.0', generatedAt: '2026-09-20T12:00:00Z' };
-    const catalogNdjson = JSON.stringify({
-      id: 'ing-vacambre',
-      name: 'Vacío vacuno (crudo) UPDATED',
-      source: 'system',
-      lang: 'es',
-      calories_100g: 180,
-      protein_100g: 21.0,
-      carbs_100g: 0,
-      fats_100g: 11.0,
-      contentHash: 'updatedhash'
-    }) + '\n';
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('catalog_meta.json')) return new Response(JSON.stringify(metaResponse), { status: 200 });
-      if (String(url).includes('catalog.json')) return new Response(catalogNdjson, { status: 200 });
       return new Response('{}', { status: 200 });
     });
 
@@ -127,10 +96,6 @@ describe('CatalogHydrationService [APP-206]', () => {
     expect(customFood).not.toBeNull();
     expect(customFood?.source).toBe('custom');
     expect(customFood?.name).toBe('My Special Meal');
-
-    // 4. Verify system food was updated
-    const systemFood = await db.base_ingredients.findOne('ing-vacambre').exec();
-    expect(systemFood?.name).toBe('Vacío vacuno (crudo) UPDATED');
   });
 
   it('supports force refresh with cache bypass', async () => {

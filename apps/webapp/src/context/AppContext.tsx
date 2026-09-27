@@ -53,7 +53,7 @@ interface AppContextType {
     portionName: string
   ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
-  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>) => Promise<void>;
+  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
   removeCustomIngredient: (id: string) => Promise<void>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
@@ -69,9 +69,6 @@ interface AppContextType {
   catalogVersion: string | null;
   catalogGeneratedAt: string | null;
   catalogFileSizeBytes: number | null;
-  isHydratingCatalog: boolean;
-  hydrationProgress: { status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number };
-  abortCatalogUpdate: () => void;
   refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
 }
 
@@ -109,63 +106,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
-  const [isHydratingCatalog, setIsHydratingCatalog] = useState(false);
-  const [hydrationProgress, setHydrationProgress] = useState<{ status: 'idle' | 'syncing' | 'error', percentage: number, loadedBytes: number, totalBytes?: number, itemsProcessed: number }>({ status: 'idle', percentage: 0, loadedBytes: 0, itemsProcessed: 0 });
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
   const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
   const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
   const syncLock = React.useRef(false);
-  const hydrationAbortController = React.useRef<AbortController | null>(null);
-
-  const abortCatalogUpdate = useCallback(() => {
-    if (hydrationAbortController.current) {
-      hydrationAbortController.current.abort();
-      hydrationAbortController.current = null;
-    }
-  }, []);
 
   const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
-    if (isHydratingCatalog) {
-      return { status: 'SKIPPED', itemsUpserted: 0, error: 'Update already in progress' };
-    }
-    setIsHydratingCatalog(true);
-    setHydrationProgress({ status: 'syncing', percentage: 0, loadedBytes: 0, itemsProcessed: 0 });
-    
-    hydrationAbortController.current = new AbortController();
-    
     try {
-      const res = await hydrationService.hydrate({
-        ...options,
-        signal: hydrationAbortController.current.signal,
-        onProgress: (progress) => {
-          setHydrationProgress({
-            status: 'syncing',
-            loadedBytes: progress.loadedBytes,
-            totalBytes: progress.totalBytes,
-            itemsProcessed: progress.itemsProcessed,
-            percentage: progress.totalBytes ? Math.min(100, Math.round((progress.loadedBytes / progress.totalBytes) * 100)) : 0
-          });
-        }
-      });
-      if (res.version) {
-        setCatalogVersion(res.version);
-      }
-      if (res.generatedAt) {
-        setCatalogGeneratedAt(res.generatedAt);
-      }
-      if (res.fileSizeBytes) {
-        setCatalogFileSizeBytes(res.fileSizeBytes);
-      }
-      setHydrationProgress(prev => ({ ...prev, status: res.status === 'ERROR' ? 'error' : 'idle' }));
+      const res = await hydrationService.hydrate(options);
+      if (res.version) setCatalogVersion(res.version);
+      if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
+      if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
       return res;
     } catch (e) {
-      setHydrationProgress(prev => ({ ...prev, status: 'error' }));
       return { status: 'ERROR', itemsUpserted: 0 };
-    } finally {
-      setIsHydratingCatalog(false);
-      hydrationAbortController.current = null;
     }
-  }, [hydrationService, isHydratingCatalog]);
+  }, [hydrationService]);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -504,8 +460,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     forceSync().catch(console.error);
   };
 
-  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>) => {
-    await dbService.saveCustomFood(ingData);
+  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => {
+    await dbService.saveCustomFood(ingData, portions);
     forceSync().catch(console.error);
   };
 
@@ -578,9 +534,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         catalogVersion,
         catalogGeneratedAt,
         catalogFileSizeBytes,
-        isHydratingCatalog,
-        hydrationProgress,
-        abortCatalogUpdate,
         refreshCatalog
       }}
     >

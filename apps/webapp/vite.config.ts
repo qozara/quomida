@@ -149,6 +149,12 @@ export default defineConfig(({ mode }) => {
       '@quomida/i18n-locales': path.resolve(__dirname, '../../packages/i18n-locales/src/index.ts')
     }
   },
+  worker: {
+    format: 'es'
+  },
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm', 'sqlite-wasm-http']
+  },
   server: {
     port: 3000
   },

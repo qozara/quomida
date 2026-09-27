@@ -23,13 +23,48 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
 
   // Fetch available portions dynamically
   useEffect(() => {
-    if (ingredient && db) {
-      db.portions.find({ selector: { base_food_id: ingredient.id } }).exec().then((docs: any[]) => {
-        setAvailablePortions(docs.map((d: any) => d.toJSON ? d.toJSON() : d));
-      });
-    } else {
-      setAvailablePortions([]);
-    }
+    let isCancelled = false;
+    const fetchAllPortions = async () => {
+      if (!ingredient || !db) {
+        setAvailablePortions([]);
+        return;
+      }
+      
+      const portions: any[] = [];
+      
+      // 1. Fetch specific custom portions from local RxDB
+      try {
+        const localDocs = await db.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
+        const custom = localDocs.map((d: any) => d.toJSON ? d.toJSON() : d).map((p: any) => ({ ...p, tag: 'Custom' }));
+        portions.push(...custom);
+      } catch (e) {}
+
+      // 2. Fetch remote portions if ingredient is from system
+      if (ingredient.source === 'system') {
+        try {
+          const remoteService = new (await import('../services/RemoteCatalogService.js')).RemoteCatalogService(
+            (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
+          );
+          const remoteDocs = await remoteService.getPortionsForIngredient(ingredient.id);
+          const external = remoteDocs.map(p => ({ ...p, tag: 'External' }));
+          portions.push(...external);
+        } catch (e) {}
+      }
+
+      // 3. Fetch generic fallback portions from local RxDB
+      try {
+        const genericDocs = await db.portions.find({ selector: { base_food_id: 'generic' } }).exec();
+        const generic = genericDocs.map((d: any) => d.toJSON ? d.toJSON() : d).map((p: any) => ({ ...p, tag: 'Generic' }));
+        portions.push(...generic);
+      } catch (e) {}
+      
+      if (!isCancelled) {
+        setAvailablePortions(portions);
+      }
+    };
+    
+    fetchAllPortions();
+    return () => { isCancelled = true; };
   }, [ingredient, db]);
 
   useEffect(() => {
@@ -125,7 +160,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
             >
               {availablePortions.map((p) => (
                 <option key={p.id} value={p.name}>
-                  {p.name} ({p.equivalent_weight_g}g)
+                  {p.name} ({p.equivalent_weight_g}g) {p.tag === 'Generic' ? '(Fallback)' : p.tag ? `(${p.tag})` : ''}
                 </option>
               ))}
               <option value="g">{t.portionModal.customGrams}</option>

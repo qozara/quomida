@@ -314,7 +314,7 @@ export class LocalDBService {
     await this.db!.user_settings.upsert(updated);
   }
 
-  async saveCustomFood(foodInput: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }): Promise<string> {
+  async saveCustomFood(foodInput: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }, portions?: { name: string, equivalent_weight_g: number }[]): Promise<string> {
     if (!this.db) await this.init();
     const id = foodInput.id || `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const newFood: BaseIngredient = {
@@ -324,6 +324,17 @@ export class LocalDBService {
       updatedAt: Date.now()
     };
     await this.db!.base_ingredients.insert(newFood);
+
+    if (portions && portions.length > 0) {
+      const portionsToUpsert = portions.map((p, i) => ({
+        id: `port-${id}-${i}`,
+        base_food_id: id,
+        name: p.name,
+        equivalent_weight_g: p.equivalent_weight_g
+      }));
+      await this.db!.portions.bulkUpsert(portionsToUpsert);
+    }
+    
     return id;
   }
 

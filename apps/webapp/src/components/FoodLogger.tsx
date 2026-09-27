@@ -4,6 +4,8 @@ import type { BaseIngredient, MealType } from '@quomida/domain-core';
 import { parseNaturalLanguageLog, MockLLMProvider } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle } from 'lucide-react';
 
+import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
+
 interface FoodLoggerProps {
   onSelectIngredient: (ingredient: BaseIngredient, mealType: MealType) => void;
 }
@@ -15,8 +17,12 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
   const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [filteredIngredients, setFilteredIngredients] = useState<BaseIngredient[]>([]);
+  const [remoteService] = useState(() => new RemoteCatalogService(
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
+  ));
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
 
-  // Search results dynamic filter against RxDB and Custom ingredients
+  // Search results dynamic filter against RxDB, Custom ingredients, and Remote SQLite
   React.useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredIngredients([]);
@@ -33,8 +39,9 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       );
 
       let systemMatches: BaseIngredient[] = [];
+      let remoteMatches: BaseIngredient[] = [];
       
-      // 2. Search massive system database (dynamic query)
+      // 2. Search local built-in system database
       if (db) {
         try {
           const docs = await db.base_ingredients.find({
@@ -42,7 +49,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
               source: 'system',
               name: { $regex: new RegExp(query, 'i') } 
             },
-            limit: 20
+            limit: 10
           }).exec();
           
           if (!isCancelled) {
@@ -53,8 +60,21 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         }
       }
 
+      // 3. Search external remote database
+      try {
+        setIsSearchingRemote(true);
+        remoteMatches = await remoteService.searchIngredients(query, 10);
+      } catch (e) {
+        console.error('Remote search query failed:', e);
+      } finally {
+        if (!isCancelled) setIsSearchingRemote(false);
+      }
+
       if (!isCancelled) {
-        setFilteredIngredients([...customMatches, ...systemMatches].slice(0, 30));
+        // Merge and deduplicate by ID
+        const allMatches = [...customMatches, ...systemMatches, ...remoteMatches];
+        const unique = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
+        setFilteredIngredients(unique.slice(0, 30));
       }
     };
 
@@ -144,33 +164,49 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
           {/* Real-time search result list */}
           {searchQuery.trim() !== '' && (
-            <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20">
-              {filteredIngredients.length === 0 ? (
+            <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
+              {filteredIngredients.length === 0 && !isSearchingRemote ? (
                 <div className="p-4 text-center text-xs text-slate-500">
                   {t.search.noResults}
                 </div>
               ) : (
-                filteredIngredients.map((ing) => (
-                  <button
-                    key={ing.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectIngredient(ing, 'meal_lunch');
-                      setSearchQuery('');
-                    }}
-                    className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
-                        {ing.name}
+                <>
+                  {filteredIngredients.map((ing) => (
+                    <button
+                      key={ing.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectIngredient(ing, 'meal_lunch');
+                        setSearchQuery('');
+                      }}
+                      className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                            {ing.name}
+                          </div>
+                          {ing.source === 'custom' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Custom</span>
+                          )}
+                          {ing.source === 'system' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">System</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400">
-                        {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
-                      </div>
+                      <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                    </button>
+                  ))}
+                  {isSearchingRemote && (
+                    <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
+                      <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                      Searching remote catalog...
                     </div>
-                    <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
-                  </button>
-                ))
+                  )}
+                </>
               )}
             </div>
           )}
