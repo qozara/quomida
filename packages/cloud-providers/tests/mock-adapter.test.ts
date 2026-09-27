@@ -92,5 +92,30 @@ describe('MockCloudSyncProvider', () => {
     expect(pulled[0].collection).toBe('daily_logs');
     expect(pulled[0].documents[0].id).toBe('log-1');
   });
+
+  it('strictly ignores system ingredients during push for sync isolation', async () => {
+    await adapter.initialize('mock-token');
+
+    const samplePayload = {
+      collection: 'base_ingredients',
+      documents: [
+        { id: 'ing-custom', source: 'custom', name: 'My Chicken' },
+        { id: 'ing-ai', source: 'ai', name: 'Scanned Chicken' },
+        { id: 'ing-system', source: 'system', name: 'VFS Chicken' }
+      ]
+    };
+
+    await adapter.push(samplePayload);
+    
+    const pulled = await adapter.pull();
+    const catalogPayload = pulled.find(p => p.collection === 'base_ingredients');
+    
+    expect(catalogPayload).toBeDefined();
+    expect(catalogPayload!.documents).toHaveLength(2);
+    const ids = catalogPayload!.documents.map(d => d.id);
+    expect(ids).toContain('ing-custom');
+    expect(ids).toContain('ing-ai');
+    expect(ids).not.toContain('ing-system'); // System items must NOT be synced
+  });
 });
 

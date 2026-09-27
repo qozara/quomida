@@ -189,6 +189,53 @@ describe('CompositeCloudSyncProvider & Strategy Pattern', () => {
     expect(portionRows[0].values).toContain('Taza');
   });
 
+  it('strictly isolates system ingredients and only pushes custom or ai sources', async () => {
+    await adapter.push({
+      collection: 'base_ingredients',
+      documents: [
+        {
+          id: 'food_custom',
+          name: 'My Custom Oat',
+          source: 'custom',
+          lang: 'en',
+          calories_100g: 389,
+          protein_100g: 16.9,
+          carbs_100g: 66.3,
+          fats_100g: 6.9
+        },
+        {
+          id: 'food_system',
+          name: 'System Oat (VFS cache)',
+          source: 'system',
+          lang: 'en',
+          calories_100g: 380,
+          protein_100g: 15,
+          carbs_100g: 65,
+          fats_100g: 6
+        },
+        {
+          id: 'food_ai',
+          name: 'AI Generated Oat',
+          source: 'ai',
+          lang: 'en',
+          calories_100g: 390,
+          protein_100g: 17,
+          carbs_100g: 66,
+          fats_100g: 7
+        }
+      ]
+    });
+
+    const catalogDocId = await tabularDriver.ensureDocument('Quomida Food Catalog', ['base_ingredients', 'recipes', 'portions']);
+    const ingRows = await tabularDriver.readTable(catalogDocId, 'base_ingredients');
+    
+    expect(ingRows.length).toBe(2);
+    const ids = ingRows.map(r => r.id);
+    expect(ids).toContain('food_custom');
+    expect(ids).toContain('food_ai');
+    expect(ids).not.toContain('food_system');
+  });
+
   it('pulls data from drivers and reconstitutes normalized RxDB documents', async () => {
     // Push settings and daily logs
     await adapter.push({
