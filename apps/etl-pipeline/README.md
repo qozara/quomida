@@ -118,14 +118,23 @@ npm run start --workspace=@quomida/etl-pipeline -- --with-off --with-system
 
 *(Note: The `--with-off` flag downloads the 13GB OpenFoodFacts dataset. It takes time but is cached locally in `data/raw/`)*
 
-### 3. Build-Time System Generation
+### 3. Understanding `data/raw/` & Handcrafted Files (Maintainer Guide)
+
+In this ETL architecture, the `data/raw/` directory acts as a **pure data sink** for automated download scripts (`download_system.sh`, `download_off.sh`, etc.). When the pipeline runs, these scripts fetch datasets from the URLs configured in your `.env` and ruthlessly dump them into `data/raw/`.
+
+**If you are a maintainer building custom handcrafted CSVs, DO NOT place them in `data/raw/` blindly**, as the download scripts may overwrite them. Instead, use one of these intended workflows:
+
+- **The Safe Way (Recommended):** Place your handcrafted CSVs in a separate, version-controlled directory like `data/examples/` (or your own ignored `data/custom/`). Then, update your `.env` to point to them (e.g., `SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"`). The automated scripts will safely copy them into `raw/` for processing.
+- **The Direct Way:** You *can* place handcrafted files directly into `data/raw/system/`, **but you MUST comment out the corresponding URLs in your `.env`** (e.g., `# SYSTEM_INGREDIENTS_URL="..."`). When commented out, the download scripts will skip the fetch phase, safely leaving your manually placed files intact for the Node.js parser to process.
+
+### 4. Build-Time System Generation
 
 The web application's `prebuild` hook automatically runs this command to ensure `catalog_system.ndjson` is built into the app before Vite bundles it:
 ```bash
 npm run build:system --workspace=@quomida/etl-pipeline
 ```
 
-### 4. Cleaning Cached Data
+### 5. Cleaning Cached Data
 
 If you need to reset the pipeline (e.g. to redownload OpenFoodFacts or flush the state tracking):
 ```bash
@@ -133,7 +142,7 @@ npm run clean --workspace=@quomida/etl-pipeline
 ```
 *Note: This script will prompt you for confirmation because it deletes the 13GB downloaded OpenFoodFacts dataset and all intermediate JSONL files.*
 
-### 5. Generate a Custom System Catalog (Advanced)
+### 6. Generate a Custom System Catalog (Advanced)
 
 If you want to generate a rich foundational catalog containing all items for Latin America and Spain, you can instruct the pipeline to scan OpenFoodFacts and output clean **CSV** templates that you can edit in Excel or Google Sheets.
 
