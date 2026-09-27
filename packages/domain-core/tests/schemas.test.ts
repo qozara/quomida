@@ -14,6 +14,12 @@ describe('RxDB Schema Specs', () => {
     expect(baseIngredientsSchema.primaryKey).toBe('id');
     expect(baseIngredientsSchema.required).toContain('name');
     expect(baseIngredientsSchema.required).toContain('calories_100g');
+    
+    // Validate source enum contains 'system', 'custom', and 'ai'
+    const sourceProp = baseIngredientsSchema.properties.source as any;
+    expect(sourceProp.enum).toContain('system');
+    expect(sourceProp.enum).toContain('custom');
+    expect(sourceProp.enum).toContain('ai');
   });
 
   it('defines recipes schema with embedded ingredients array', () => {

@@ -1,4 +1,4 @@
-export type IngredientSource = 'system' | 'custom';
+export type IngredientSource = 'system' | 'custom' | 'ai';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type MealType = 'meal_breakfast' | 'meal_lunch' | 'meal_dinner' | 'meal_snack';
 

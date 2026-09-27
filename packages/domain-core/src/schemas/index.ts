@@ -17,7 +17,7 @@ export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
   properties: {
     id: { type: 'string', maxLength: 100 },
     name: { type: 'string' },
-    source: { type: 'string', enum: ['system', 'custom'] },
+    source: { type: 'string', enum: ['system', 'custom', 'ai'] },
     lang: { type: 'string' },
     calories_100g: { type: 'number', minimum: 0 },
     protein_100g: { type: 'number', minimum: 0 },
