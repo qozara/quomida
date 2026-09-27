@@ -40,15 +40,29 @@ rl.question('Are you sure you want to proceed? (y/N): ', (answer) => {
       }
     }
 
-    // Delete generated directory
+    // Delete dist-cdn directory
+    const distCdnDir = path.resolve(rootDir, 'dist-cdn');
+    if (fs.existsSync(distCdnDir)) {
+      fs.rmSync(distCdnDir, { recursive: true, force: true });
+      console.log(' - Deleted dist-cdn/');
+    }
+
+    // Delete generated directory (CSV templates from OFF)
     const generatedDir = path.join(dataDir, 'generated');
     if (fs.existsSync(generatedDir)) {
       fs.rmSync(generatedDir, { recursive: true, force: true });
       console.log(' - Deleted data/generated/');
     }
+    
+    // Delete webapp generated catalog
+    const webappGeneratedDir = path.resolve(rootDir, '../webapp/src/generated');
+    if (fs.existsSync(webappGeneratedDir)) {
+      fs.rmSync(webappGeneratedDir, { recursive: true, force: true });
+      console.log(' - Deleted apps/webapp/src/generated/');
+    }
 
     // Delete state file
-    const stateFile = path.join(dataDir, '.state.json');
+    const stateFile = path.join(dataDir, 'temp', '.etl-state.json');
     if (fs.existsSync(stateFile)) {
       fs.unlinkSync(stateFile);
       console.log(' - Deleted data/.state.json');

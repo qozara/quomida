@@ -17,6 +17,7 @@ apps/webapp/public/_headers
 # ETL Pipeline Workspaces
 apps/etl-pipeline/dist-cdn/
 apps/etl-pipeline/data/temp/
+apps/etl-pipeline/data/generated/
 apps/etl-pipeline/data/raw/**/*.csv
 apps/etl-pipeline/data/raw/**/*.jsonl
 apps/etl-pipeline/data/raw/**/*.gz
