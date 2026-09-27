@@ -14,6 +14,9 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'quomida-etl-test-'));
     publicDir = path.join(tempDir, 'public');
     assetsDir = path.join(tempDir, 'assets');
+    
+    // Unset environment variable during tests so it doesn't attempt to fetch
+    delete process.env.PREBUILT_SYSTEM_CATALOG_URL;
   });
 
   afterEach(() => {
@@ -104,14 +107,17 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     
     await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, tempDir, reset: true });
 
-    const catalogPath = path.join(publicDir, 'catalog.json');
+    const catalogPath = path.join(publicDir, 'catalog.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
 
     expect(fs.existsSync(catalogPath)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
 
-    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
-    const items = catalogDataRaw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(catalogPath);
+    const items = db.prepare('SELECT * FROM base_ingredients').all() as any[];
+    db.close();
+    
     const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
 
     expect(metaData.catalogVersion).toBeDefined();
@@ -138,12 +144,11 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
 
     await runETL({ publicDir, assetsDir, dataRawDir: rawDir, tempDir, reset: true });
 
-    const catalogPath = path.join(publicDir, 'catalog.json');
-    const catalogDataRaw = fs.readFileSync(catalogPath, 'utf-8');
-    const items = catalogDataRaw
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line));
+    const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(catalogPath);
+    const items = db.prepare('SELECT * FROM base_ingredients').all() as any[];
+    db.close();
     
     const testItem = items.find((i: any) => i.name === 'Alimento Test');
     expect(testItem).toBeDefined();
