@@ -53,8 +53,14 @@ quomida/
 │   └── i18n-locales/     # Centralized English & Spanish translation dictionaries
 ├── apps/
 │   ├── webapp/           # React 19 + Vite + RxDB PWA with modern glassmorphic mobile UI
-│   ├── etl-pipeline/     # Regional food dataset ingestion & seed_v1.json builder
-│   └── cli/              # Terminal CLI: domain testing, Google OAuth login/logout & live E2E tests
+│   │   ├── src/generated/# [Git Ignored] Built-in catalog seed bundled physically into webapp
+│   │   └── public/       # Static favicons and Vite app shell artifacts
+│   ├── etl-pipeline/     # Regional food dataset ingestion & external catalog generator
+│   │   ├── data/raw/     # [Git Ignored] Drop massive 13GB regional DB source files here
+│   │   ├── data/temp/    # [Git Ignored] Ephemeral memory chunks and state logs
+│   │   ├── data/examples/# Version-controlled baseline CSV templates for maintainers
+│   │   └── dist-cdn/     # [Git Ignored] Generated catalog.sqlite VFS for CDN deployment
+│   └── cli/              # Terminal CLI: domain testing, SQLite queries, Google OAuth login
 ├── docs/                 # Architecture blueprints, persistence guides, product spec, ADRs, and guides
 └── AGENTS.md             # AI Agent rules & verification registry
 ```

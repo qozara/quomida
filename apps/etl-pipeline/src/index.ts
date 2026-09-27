@@ -75,7 +75,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
   const currentFile = fileURLToPath(import.meta.url);
   const currentDir = path.dirname(currentFile);
   
-  const publicDir = options?.publicDir || path.resolve(currentDir, '../../webapp/public');
+  const publicDir = options?.publicDir || path.resolve(currentDir, '../dist-cdn');
   const dataRawDir = options?.dataRawDir || path.resolve(currentDir, '../data/raw');
   const tempDir = options?.tempDir || path.resolve(currentDir, '../data/temp');
   const dataDir = path.resolve(currentDir, '../data');
