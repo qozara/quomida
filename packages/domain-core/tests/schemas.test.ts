@@ -33,6 +33,15 @@ describe('RxDB Schema Specs', () => {
     expect(portionsSchema.primaryKey).toBe('id');
     expect(portionsSchema.required).toContain('base_food_id');
     expect(portionsSchema.required).toContain('equivalent_weight_g');
+    
+    // Validate source enum contains 'system', 'custom', and 'ai'
+    const sourceProp = portionsSchema.properties.source as any;
+    expect(sourceProp.enum).toContain('system');
+    expect(sourceProp.enum).toContain('custom');
+    expect(sourceProp.enum).toContain('ai');
+    
+    expect(portionsSchema.properties.is_generic).toBeDefined();
+    expect((portionsSchema.properties.is_generic as any).type).toBe('boolean');
   });
 
   it('defines daily_logs schema with hardcoded macros snapshot and optional food_name', () => {

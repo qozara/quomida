@@ -117,10 +117,21 @@ export async function resolveAndExportNDJSON(
       fats_100g REAL NOT NULL,
       contentHash TEXT NOT NULL
     );
+    CREATE TABLE portions (
+      id TEXT PRIMARY KEY,
+      base_food_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      equivalent_weight_g REAL NOT NULL,
+      contentHash TEXT NOT NULL
+    );
   `);
   const insertStmt = db.prepare(`
     INSERT INTO base_ingredients (id, name, source, lang, calories_100g, protein_100g, carbs_100g, fats_100g, contentHash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertPortionStmt = db.prepare(`
+    INSERT INTO portions (id, base_food_id, name, equivalent_weight_g, contentHash)
+    VALUES (?, ?, ?, ?, ?)
   `);
 
   const sysStream = systemOutPath ? fs.createWriteStream(systemOutPath, { flags: 'w' }) : null;
@@ -164,26 +175,36 @@ export async function resolveAndExportNDJSON(
           };
         }
         
-        const isSystem = item.originSource === 'SYSTEM' || item._type === 'portion';
+        const isSystem = item.originSource === 'SYSTEM';
         
         if (isSystem && sysStream) {
           sysStream.write(JSON.stringify(finalItem) + '\n');
           systemCatalogItems.push({ id: finalItem.id, hash: contentHash });
           systemExportedCount++;
         } else {
-          insertStmt.run(
-            finalItem.id,
-            finalItem.name,
-            finalItem.source,
-            finalItem.lang,
-            finalItem.calories_100g,
-            finalItem.protein_100g,
-            finalItem.carbs_100g,
-            finalItem.fats_100g,
-            finalItem.contentHash
-          );
+          if (item._type === 'portion') {
+            insertPortionStmt.run(
+              finalItem.id,
+              finalItem.base_food_id,
+              finalItem.name,
+              finalItem.equivalent_weight_g,
+              finalItem.contentHash
+            );
+          } else {
+            insertStmt.run(
+              finalItem.id,
+              finalItem.name,
+              finalItem.source,
+              finalItem.lang,
+              finalItem.calories_100g,
+              finalItem.protein_100g,
+              finalItem.carbs_100g,
+              finalItem.fats_100g,
+              finalItem.contentHash
+            );
+            externalExportedCount++;
+          }
           externalCatalogItems.push({ id: finalItem.id, hash: contentHash });
-          externalExportedCount++;
         }
       }
     }
@@ -193,7 +214,10 @@ export async function resolveAndExportNDJSON(
     await new Promise<void>((resolve) => sysStream.end(() => resolve()));
   }
 
-  db.exec(`CREATE INDEX idx_name ON base_ingredients(name);`);
+  db.exec(`
+    CREATE INDEX idx_name ON base_ingredients(name);
+    CREATE INDEX idx_portion_base_food ON portions(base_food_id);
+  `);
   db.close();
 
   console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items to ${outPath}`);

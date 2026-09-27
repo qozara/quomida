@@ -159,7 +159,17 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     await db.addCollections({
       base_ingredients: { schema: baseIngredientsSchema },
       recipes: { schema: recipesSchema },
-      portions: { schema: portionsSchema },
+      portions: { 
+        schema: portionsSchema,
+        migrationStrategies: {
+          1: (oldDoc: any) => {
+            // Migration to v1: Add generic source and flag
+            oldDoc.source = 'system';
+            oldDoc.is_generic = true;
+            return oldDoc;
+          }
+        }
+      },
       daily_logs: { schema: dailyLogsSchema },
       user_settings: { schema: userSettingsSchema },
       system_metadata: { schema: systemMetadataSchema }

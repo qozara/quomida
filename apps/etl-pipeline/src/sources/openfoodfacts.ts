@@ -178,6 +178,10 @@ export async function parseOpenFoodFactsJSONL(
 
     const id = `ing-off-${code}`;
 
+    let servingQty = parseFloatSafe(product.serving_quantity);
+    let servingSize = product.serving_size;
+    let hasPortion = servingQty > 0 && typeof servingSize === 'string' && servingSize.trim().length > 0;
+
     if (isCSV) {
       // Strip newlines and escape commas/quotes for CSV
       const cleanName = rawName.replace(/[\r\n]+/g, ' ').trim();
@@ -188,18 +192,13 @@ export async function parseOpenFoodFactsJSONL(
       outStream.write(`${id},${csvName},system,${matchedLang},${calories},${protein},${carbs},${fats}\n`);
 
       // Try to parse serving size for portions
-      if (portionsStream) {
-        let servingQty = parseFloatSafe(product.serving_quantity);
-        let servingSize = product.serving_size;
-        
-        if (servingQty > 0 && typeof servingSize === 'string' && servingSize.trim().length > 0) {
-          const csvPortionName = servingSize.includes(',') || servingSize.includes('"')
-            ? `"${servingSize.replace(/"/g, '""')}"`
-            : servingSize.trim();
-            
-          const portionId = `port-off-${code}-1`;
-          portionsStream.write(`${portionId},${id},${csvPortionName},${servingQty}\n`);
-        }
+      if (portionsStream && hasPortion) {
+        const csvPortionName = servingSize.includes(',') || servingSize.includes('"')
+          ? `"${servingSize.replace(/"/g, '""')}"`
+          : servingSize.trim();
+          
+        const portionId = `port-off-${code}-1`;
+        portionsStream.write(`${portionId},${id},${csvPortionName},${servingQty}\n`);
       }
     } else {
       const item = {
@@ -216,6 +215,21 @@ export async function parseOpenFoodFactsJSONL(
         originalId: code
       };
       outStream.write(JSON.stringify(item) + '\n');
+      
+      if (hasPortion) {
+        const portionId = `port-off-${code}-1`;
+        const portionItem = {
+          _type: 'portion',
+          id: portionId,
+          base_food_id: id,
+          name: servingSize.trim(),
+          equivalent_weight_g: servingQty,
+          source: 'system',
+          is_generic: false,
+          originSource: 'OPENFOODFACTS'
+        };
+        outStream.write(JSON.stringify(portionItem) + '\n');
+      }
     }
   }
 

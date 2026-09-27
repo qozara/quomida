@@ -32,6 +32,8 @@ export interface Portion {
   base_food_id: string;
   name: string;
   equivalent_weight_g: number;
+  source?: IngredientSource;
+  is_generic?: boolean;
   updatedAt?: number;
 }
 
