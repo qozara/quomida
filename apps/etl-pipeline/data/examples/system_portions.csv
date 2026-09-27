@@ -1,7 +1,81 @@
 id,base_food_id,name,equivalent_weight_g
-port-vacambre-1,ing-vacambre,1 porción mediana,200
-port-milanesa-1,ing-milanesa-carne,1 unidad (120g),120
-port-empanada-1,ing-empanada-carne,1 unidad (90g),90
-port-palta-1,ing-palta,1/2 unidad mediana,80
-port-huevo-1,ing-huevo,1 huevo mediano (50g),50
-port-aceite-1,ing-aceite-oliva,1 cucharada (15ml),14
+port-std-es-pizca,generic,1 pizca (1 g),1
+port-std-es-cdita-cafe,generic,1 cucharadita de café (2.5 g),2.5
+port-std-es-cdita-te,generic,1 cucharadita de té (5 g),5
+port-std-es-cdita-colmada,generic,1 cucharadita colmada (8 g),8
+port-std-es-cuchara-postre,generic,1 cucharada de postre (10 g),10
+port-std-es-chorrito,generic,1 chorrito (10 ml),10
+port-std-es-cuchara-sopera,generic,1 cucharada sopera (15 g),15
+port-std-es-cuchara-colmada,generic,1 cucharada colmada (25 g),25
+port-std-es-punado,generic,1 puñado (30 g),30
+port-std-es-pocillo-cafe,generic,1 pocillo de café (50 ml),50
+port-std-es-cuarto-taza,generic,1/4 taza (60 ml / 60 g),60
+port-std-es-tercio-taza,generic,1/3 taza (80 ml / 80 g),80
+port-std-es-media-taza,generic,1/2 taza (120 ml / 120 g),120
+port-std-es-taza-te,generic,1 taza de té (150 ml),150
+port-std-es-tres-cuartos-taza,generic,3/4 taza (180 ml / 180 g),180
+port-std-es-taza-estandar,generic,1 taza (240 ml / 240 g),240
+port-std-es-taza-desayuno,generic,1 taza desayuno (250 ml),250
+port-std-es-tazon,generic,1 tazón / mug (300 ml),300
+port-std-es-copita,generic,1 copita / shot (30 ml),30
+port-std-es-vaso-chico,generic,1 vaso chico (150 ml),150
+port-std-es-vaso-estandar,generic,1 vaso (200 ml),200
+port-std-es-vaso-grande,generic,1 vaso grande (250 ml),250
+port-std-es-lata,generic,1 lata (354 ml),354
+port-std-es-botella-chica,generic,1 botella chica (500 ml),500
+port-std-es-cucharon-sopa,generic,1 cucharón de sopa (100 ml / 100 g),100
+port-std-es-plato-postre,generic,1 plato de postre (150 g),150
+port-std-es-bowl-chico,generic,1 bowl chico (150 g),150
+port-std-es-plato-playo,generic,1 plato playo / ración (250 g),250
+port-std-es-bowl-mediano,generic,1 bowl mediano (250 g),250
+port-std-es-plato-hondo,generic,1 plato hondo (350 g),350
+port-std-es-feta-fina,generic,1 feta / rodaja fina (15 g),15
+port-std-es-rebanada-chica,generic,1 rebanada chica (25 g),25
+port-std-es-rebanada-mediana,generic,1 rebanada mediana (40 g),40
+port-std-es-rebanada-gruesa,generic,1 rebanada gruesa (60 g),60
+port-std-es-unidad-chica,generic,1 unidad chica (50 g),50
+port-std-es-unidad-mediana,generic,1 unidad mediana (100 g),100
+port-std-es-unidad-grande,generic,1 unidad grande (150 g),150
+port-std-es-porcion-chica,generic,1 porción chica (100 g),100
+port-std-es-porcion-mediana,generic,1 porción mediana (150 g),150
+port-std-es-porcion-individual,generic,1 porción individual (200 g),200
+port-std-es-porcion-grande,generic,1 porción grande (250 g),250
+port-std-en-pinch,generic,1 pinch (1 g),1
+port-std-en-tsp,generic,1 tsp / teaspoon (5 g / 5 ml),5
+port-std-en-heaping-tsp,generic,1 heaping tsp (8 g),8
+port-std-en-dessertspoon,generic,1 dessertspoon (10 g / 10 ml),10
+port-std-en-dash,generic,1 dash / splash (10 ml),10
+port-std-en-tbsp,generic,1 tbsp / tablespoon (15 g / 15 ml),15
+port-std-en-heaping-tbsp,generic,1 heaping tbsp (25 g),25
+port-std-en-handful,generic,1 handful (30 g),30
+port-std-en-shot,generic,1 shot / 1 fl oz (30 ml),30
+port-std-en-quarter-cup,generic,1/4 cup (60 ml / 60 g),60
+port-std-en-third-cup,generic,1/3 cup (80 ml / 80 g),80
+port-std-en-half-cup,generic,1/2 cup (120 ml / 120 g),120
+port-std-en-two-thirds-cup,generic,2/3 cup (160 ml / 160 g),160
+port-std-en-three-quarters-cup,generic,3/4 cup (180 ml / 180 g),180
+port-std-en-cup,generic,1 cup (240 ml / 240 g),240
+port-std-en-glass,generic,1 glass (200 ml / 200 g),200
+port-std-en-large-glass,generic,1 large glass (250 ml / 250 g),250
+port-std-en-mug,generic,1 mug (300 ml / 300 g),300
+port-std-en-can,generic,1 can (12 fl oz / 355 ml),355
+port-std-en-bottle,generic,1 bottle (16.9 fl oz / 500 ml),500
+port-std-en-soup-ladle,generic,1 soup ladle (100 ml / 100 g),100
+port-std-en-small-bowl,generic,1 small bowl (150 g),150
+port-std-en-medium-bowl,generic,1 medium bowl (250 g),250
+port-std-en-dinner-plate,generic,1 dinner plate / serving (250 g),250
+port-std-en-soup-plate,generic,1 soup / deep bowl (350 g),350
+port-std-en-thin-slice,generic,1 thin slice (15 g),15
+port-std-en-small-slice,generic,1 small slice (25 g),25
+port-std-en-medium-slice,generic,1 medium slice (40 g),40
+port-std-en-thick-slice,generic,1 thick slice (60 g),60
+port-std-en-small-unit,generic,1 small unit / piece (50 g),50
+port-std-en-medium-unit,generic,1 medium unit / piece (100 g),100
+port-std-en-large-unit,generic,1 large unit / piece (150 g),150
+port-std-en-small-serving,generic,1 small serving (100 g),100
+port-std-en-medium-serving,generic,1 medium serving (150 g),150
+port-std-en-individual-serving,generic,1 individual serving (200 g),200
+port-std-en-large-serving,generic,1 large serving (250 g),250
+port-std-oz,generic,1 oz / ounce (28.35 g),28.35
+port-std-100g,generic,100 g / 100 ml (reference),100
+port-std-lb,generic,1 lb / pound (453.6 g),453.6
