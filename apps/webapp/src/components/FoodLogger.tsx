@@ -11,7 +11,7 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, t, dbService, db } = useApp();
+  const { ingredients, t, dbService, db, isOnline } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
@@ -61,13 +61,15 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       }
 
       // 3. Search external remote database
-      try {
-        setIsSearchingRemote(true);
-        remoteMatches = await remoteService.searchIngredients(query, 10);
-      } catch (e) {
-        console.error('Remote search query failed:', e);
-      } finally {
-        if (!isCancelled) setIsSearchingRemote(false);
+      if (isOnline) {
+        try {
+          setIsSearchingRemote(true);
+          remoteMatches = await remoteService.searchIngredients(query, 10);
+        } catch (e) {
+          console.error('Remote search query failed:', e);
+        } finally {
+          if (!isCancelled) setIsSearchingRemote(false);
+        }
       }
 
       if (!isCancelled) {
@@ -81,7 +83,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     performSearch();
 
     return () => { isCancelled = true; };
-  }, [searchQuery, ingredients, db]);
+  }, [searchQuery, ingredients, db, isOnline]);
 
   const handleAiParse = async (e: React.FormEvent) => {
     e.preventDefault();

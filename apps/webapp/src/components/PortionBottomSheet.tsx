@@ -15,7 +15,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   defaultMealType,
   onClose
 }) => {
-  const { db, logFoodItem, t } = useApp();
+  const { db, logFoodItem, t, isOnline } = useApp();
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedPortionName, setSelectedPortionName] = useState<string>('g');
@@ -40,7 +40,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
       } catch (e) {}
 
       // 2. Fetch remote portions if ingredient is from system
-      if (ingredient.source === 'system') {
+      if (ingredient.source === 'system' && isOnline) {
         try {
           const remoteService = new (await import('../services/RemoteCatalogService.js')).RemoteCatalogService(
             (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
@@ -65,7 +65,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
     
     fetchAllPortions();
     return () => { isCancelled = true; };
-  }, [ingredient, db]);
+  }, [ingredient, db, isOnline]);
 
   useEffect(() => {
     if (availablePortions.length > 0) {
