@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
-import { resolveAndExportNDJSON } from './resolver.js';
+import { exportSystemCatalog } from './exporters/SystemExporter.js';
+import { exportSQLiteCatalog } from './exporters/SQLiteExporter.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
 import { parseUsdaCSV } from './sources/usda.js';
@@ -14,7 +15,6 @@ import { parseSystemCSV } from './sources/system.js';
 import { StateTracker } from './utils/StateTracker.js';
 
 export * from './types.js';
-export * from './resolver.js';
 export * from './utils/parserUtils.js';
 export * from './sources/sara2.js';
 export * from './sources/tbca.js';
@@ -250,7 +250,18 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     const systemCatalogPath = path.join(dataDir, 'catalog_system.ndjson');
     const systemMetaPath = path.join(dataDir, 'catalog_system_meta.json');
     
-    await resolveAndExportNDJSON(intermediateFiles, catalogPath, metaPath, systemCatalogPath, systemMetaPath);
+    const isSystemOnly = process.argv.includes('--system-only');
+    
+    // Always export system catalog if system file is generated
+    const systemFile = path.join(tempDir, 'system.ndjson');
+    if (fs.existsSync(systemFile)) {
+      await exportSystemCatalog(systemFile, systemCatalogPath, systemMetaPath);
+    }
+    
+    if (!isSystemOnly) {
+      // Export external datasets to SQLite
+      await exportSQLiteCatalog(intermediateFiles, catalogPath, metaPath);
+    }
 
     // Generate _headers file for Cloudflare Pages
     const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;

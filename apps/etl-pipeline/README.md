@@ -108,15 +108,25 @@ TBCA_URL="https://example.com/actual_tbca.csv"
 SARA2_URL="https://example.com/actual_sara2.csv"
 ```
 
-### 2. Run the Full Pipeline
+### 2. The Dual-Pipeline Architecture
 
-To process all remote datasets (USDA, SARA2, TBCA, etc.) and generate both system and external catalogs:
+To ensure clean CI/CD deployments (like Vercel) and fast web app builds, the ETL pipeline is strictly split into two isolated flows:
+
+**Flow A: System Catalog (Built-in)**
+- Generates only the foundational `catalog_system.ndjson`.
+- Has **zero SQLite dependencies**. It bypasses `better-sqlite3` and any C++ native bindings.
+- Automatically executed by the webapp during Vercel builds (`npm run build:system`).
+
+**Flow B: External Catalog (Remote HTTP SQLite)**
+- Generates the massive 13GB `catalog.sqlite` containing OpenFoodFacts.
+- Uses `better-sqlite3` to construct FTS5 trigram indexes for sub-millisecond remote substring search.
+- Designed to be run on-demand locally or via a dedicated GitHub Action worker, *never* during a web frontend deployment.
+- Triggered manually using `npm run build:external`.
 
 ```bash
-npm run start --workspace=@quomida/etl-pipeline -- --with-off --with-system
+# Flow B: Process all external datasets locally (requires better-sqlite3)
+npm run build:external --workspace=@quomida/etl-pipeline
 ```
-
-*(Note: The `--with-off` flag downloads the 13GB OpenFoodFacts dataset. It takes time but is cached locally in `data/raw/`)*
 
 ### 3. Understanding `data/raw/` & Handcrafted Files (Maintainer Guide)
 

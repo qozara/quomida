@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "build:system": "tsx src/index.ts --system-only",
+    "build:external": "tsx src/index.ts",
     "generate-system-catalog": "tsx src/index.ts --generate-system-catalog",
     "clean": "tsx src/scripts/clean.ts",
     "clean:all": "tsx src/scripts/clean.ts --all",
