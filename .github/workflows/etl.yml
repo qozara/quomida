@@ -100,11 +100,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog.json --file=apps/webapp/public/catalog.json --content-type=application/json
+          command: r2 object put quomida-data/catalog.sqlite --file=apps/etl-pipeline/dist-cdn/catalog.sqlite --content-type=application/x-sqlite3
 
       - name: Upload Catalog Meta to Cloudflare R2
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog_meta.json --file=apps/webapp/public/catalog_meta.json --content-type=application/json
+          command: r2 object put quomida-data/catalog_meta.json --file=apps/etl-pipeline/dist-cdn/catalog_meta.json --content-type=application/json
