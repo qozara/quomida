@@ -34,6 +34,8 @@ export const SettingsModal: React.FC = () => {
   const [fatsTarget, setFatsTarget] = useState(userSettings.custom_macros?.fats || 65);
   const [isSaved, setIsSaved] = useState(false);
 
+  const [isChecking, setIsChecking] = useState(false);
+
   if (!isSettingsOpen) return null;
 
   const handleSaveGoals = async (e: React.FormEvent) => {
@@ -49,8 +51,6 @@ export const SettingsModal: React.FC = () => {
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
-
-  const [isChecking, setIsChecking] = useState(false);
 
   const handleCheckCatalogUpdates = async () => {
     if (isChecking) return;
@@ -248,48 +248,7 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4: Built-in Catalog Management [APP-208] */}
-        <div className="space-y-3 pt-2 border-t border-slate-800">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
-            <Database className="w-4 h-4 text-emerald-400" />
-            <span>{(t.settings as any).catalogTitle || 'Food Catalog & Ingredients'}</span>
-          </div>
-
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>
-                {((t.settings as any).catalogVersion || 'Catalog Version: {{version}}').replace(
-                  '{{version}}',
-                  catalogVersion || 'None'
-                )}
-              </span>
-            </div>
-
-              <button
-                type="button"
-                onClick={handleCheckCatalogUpdates}
-                disabled={isChecking}
-                className="w-full min-h-[44px] py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
-                aria-label={(t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates'}
-              >
-                <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
-                <span>
-                  {isChecking ? 'Checking...' : ((t.settings as any).checkCatalogUpdates || 'Check for Catalog Updates')}
-                </span>
-              </button>
-
-            {catalogFeedback && (
-              <div
-                aria-live="polite"
-                className="text-xs text-center p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-medium"
-              >
-                {catalogFeedback}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section 5: App Version & Catalog Info */}
+        {/* Section 4: App Version & Catalog Info */}
         <div className="pt-2 border-t border-slate-800/80 text-center flex flex-col gap-1">
           <span className="text-xs text-slate-500 font-mono">
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}

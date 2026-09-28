@@ -27,6 +27,21 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       {
+        name: 'fix-sqlite-worker',
+        enforce: 'pre',
+        transform(code, id) {
+          if (id.includes('sqlite-wasm-http/dist/index.js')) {
+            return code.replace(
+              /new Worker\(new URL\('\.\/sqlite-worker\.js', import\.meta\.url\)\)/g,
+              "new Worker(new URL('./sqlite-worker.js', import.meta.url), { type: 'module' })"
+            ).replace(
+              /new Worker\(new URL\('\.\/vfs-http-worker\.js', import\.meta\.url\)\)/g,
+              "new Worker(new URL('./vfs-http-worker.js', import.meta.url), { type: 'module' })"
+            );
+          }
+        }
+      },
+      {
         name: 'csp-injector',
         transformIndexHtml(html) {
           return html.replace('__VITE_CSP_CATALOG_DOMAIN__', cspDomain ? ` ${cspDomain}` : '');

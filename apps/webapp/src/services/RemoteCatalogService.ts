@@ -12,7 +12,10 @@ export class RemoteCatalogService {
 
   private getPool() {
     if (!this.poolPromise) {
-      this.poolPromise = createSQLiteHTTPPool({ workers: 1 })
+      this.poolPromise = createSQLiteHTTPPool({ 
+        workers: 1,
+        httpOptions: { backendType: 'sync', maxPageSize: 4096 } 
+      })
         .then(async (pool) => {
           await pool.open(this.catalogUrl);
           return pool;
@@ -24,40 +27,35 @@ export class RemoteCatalogService {
   async searchIngredients(query: string, limit: number = 20): Promise<BaseIngredient[]> {
     const pool = await this.getPool();
     const sql = `SELECT * FROM base_ingredients WHERE name LIKE '%' || $query || '%' LIMIT $limit`;
-    const results = await pool.exec(sql, { $query: query, $limit: limit });
     
-    if (!results || results.length === 0 || !results[0].row) return [];
+    // Add a timeout to prevent infinite spinning if the worker crashes (e.g. due to 403 Forbidden)
+    const results = await Promise.race([
+      pool.exec(sql, { $query: query, $limit: limit }, { rowMode: 'object' }),
+      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 10000))
+    ]).catch(err => {
+      console.error('Remote search error:', err);
+      return [];
+    });
     
-    const out: BaseIngredient[] = [];
-    for (const res of results) {
-      if (!res.row) continue;
-      const obj: any = {};
-      for (let i = 0; i < res.columnNames.length; i++) {
-        obj[res.columnNames[i]] = res.row[i];
-      }
-      out.push(obj as BaseIngredient);
-    }
+    if (!results || results.length === 0) return [];
     
-    return out;
+    return results as unknown as BaseIngredient[];
   }
 
   async getPortionsForIngredient(baseFoodId: string): Promise<Portion[]> {
     const pool = await this.getPool();
     const sql = `SELECT * FROM portions WHERE base_food_id = $id`;
-    const results = await pool.exec(sql, { $id: baseFoodId });
     
-    if (!results || results.length === 0 || !results[0].row) return [];
+    const results = await Promise.race([
+      pool.exec(sql, { $id: baseFoodId }, { rowMode: 'object' }),
+      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 10000))
+    ]).catch(err => {
+      console.error('Remote portions error:', err);
+      return [];
+    });
     
-    const out: Portion[] = [];
-    for (const res of results) {
-      if (!res.row) continue;
-      const obj: any = {};
-      for (let i = 0; i < res.columnNames.length; i++) {
-        obj[res.columnNames[i]] = res.row[i];
-      }
-      out.push(obj as Portion);
-    }
+    if (!results || results.length === 0) return [];
     
-    return out;
+    return results as unknown as Portion[];
   }
 }
