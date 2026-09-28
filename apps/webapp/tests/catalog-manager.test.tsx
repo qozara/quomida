@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CatalogManager } from '../src/components/CatalogManager.js';
 import * as AppContext from '../src/context/AppContext.js';
 
