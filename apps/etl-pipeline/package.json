@@ -5,14 +5,14 @@
   "main": "./src/index.ts",
   "scripts": {
     "build": "tsc --noEmit",
-    "build:system": "tsx src/index.ts --system-only",
-    "build:external": "tsx src/index.ts",
-    "generate-system-catalog": "tsx src/index.ts --generate-system-catalog",
+    "build:system": "tsx src/build-system.ts",
+    "build:external": "tsx src/build-external.ts",
+    "generate-system-catalog": "tsx src/scripts/generate-system-catalog.ts",
     "clean": "tsx src/scripts/clean.ts",
     "clean:all": "tsx src/scripts/clean.ts --all",
     "show-catalog-setup": "tsx src/scripts/show-catalog-setup.ts",
     "upload:r2": "tsx src/scripts/upload-r2.ts",
-    "start": "npx tsx src/index.ts"
+    "start": "npx tsx src/build-external.ts"
   },
   "dependencies": {
     "@quomida/domain-core": "*",

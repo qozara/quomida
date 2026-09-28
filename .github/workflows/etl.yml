@@ -84,13 +84,13 @@ jobs:
           if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-off"
           fi
-          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-sara2"
           fi
-          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-tbca"
           fi
-          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-usda"
           fi
           npm run etl -- $FLAGS
