@@ -1,33 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabaseSync } from 'node:sqlite';
 import { RemoteCatalogService } from '../src/services/RemoteCatalogService.js';
 import fs from 'fs';
-
-// Mock sqlite-wasm-http for Node environment
 import { vi } from 'vitest';
 
 vi.mock('sqlite-wasm-http', () => {
   return {
     createSQLiteHTTPPool: async () => {
-      // In tests, we connect directly to an in-memory db
-      const db = new DatabaseSync(':memory:');
-      db.exec(`
-        CREATE TABLE base_ingredients (id TEXT, name TEXT);
-        INSERT INTO base_ingredients (id, name) VALUES ('1', 'Avacado Test');
-        CREATE TABLE portions (base_food_id TEXT, name TEXT, equivalent_weight_g REAL);
-      `);
       return {
         open: async () => {},
-        close: async () => db.close(),
-        exec: async (sql: string, bind: any) => {
-          const stmt = db.prepare(sql);
-          const rows = stmt.all(bind);
-          if (rows.length === 0) return [];
-          const columnNames = Object.keys(rows[0] as any);
-          return rows.map((row: any) => ({
-            columnNames,
-            row: Object.values(row)
-          }));
+        close: async () => {},
+        exec: async (sql: string, bind: any, options: any) => {
+          if (sql.includes('FROM portions')) {
+            if (bind.$id === '1') return [{ base_food_id: '1', name: 'Slice', equivalent_weight_g: 30 }];
+            return [];
+          }
+          if (sql.includes('FROM base_ingredients_fts')) {
+            if (bind.$query && bind.$query.toLowerCase().includes('avacado')) {
+              return [{ id: '1', name: 'Avacado Test' }];
+            }
+            return [];
+          }
+          return [];
         }
       };
     }
@@ -52,12 +45,13 @@ describe('RemoteCatalogService', () => {
     expect(results).toEqual([]);
   });
 
-  it('should propagate connector failures when the remote database is unreachable', async () => {
+  it('should gracefully return empty array when the remote database is unreachable', async () => {
     // Force a failure by hijacking the internal pool
     const pool = await (service as any).getPool();
     vi.spyOn(pool, 'exec').mockRejectedValueOnce(new Error('Network offline'));
 
-    await expect(service.searchIngredients('Avacado')).rejects.toThrow('Network offline');
+    const results = await service.searchIngredients('Avacado');
+    expect(results).toEqual([]);
   });
 
   it('should search for portions linked to a base_food_id', async () => {

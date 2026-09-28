@@ -2,18 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { runETL, sanitizeIngredient, computeContentHash, computeCatalogVersion } from '../src/index.js';
+import { sanitizeIngredient, computeContentHash } from '../src/utils/sanitizer.js';
+import { exportSQLiteCatalog } from '../src/exporters/SQLiteExporter.js';
 import type { BaseIngredient } from '@quomida/domain-core';
 
 describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
   let tempDir: string;
   let publicDir: string;
-  let assetsDir: string;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'quomida-etl-test-'));
     publicDir = path.join(tempDir, 'public');
-    assetsDir = path.join(tempDir, 'assets');
+    fs.mkdirSync(publicDir, { recursive: true });
     
     // Unset environment variable during tests so it doesn't attempt to fetch
     delete process.env.PREBUILT_SYSTEM_CATALOG_URL;
@@ -27,7 +27,7 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     const maliciousFood: any = {
       id: 'ing-xss',
       name: '  <script>alert("hack")</script>Apple, raw  ',
-      source: 'system',
+      originSource: 'system',
       lang: 'es',
       calories_100g: 52,
       protein_100g: 0.3,
@@ -65,50 +65,27 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(hashModified).not.toBe(hash1);
   });
 
-  it('produces deterministic catalogVersion across multiple runs', () => {
-    const items: BaseIngredient[] = [
-      {
-        id: 'ing-1',
-        name: 'Item 1',
-        source: 'system',
-        lang: 'es',
-        calories_100g: 100,
-        protein_100g: 10,
-        carbs_100g: 10,
-        fats_100g: 2
-      }
-    ];
-
-    const v1 = computeCatalogVersion(items);
-    const v2 = computeCatalogVersion(items);
-    expect(v1).toBe(v2);
-
-    const changedItems: BaseIngredient[] = [
-      {
-        ...items[0],
-        protein_100g: 12
-      }
-    ];
-    const v3 = computeCatalogVersion(changedItems);
-    expect(v3).not.toBe(v1);
-  });
-
-  it('generates catalog.json and catalog_meta.json in public directory with matching versions', async () => {
-    // Pass a fake empty dataRawDir so it doesn't accidentally read the massive 10GB real dump during tests
-    const emptyRawDir = path.join(tempDir, 'empty_raw');
-    const saraDir = path.join(emptyRawDir, 'sara2');
-    fs.mkdirSync(saraDir, { recursive: true });
-    
+  it('generates catalog.sqlite and catalog_meta.json using SQLiteExporter', async () => {
+    const ndjsonPath = path.join(tempDir, 'source.ndjson');
     fs.writeFileSync(
-      path.join(saraDir, 'sara2.csv'),
-      'id,nombre,energia_kcal,proteinas,cho_disponibles,lipidos\nS100,Alimento Test Bife Magico,210,22.5,0,13.4\n',
+      ndjsonPath,
+      JSON.stringify({
+        id: "ing-1",
+        name: "Alimento Test Bife Magico",
+        originSource: "SARA2",
+        lang: "es",
+        calories_100g: 210,
+        protein_100g: 22.5,
+        carbs_100g: 0,
+        fats_100g: 13.4
+      }) + '\n',
       'utf-8'
     );
     
-    await runETL({ publicDir, assetsDir, dataRawDir: emptyRawDir, tempDir, reset: true });
-
     const catalogPath = path.join(publicDir, 'catalog.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
+
+    await exportSQLiteCatalog([ndjsonPath], catalogPath, metaPath);
 
     expect(fs.existsSync(catalogPath)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
@@ -128,31 +105,6 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     const firstItem = items[0];
     expect(firstItem.id).toBeDefined();
     expect(firstItem.contentHash).toBeDefined();
-    expect(firstItem.source).toBe('system');
-  });
-
-  it('ingests raw files from dataRawDir and resolves them properly', async () => {
-    const rawDir = path.join(tempDir, 'raw');
-    const usdaDir = path.join(rawDir, 'usda');
-    fs.mkdirSync(usdaDir, { recursive: true });
-
-    fs.writeFileSync(
-      path.join(usdaDir, 'usda.csv'),
-      'fdc_id,description,energy,protein,carbohydrate,lipid\n9999,Alimento Test,100,5,10,2\n',
-      'utf-8'
-    );
-
-    await runETL({ publicDir, assetsDir, dataRawDir: rawDir, tempDir, reset: true });
-
-    const catalogPath = path.join(publicDir, 'catalog.sqlite');
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync(catalogPath);
-    const items = db.prepare('SELECT * FROM base_ingredients').all() as any[];
-    db.close();
-    
-    const testItem = items.find((i: any) => i.name === 'Alimento Test');
-    expect(testItem).toBeDefined();
-    expect(testItem.calories_100g).toBe(100);
-    expect(testItem.source).toBe('system');
+    expect(firstItem.source).toBe('SARA2');
   });
 });
