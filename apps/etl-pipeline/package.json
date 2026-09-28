@@ -10,6 +10,7 @@
     "clean": "tsx src/scripts/clean.ts",
     "clean:all": "tsx src/scripts/clean.ts --all",
     "show-catalog-setup": "tsx src/scripts/show-catalog-setup.ts",
+    "upload:r2": "tsx src/scripts/upload-r2.ts",
     "start": "npx tsx src/index.ts"
   },
   "dependencies": {

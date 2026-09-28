@@ -95,16 +95,9 @@ jobs:
           fi
           npm run etl -- $FLAGS
 
-      - name: Upload Catalog to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog.sqlite --file=apps/etl-pipeline/dist-cdn/catalog.sqlite --content-type=application/x-sqlite3
-
-      - name: Upload Catalog Meta to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog_meta.json --file=apps/etl-pipeline/dist-cdn/catalog_meta.json --content-type=application/json
+      - name: Upload Artifacts to Cloudflare R2
+        env:
+          CLOUDFLARE_BUCKET_NAME: "quomida-data"
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run upload:r2 --workspace=@quomida/etl-pipeline

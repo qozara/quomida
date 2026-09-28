@@ -181,11 +181,26 @@ For the official Qozara deployment, we use **GitHub Actions** to build the ETL p
 
 **GitHub Actions Integration (`.github/workflows/etl.yml`):**
 - Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
-- Uses `cloudflare/wrangler-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
+- Uses `cloudflare/wrangler-action` to upload the generated SQLite artifacts directly to Cloudflare R2.
 
 **Required GitHub Secrets:**
-- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with "Cloudflare Pages" edit permissions.
+- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with R2 edit permissions.
 - `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
+
+#### Local R2 Upload (Maintainers)
+Maintainers can manually upload the generated catalog to Cloudflare R2 using the provided unified command. This utilizes the same environment configuration without requiring any additional runtime dependencies.
+
+1. Ensure your `.env` contains the required credentials:
+   ```env
+   CLOUDFLARE_BUCKET_NAME="quomida-data"
+   CLOUDFLARE_ACCOUNT_ID="your_account_id"
+   CLOUDFLARE_API_TOKEN="your_api_token"
+   ```
+2. Run the upload command:
+   ```bash
+   npm run upload:r2 --workspace=@quomida/etl-pipeline
+   ```
+*(Note: If any of the three required environment variables are missing, the command will intentionally fail.)*
 
 ---
 

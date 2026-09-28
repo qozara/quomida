@@ -20,16 +20,17 @@ GitHub Pages does not natively support infinite preview environments per PR on a
 
 We have decided to split our CDN infrastructure:
 1. **WebApp** remains on **Vercel** for its robust React/SSR support and UI preview environments.
-2. **ETL Pipeline Data** will be hosted on **Cloudflare Pages**.
+2. **ETL Pipeline Data** will be hosted on **Cloudflare R2 Object Storage**.
 
-**Why Cloudflare Pages for ETL?**
-- **Free Unlimited Previews**: Cloudflare natively provisions preview URLs for every Pull Request.
-- **Bandwidth**: Serving large, static JSON files via Cloudflare's CDN is highly performant and avoids eating into Vercel's bandwidth limits.
+**Why Cloudflare R2 for ETL?**
+- **Zero Egress Fees**: Serving large, static `.sqlite` databases via Cloudflare's R2 is highly performant and avoids eating into Vercel's bandwidth limits or incurring traditional S3 egress costs.
 - **Decoupling**: The WebApp and ETL data build processes remain completely isolated.
+- **Unified Upload Interface**: By using an R2 bucket (`quomida-data`), we bypass complex Pages build limits and push artifacts directly.
 
-**Workflow Integration (Direct Upload):**
+**Workflow Integration (Unified NPM Script):**
 - **Pull Requests, Pushes to Main, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It is responsible for building the pipeline (`npm run etl`) directly in the GitHub Actions Ubuntu runner.
-- **Deployment**: After a successful build, the Action uses `cloudflare/wrangler-action` to directly upload the generated `apps/etl-pipeline/dist-cdn` folder to Cloudflare's edge network. The Action automatically routes deployments from PRs to Preview environments, and pushes to `main` to the Production environment.
+- **Deployment**: After a successful build, the Action executes the unified `npm run upload:r2` script. This executes `npx wrangler r2 object put` to push the SQLite catalog and its metadata directly to the Cloudflare R2 bucket.
+- **Standard Practice (DRY)**: Abstracting the CLI upload commands into the `package.json` script ensures that maintainers running local uploads execute the exact same logic as the CI environment, adhering to single-source-of-truth principles.
 
 ## Consequences
 
