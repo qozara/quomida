@@ -150,11 +150,23 @@ export async function resolveAndExportNDJSON(
 
   for (const file of inputFiles) {
     if (!fs.existsSync(file)) continue;
-    console.log(`[ETL Pipeline] Resolving items from ${file}`);
+    
+    const stats = fs.statSync(file);
+    const mbTotal = (stats.size / (1024 * 1024)).toFixed(1);
+    const filename = file.split(/[/\\]/).pop() || 'unknown';
+    
+    console.log(`[ETL Pipeline] Resolving items from ${filename} (${mbTotal}MB)`);
     const fileStream = fs.createReadStream(file);
     const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+    
+    let linesProcessed = 0;
 
     for await (const line of rl) {
+      linesProcessed++;
+      if (linesProcessed % 100000 === 0) {
+        console.log(`[ETL Pipeline] [RESOLVER] ${filename} - Processed ${linesProcessed} lines...`);
+      }
+
       if (!line.trim()) continue;
       const item: RawIngredientItem & { _type?: string } = JSON.parse(line);
 
