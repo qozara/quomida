@@ -6,6 +6,7 @@ import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
 import { exportSQLiteCatalog } from './exporters/SQLiteExporter.js';
+import { fetchPrebuiltSystemCatalog } from './utils/fetchPrebuiltSystem.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
 import { parseUsdaCSV } from './sources/usda.js';
@@ -98,34 +99,13 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     return f;
   };
 
-  const isSystemOnly = process.argv.includes('--system-only');
-
   // 1. SYSTEM
   const systemOut = addIntermediate('system');
-  if (isSystemOnly || !hasCompleted(state.stage, 'SYSTEM')) {
+  if (!hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
     
-    let prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
-    if (prebuiltUrl) {
-      if (prebuiltUrl.startsWith('http') && !prebuiltUrl.endsWith('.ndjson')) {
-        prebuiltUrl = prebuiltUrl.endsWith('/') ? prebuiltUrl + 'catalog_system.ndjson' : prebuiltUrl + '/catalog_system.ndjson';
-      }
-      console.log(`[ETL Pipeline] PREBUILT_SYSTEM_CATALOG_URL detected: ${prebuiltUrl}`);
-      try {
-        if (prebuiltUrl.startsWith('http://') || prebuiltUrl.startsWith('https://')) {
-          const res = await fetch(prebuiltUrl);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const text = await res.text();
-          fs.writeFileSync(systemOut, text);
-        } else {
-          const localPath = prebuiltUrl.startsWith('file://') ? prebuiltUrl.replace('file://', '') : prebuiltUrl;
-          fs.copyFileSync(path.resolve(currentDir, '../../', localPath), systemOut);
-        }
-        console.log(`[ETL Pipeline] Successfully loaded prebuilt system catalog.`);
-      } catch (e) {
-        console.error(`[ETL Pipeline] Failed to load prebuilt system catalog:`, e);
-        process.exit(1);
-      }
+    if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
+      await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, systemOut, currentDir);
     } else {
       const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
       const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');

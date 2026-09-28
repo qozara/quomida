@@ -7,6 +7,8 @@ import './config/env.js';
 import { parseSystemCSV } from './sources/system.js';
 import { exportSystemCatalog } from './exporters/SystemExporter.js';
 
+import { fetchPrebuiltSystemCatalog } from './utils/fetchPrebuiltSystem.js';
+
 async function run() {
   const currentFile = fileURLToPath(import.meta.url);
   const currentDir = path.dirname(currentFile);
@@ -25,10 +27,7 @@ async function run() {
   const systemOut = path.join(tempDir, 'system.ndjson');
 
   if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
-    if (!fs.existsSync(systemOut)) {
-      console.error('[ETL Pipeline] FATAL: Prebuilt system catalog was not downloaded successfully.');
-      process.exit(1);
-    }
+    await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, systemOut, currentDir);
   } else {
     const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
     const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
