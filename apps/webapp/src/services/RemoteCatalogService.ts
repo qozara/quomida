@@ -26,7 +26,7 @@ export class RemoteCatalogService {
 
   async searchIngredients(query: string, limit: number = 20): Promise<BaseIngredient[]> {
     const pool = await this.getPool();
-    const sql = `SELECT * FROM base_ingredients WHERE name LIKE '%' || $query || '%' LIMIT $limit`;
+    const sql = `SELECT * FROM base_ingredients WHERE name LIKE $query || '%' LIMIT $limit`;
     
     // Add a timeout to prevent infinite spinning if the worker crashes (e.g. due to 403 Forbidden)
     const results = await Promise.race([

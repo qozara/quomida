@@ -215,7 +215,7 @@ export async function resolveAndExportNDJSON(
   }
 
   db.exec(`
-    CREATE INDEX idx_name ON base_ingredients(name);
+    CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
     CREATE INDEX idx_portion_base_food ON portions(base_food_id);
   `);
   db.close();
