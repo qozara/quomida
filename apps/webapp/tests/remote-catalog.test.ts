@@ -15,7 +15,7 @@ vi.mock('sqlite-wasm-http', () => {
             return [];
           }
           if (sql.includes('FROM base_ingredients_fts')) {
-            if (bind.$query && bind.$query.toLowerCase().includes('avacado')) {
+            if (bind.$matchQuery && bind.$matchQuery.toLowerCase().includes('avacado')) {
               return [{ id: '1', name: 'Avacado Test' }];
             }
             return [];

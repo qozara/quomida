@@ -44,8 +44,7 @@ export async function exportSQLiteCatalog(
     );
     CREATE VIRTUAL TABLE base_ingredients_fts USING fts5(
       name,
-      id UNINDEXED,
-      tokenize='trigram'
+      id UNINDEXED
     );
   `);
   
