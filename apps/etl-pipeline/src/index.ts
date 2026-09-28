@@ -6,7 +6,6 @@ import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
 import { exportSystemCatalog } from './exporters/SystemExporter.js';
-import { exportSQLiteCatalog } from './exporters/SQLiteExporter.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
 import { parseUsdaCSV } from './sources/usda.js';
@@ -260,6 +259,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     
     if (!isSystemOnly) {
       // Export external datasets to SQLite
+      const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
       await exportSQLiteCatalog(intermediateFiles, catalogPath, metaPath);
     }
 
