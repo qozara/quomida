@@ -61,6 +61,13 @@ rl.question('Are you sure you want to proceed? (y/N): ', (answer) => {
       console.log(' - Deleted apps/webapp/src/generated/');
     }
 
+    // Delete local wrangler state
+    const wranglerDir = path.resolve(rootDir, '.wrangler');
+    if (fs.existsSync(wranglerDir)) {
+      fs.rmSync(wranglerDir, { recursive: true, force: true });
+      console.log(' - Deleted .wrangler/ state');
+    }
+
     // Delete state file
     const stateFile = path.join(dataDir, 'temp', '.etl-state.json');
     if (fs.existsSync(stateFile)) {

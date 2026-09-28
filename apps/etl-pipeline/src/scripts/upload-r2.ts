@@ -23,11 +23,15 @@ const metaFile = path.join(rootDir, 'dist-cdn/catalog_meta.json');
 console.log(`[R2 Upload] Uploading artifacts to Cloudflare R2 bucket: ${bucketName}...`);
 
 try {
+  const sqliteCmd = `npx wrangler r2 object put ${bucketName}/catalog.sqlite --file="${sqliteFile}" --content-type=application/x-sqlite3 --remote`;
   console.log('\n[R2 Upload] Uploading catalog.sqlite...');
-  execSync(`npx wrangler r2 object put ${bucketName}/catalog.sqlite --file="${sqliteFile}" --content-type=application/x-sqlite3`, { stdio: 'inherit' });
+  console.log(`[R2 Upload] Executing: ${sqliteCmd}`);
+  execSync(sqliteCmd, { stdio: 'inherit' });
 
+  const metaCmd = `npx wrangler r2 object put ${bucketName}/catalog_meta.json --file="${metaFile}" --content-type=application/json --remote`;
   console.log('\n[R2 Upload] Uploading catalog_meta.json...');
-  execSync(`npx wrangler r2 object put ${bucketName}/catalog_meta.json --file="${metaFile}" --content-type=application/json`, { stdio: 'inherit' });
+  console.log(`[R2 Upload] Executing: ${metaCmd}`);
+  execSync(metaCmd, { stdio: 'inherit' });
 
   console.log('\n[R2 Upload] Successfully uploaded all artifacts to R2!');
 } catch (error) {
