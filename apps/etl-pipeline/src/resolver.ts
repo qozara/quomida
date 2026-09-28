@@ -1,7 +1,7 @@
 import fs from 'fs';
 import readline from 'readline';
 import crypto from 'crypto';
-import { DatabaseSync } from 'node:sqlite';
+import Database from 'better-sqlite3';
 import { normalizeFoodName } from './utils/parserUtils.js';
 import type { DataSourceOrigin, RawIngredientItem } from './types.js';
 import type { CatalogItem, CatalogPayload, CatalogMetaPayload } from './index.js';
@@ -101,7 +101,7 @@ export async function resolveAndExportNDJSON(
   if (fs.existsSync(outPath)) {
     fs.unlinkSync(outPath);
   }
-  const db = new DatabaseSync(outPath);
+  const db = new Database(outPath);
   db.exec(`
     PRAGMA page_size = 4096;
     PRAGMA journal_mode = OFF;
@@ -124,10 +124,19 @@ export async function resolveAndExportNDJSON(
       equivalent_weight_g REAL NOT NULL,
       contentHash TEXT NOT NULL
     );
+    CREATE VIRTUAL TABLE base_ingredients_fts USING fts5(
+      name,
+      id UNINDEXED,
+      tokenize='trigram'
+    );
   `);
   const insertStmt = db.prepare(`
     INSERT INTO base_ingredients (id, name, source, lang, calories_100g, protein_100g, carbs_100g, fats_100g, contentHash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertFtsStmt = db.prepare(`
+    INSERT INTO base_ingredients_fts (id, name)
+    VALUES (?, ?)
   `);
   const insertPortionStmt = db.prepare(`
     INSERT INTO portions (id, base_food_id, name, equivalent_weight_g, contentHash)
@@ -201,6 +210,10 @@ export async function resolveAndExportNDJSON(
               finalItem.carbs_100g,
               finalItem.fats_100g,
               finalItem.contentHash
+            );
+            insertFtsStmt.run(
+              finalItem.id,
+              finalItem.name
             );
             externalExportedCount++;
           }
