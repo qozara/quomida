@@ -84,7 +84,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   const calculated = calculateItemMacros(ingredient, weightGrams);
 
   const handleLog = async () => {
-    await logFoodItem(ingredient, mealType, quantity, selectedPortionName);
+    await logFoodItem(ingredient, mealType, quantity, selectedPortionName, availablePortions);
     onClose();
   };
 

@@ -77,21 +77,6 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
               const unique = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
               return unique.slice(0, 30);
             });
-
-            // Cache remote results locally
-            if (db) {
-              for (const match of remoteMatches) {
-                try {
-                  const existing = await db.base_ingredients.findOne(match.id).exec();
-                  if (!existing) {
-                    await db.base_ingredients.insert(match);
-                    console.log(`[Cache] Cached remote result to built-in local catalog: ${match.name}`);
-                  }
-                } catch (err) {
-                  // Ignore insertion conflicts
-                }
-              }
-            }
           }
         } catch (e) {
           console.error('Remote search query failed:', e);

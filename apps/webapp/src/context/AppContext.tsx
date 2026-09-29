@@ -50,7 +50,8 @@ interface AppContextType {
     ingredient: BaseIngredient,
     mealType: MealType,
     quantity: number,
-    portionName: string
+    portionName: string,
+    passedPortions?: Portion[]
   ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
   addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
@@ -427,14 +428,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ingredient: BaseIngredient,
     mealType: MealType,
     quantity: number,
-    portionName: string
+    portionName: string,
+    passedPortions?: Portion[]
   ) => {
-    let relevantPortions: Portion[] = [];
+    let relevantPortions: Portion[] = passedPortions || [];
+    
     if (dbService) {
       const rxdb = dbService.getDatabaseInstance();
       if (rxdb) {
-        const pdocs = await rxdb.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
-        relevantPortions = pdocs.map((d: any) => d.toJSON ? d.toJSON() : d);
+        // --- LAZY CACHING LOGIC ---
+        // Only cache to local catalog if it doesn't already exist
+        const existingIng = await rxdb.base_ingredients.findOne(ingredient.id).exec();
+        if (!existingIng && ingredient.source !== 'custom') {
+           try {
+              await rxdb.base_ingredients.insert(ingredient);
+              console.log(`[Cache] Lazy-cached remote result to built-in local catalog: ${ingredient.name}`);
+           } catch(e) {}
+        }
+
+        if (passedPortions && passedPortions.length > 0) {
+           for (const p of passedPortions) {
+              // Only cache true valid portion objects, ignore UI-tagged versions
+              if (p.id) {
+                 try {
+                    const existingP = await rxdb.portions.findOne(p.id).exec();
+                    if (!existingP) {
+                       const { tag, ...cleanPortion } = p as any;
+                       await rxdb.portions.insert(cleanPortion);
+                    }
+                 } catch(e) {}
+              }
+           }
+        }
+        // --- END LAZY CACHING LOGIC ---
+
+        if (!passedPortions || passedPortions.length === 0) {
+          const pdocs = await rxdb.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
+          relevantPortions = pdocs.map((d: any) => d.toJSON ? d.toJSON() : d);
+        }
       }
     }
     const weightGrams = convertPortionToGrams(quantity, portionName, relevantPortions);
