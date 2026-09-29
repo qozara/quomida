@@ -28,14 +28,13 @@ export class RemoteCatalogService {
     const pool = await this.getPool();
     // Use FTS5 virtual table for sub-millisecond full substring searching over HTTP VFS
     // Format query for FTS prefix matching: "apple pie" -> "apple* pie*"
-    const matchQuery = query.split(/\\s+/).filter(Boolean).map(term => term + '*').join(' ');
+    const matchQuery = query.split(/\s+/).filter(Boolean).map(term => term + '*').join(' ');
 
     const sql = `
       SELECT b.* 
       FROM base_ingredients_fts f
       JOIN base_ingredients b ON f.id = b.id
       WHERE f.name MATCH $matchQuery
-      ORDER BY rank
       LIMIT $limit
     `;
     
