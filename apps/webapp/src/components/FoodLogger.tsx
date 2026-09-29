@@ -46,7 +46,6 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         try {
           const docs = await db.base_ingredients.find({
             selector: { 
-              source: 'system',
               name: { $regex: new RegExp(query, 'i') } 
             },
             limit: 10
@@ -54,35 +53,62 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           
           if (!isCancelled) {
             systemMatches = docs.map((d: any) => d.toJSON() as BaseIngredient);
+            
+            // SHOW LOCAL RESULTS INSTANTLY
+            const localMatches = [...customMatches, ...systemMatches];
+            const localUnique = Array.from(new Map(localMatches.map(item => [item.id, item])).values());
+            setFilteredIngredients(localUnique.slice(0, 30));
           }
         } catch (e) {
           console.error('Search query failed:', e);
         }
       }
 
-      // 3. Search external remote database
-      if (isOnline) {
+      // 3. Search external remote database asynchronously
+      if (isOnline && query.length >= 3) {
         try {
           setIsSearchingRemote(true);
           remoteMatches = await remoteService.searchIngredients(query, 10);
+          
+          if (!isCancelled && remoteMatches.length > 0) {
+            // Append remote results to the list
+            setFilteredIngredients(prev => {
+              const allMatches = [...prev, ...remoteMatches];
+              const unique = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
+              return unique.slice(0, 30);
+            });
+
+            // Cache remote results locally
+            if (db) {
+              for (const match of remoteMatches) {
+                try {
+                  const existing = await db.base_ingredients.findOne(match.id).exec();
+                  if (!existing) {
+                    await db.base_ingredients.insert(match);
+                    console.log(`[Cache] Cached remote result to built-in local catalog: ${match.name}`);
+                  }
+                } catch (err) {
+                  // Ignore insertion conflicts
+                }
+              }
+            }
+          }
         } catch (e) {
           console.error('Remote search query failed:', e);
         } finally {
           if (!isCancelled) setIsSearchingRemote(false);
         }
       }
-
-      if (!isCancelled) {
-        // Merge and deduplicate by ID
-        const allMatches = [...customMatches, ...systemMatches, ...remoteMatches];
-        const unique = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
-        setFilteredIngredients(unique.slice(0, 30));
-      }
     };
 
-    performSearch();
+    const timerId = setTimeout(() => {
+      performSearch();
+    }, 300);
 
-    return () => { isCancelled = true; };
+    return () => { 
+      isCancelled = true; 
+      clearTimeout(timerId);
+    };
   }, [searchQuery, ingredients, db, isOnline]);
 
   const handleAiParse = async (e: React.FormEvent) => {

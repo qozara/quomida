@@ -41,7 +41,7 @@ export class RemoteCatalogService {
     // Add a timeout to prevent infinite spinning if the worker crashes (e.g. due to 403 Forbidden)
     const results = await Promise.race([
       pool.exec(sql, { $matchQuery: matchQuery, $limit: limit }, { rowMode: 'object' }),
-      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 10000))
+      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 15000))
     ]).catch(err => {
       console.error('Remote search error:', err);
       return [];
