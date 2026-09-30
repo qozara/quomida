@@ -105,6 +105,6 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     const firstItem = items[0];
     expect(firstItem.id).toBeDefined();
     expect(firstItem.contentHash).toBeDefined();
-    expect(firstItem.source).toBe('SARA2');
+    expect(firstItem.source).toBe('sara2');
   });
 });

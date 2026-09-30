@@ -19,7 +19,7 @@ export function sanitizeIngredient(item: RawIngredientItem): BaseIngredient {
   return {
     id: item.id,
     name: item.name.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').replace(/<[^>]*>?/gm, '').trim(),
-    source: item.originSource,
+    source: (item.originSource.toLowerCase() as any),
     lang: item.lang,
     calories_100g: cals,
     protein_100g: clamp(item.protein_100g, 100),

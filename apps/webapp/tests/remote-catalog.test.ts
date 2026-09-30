@@ -11,12 +11,15 @@ vi.mock('sqlite-wasm-http', () => {
         close: async () => {},
         exec: async (sql: string, bind: any, options: any) => {
           if (sql.includes('FROM portions')) {
-            if (bind.$id === '1') return [{ base_food_id: '1', name: 'Slice', equivalent_weight_g: 30 }];
+            if (bind && bind[0] === '1') {
+              // Return the worker message object shape
+              return [{ row: ['p1', '1', 'Slice', 30, 'hash'] }];
+            }
             return [];
           }
           if (sql.includes('FROM base_ingredients_fts')) {
-            if (bind.$matchQuery && bind.$matchQuery.toLowerCase().includes('avacado')) {
-              return [{ id: '1', name: 'Avacado Test' }];
+            if (sql.toLowerCase().includes('avacado')) {
+              return [{ row: ['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash'] }];
             }
             return [];
           }
@@ -59,6 +62,7 @@ describe('RemoteCatalogService', () => {
     await pool.exec("INSERT INTO portions (base_food_id, name, equivalent_weight_g) VALUES ('1', 'Slice', 30)", {});
 
     const portions = await service.getPortionsForIngredient('1');
+    console.log('PORTIONS', portions);
     expect(portions.length).toBe(1);
     expect(portions[0].name).toBe('Slice');
   });

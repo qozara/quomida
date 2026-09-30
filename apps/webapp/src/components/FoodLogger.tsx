@@ -24,12 +24,14 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
   // Search results dynamic filter against RxDB, Custom ingredients, and Remote SQLite
   React.useEffect(() => {
-    if (!searchQuery.trim()) {
+    const query = searchQuery.trim().toLowerCase();
+    
+    // Only search after 3 characters
+    if (query.length < 3) {
       setFilteredIngredients([]);
       return;
     }
 
-    const query = searchQuery.trim().toLowerCase();
     let isCancelled = false;
 
     const performSearch = async () => {
@@ -46,7 +48,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         try {
           const docs = await db.base_ingredients.find({
             selector: { 
-              name: { $regex: new RegExp(query, 'i') } 
+              name: { $regex: query, $options: 'i' } 
             },
             limit: 10
           }).exec();
@@ -65,10 +67,11 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       }
 
       // 3. Search external remote database asynchronously
-      if (isOnline && query.length >= 3) {
+      if (isOnline) {
         try {
           setIsSearchingRemote(true);
           remoteMatches = await remoteService.searchIngredients(query, 10);
+          console.log('FoodLogger RECEIVED remoteMatches:', remoteMatches);
           
           if (!isCancelled && remoteMatches.length > 0) {
             // Append remote results to the list
@@ -113,7 +116,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       if (!match && db) {
         try {
           const docs = await db.base_ingredients.find({
-            selector: { name: { $regex: new RegExp(foodQuery, 'i') } },
+            selector: { name: { $regex: foodQuery, $options: 'i' } },
             limit: 1
           }).exec();
           if (docs.length > 0) match = docs[0].toJSON() as BaseIngredient;
@@ -184,9 +187,9 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                 </div>
               ) : (
                 <>
-                  {filteredIngredients.map((ing) => (
+                  {filteredIngredients.map((ing, idx) => (
                     <button
-                      key={ing.id}
+                      key={`${ing.id}-${idx}`}
                       type="button"
                       onClick={() => {
                         onSelectIngredient(ing, 'meal_lunch');
