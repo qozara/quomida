@@ -100,6 +100,20 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
 
   // 1. SYSTEM
   const systemOut = addIntermediate('system');
+  const webappSystemSqlite = path.resolve(currentDir, '../../webapp/public/system.sqlite');
+
+  if (process.argv.includes('--system-only')) {
+    console.log('[ETL Pipeline] --system-only flag detected. Running fast-path for webapp build...');
+    if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
+      await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, webappSystemSqlite, currentDir);
+    } else {
+      console.warn(`[ETL Pipeline] WARNING: PREBUILT_SYSTEM_CATALOG_URL not set! Falling back to empty system.sqlite to prevent Vercel crash.`);
+      fs.writeFileSync(webappSystemSqlite, '');
+    }
+    console.log('[ETL Pipeline] --system-only fast path complete. Exiting.');
+    return;
+  }
+
   if (!hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
     
@@ -121,12 +135,6 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     state = tracker.getState();
   } else {
     console.log('[ETL Pipeline] Skipped SYSTEM (already processed)');
-  }
-
-  if (process.argv.includes('--system-only')) {
-    console.log('[ETL Pipeline] --system-only flag detected. Skipping remaining sources.');
-    tracker.updateStage('RESOLVER');
-    state = tracker.getState();
   }
 
   if (process.argv.includes('--generate-system-catalog')) {

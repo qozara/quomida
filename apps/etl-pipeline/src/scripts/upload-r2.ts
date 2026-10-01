@@ -20,6 +20,7 @@ const rootDir = path.resolve(currentDir, '../../');
 const sqliteFile = path.join(rootDir, 'dist-cdn/catalog.sqlite');
 const sqliteGzFile = path.join(rootDir, 'dist-cdn/catalog.sqlite.gz');
 const metaFile = path.join(rootDir, 'dist-cdn/catalog_meta.json');
+const systemSqliteFile = path.join(rootDir, '../webapp/public/system.sqlite');
 
 console.log(`[R2 Upload] Uploading artifacts to Cloudflare R2 bucket: ${bucketName}...`);
 
@@ -38,6 +39,11 @@ try {
   console.log('\n[R2 Upload] Uploading catalog_meta.json...');
   console.log(`[R2 Upload] Executing: ${metaCmd}`);
   execSync(metaCmd, { stdio: 'inherit' });
+
+  const systemSqliteCmd = `npx --yes wrangler r2 object put ${bucketName}/system.sqlite --file="${systemSqliteFile}" --content-type=application/x-sqlite3 --remote`;
+  console.log('\n[R2 Upload] Uploading system.sqlite...');
+  console.log(`[R2 Upload] Executing: ${systemSqliteCmd}`);
+  execSync(systemSqliteCmd, { stdio: 'inherit' });
 
   console.log('\n[R2 Upload] Successfully uploaded all artifacts to R2!');
 } catch (error) {
