@@ -116,6 +116,9 @@ export class MockCloudSyncProvider implements CloudSyncProvider {
     const map = new Map(existing.map(doc => [doc.id, doc]));
     for (const doc of payload.documents) {
       if (doc.id) {
+        if ((payload.collection === 'base_ingredients' || payload.collection === 'portions') && doc.source === 'system') {
+          continue;
+        }
         map.set(doc.id, doc);
       }
     }

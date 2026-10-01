@@ -17,7 +17,7 @@ export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
   properties: {
     id: { type: 'string', maxLength: 100 },
     name: { type: 'string' },
-    source: { type: 'string', enum: ['system', 'custom'] },
+    source: { type: 'string', enum: ['system', 'custom', 'ai'] },
     lang: { type: 'string' },
     calories_100g: { type: 'number', minimum: 0 },
     protein_100g: { type: 'number', minimum: 0 },
@@ -56,7 +56,7 @@ export const recipesSchema: RxJsonSchema<Recipe> = {
 
 export const portionsSchema: RxJsonSchema<Portion> = {
   title: 'portions',
-  version: 0,
+  version: 1,
   description: 'Domestic household portion mappings to absolute gram weights',
   primaryKey: 'id',
   type: 'object',
@@ -65,6 +65,8 @@ export const portionsSchema: RxJsonSchema<Portion> = {
     base_food_id: { type: 'string' },
     name: { type: 'string' },
     equivalent_weight_g: { type: 'number', minimum: 0.1 },
+    source: { type: 'string', enum: ['system', 'custom', 'ai'] },
+    is_generic: { type: 'boolean' },
     updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'base_food_id', 'name', 'equivalent_weight_g']

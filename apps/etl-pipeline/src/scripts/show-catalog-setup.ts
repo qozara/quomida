@@ -151,20 +151,20 @@ if (viteBase) {
     console.log(`   \x1b[31mEnsure the CDN is deployed and the URL is correct.\x1b[0m`);
   }
 } else {
-  const externalMetaPath = path.resolve(rootDir, 'apps/webapp/public/catalog_meta.json');
+  const externalMetaPath = path.resolve(rootDir, 'apps/etl-pipeline/dist-cdn/catalog_meta.json');
   if (fs.existsSync(externalMetaPath)) {
     const meta = JSON.parse(fs.readFileSync(externalMetaPath, 'utf-8'));
-    console.log(`✅ External Catalog (Fetched at Runtime from Local Build)`);
-    console.log(`   File: apps/webapp/public/catalog.json`);
+    console.log(`✅ External Catalog (Generated locally for CDN Deployment)`);
+    console.log(`   File: apps/etl-pipeline/dist-cdn/catalog.sqlite`);
     console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
     console.log(`   Contents: \x1b[33m${meta.itemCount || 0} items\x1b[0m`);
     if (meta.fileSizeBytes) {
       console.log(`   Size: ${(meta.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB (${meta.fileSizeBytes} bytes)`);
     }
   } else {
-    console.log(`❌ External Catalog (Fetched at Runtime from Local Build)`);
-    console.log(`   File: apps/webapp/public/catalog.json (Missing)`);
-    console.log(`   \x1b[33mNote: Webapp will load without the external catalog. Run 'npm run etl' to generate it locally.\x1b[0m`);
+    console.log(`❌ External Catalog (Generated locally for CDN Deployment)`);
+    console.log(`   File: apps/etl-pipeline/dist-cdn/catalog.sqlite (Missing)`);
+    console.log(`   \x1b[33mNote: Webapp will load without the external catalog if VITE_CATALOG_BASE_URL is not set. Run 'npm run etl' to generate it locally.\x1b[0m`);
   }
 }
 console.log();

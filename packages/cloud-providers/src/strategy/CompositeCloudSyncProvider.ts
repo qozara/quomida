@@ -322,6 +322,10 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         const docMap = new Map(existingDocs.map(d => [d.id, d]));
         for (const doc of payload.documents) {
           if (doc.id) {
+            // JIT Cache Sync Isolation: explicitly ignore remote VFS items
+            if ((payload.collection === 'base_ingredients' || payload.collection === 'portions') && doc.source === 'system') {
+              continue;
+            }
             docMap.set(doc.id, doc);
           }
         }

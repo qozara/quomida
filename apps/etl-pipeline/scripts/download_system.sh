@@ -23,14 +23,23 @@ SYSTEM_INGREDIENTS_URL="${SYSTEM_INGREDIENTS_URL:-YOUR_SYSTEM_INGREDIENTS_URL_HE
 SYSTEM_PORTIONS_URL="${SYSTEM_PORTIONS_URL:-YOUR_SYSTEM_PORTIONS_URL_HERE}"
 
 if [[ "${SYSTEM_INGREDIENTS_URL}" == "YOUR_"* ]] || [[ "${SYSTEM_PORTIONS_URL}" == "YOUR_"* ]]; then
-  echo "[!] WARNING: URL for SYSTEM datasets are not configured."
-  echo "    Skipping system data download. An empty catalog_system.ndjson will be generated."
-  exit 0
+  if [ -f "${RAW_DIR}/system_ingredients.csv" ]; then
+    echo "[!] URL for SYSTEM datasets not configured, but local files found in raw/system/."
+    echo "    Skipping download. The pipeline will process your manually placed files."
+    exit 0
+  else
+    echo "[!] WARNING: URL for SYSTEM datasets are not configured."
+    echo "    Skipping system data download. An empty catalog_system.ndjson will be generated."
+    exit 0
+  fi
 fi
 
 echo "==> Downloading SYSTEM Ingredients..."
 if [[ "${SYSTEM_INGREDIENTS_URL}" == file://* ]]; then
-  cp "${SYSTEM_INGREDIENTS_URL#file://}" "${RAW_DIR}/system_ingredients.csv"
+  SRC_PATH="${SYSTEM_INGREDIENTS_URL#file://}"
+  if [ "$(realpath "$SRC_PATH")" != "$(realpath "${RAW_DIR}/system_ingredients.csv")" ]; then
+    cp "$SRC_PATH" "${RAW_DIR}/system_ingredients.csv"
+  fi
 else
   curl -L -f -sS --retry 3 -o "${RAW_DIR}/system_ingredients.csv" "${SYSTEM_INGREDIENTS_URL}" || {
     echo "[!] WARNING: Failed to download SYSTEM ingredients from ${SYSTEM_INGREDIENTS_URL}."
@@ -41,7 +50,10 @@ fi
 
 echo "==> Downloading SYSTEM Portions..."
 if [[ "${SYSTEM_PORTIONS_URL}" == file://* ]]; then
-  cp "${SYSTEM_PORTIONS_URL#file://}" "${RAW_DIR}/system_portions.csv"
+  SRC_PATH="${SYSTEM_PORTIONS_URL#file://}"
+  if [ "$(realpath "$SRC_PATH")" != "$(realpath "${RAW_DIR}/system_portions.csv")" ]; then
+    cp "$SRC_PATH" "${RAW_DIR}/system_portions.csv"
+  fi
 else
   curl -L -f -sS --retry 3 -o "${RAW_DIR}/system_portions.csv" "${SYSTEM_PORTIONS_URL}" || {
     echo "[!] WARNING: Failed to download SYSTEM portions from ${SYSTEM_PORTIONS_URL}."

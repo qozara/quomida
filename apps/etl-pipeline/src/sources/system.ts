@@ -67,7 +67,10 @@ export async function parseSystemCSV(
         id,
         base_food_id,
         name: name.trim(),
-        equivalent_weight_g: parseFloatSafe(record['equivalent_weight_g'])
+        equivalent_weight_g: parseFloatSafe(record['equivalent_weight_g']),
+        source: 'system',
+        is_generic: true,
+        originSource: 'SYSTEM'
       };
 
       outStream.write(JSON.stringify(portion) + '\n');

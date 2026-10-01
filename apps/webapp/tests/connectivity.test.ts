@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('Connectivity & Offline Status Detection', () => {
@@ -53,5 +56,20 @@ describe('Connectivity & Offline Status Detection', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith('/', { method: 'HEAD' });
     expect(heartbeatSuccess).toBe(true);
+  });
+
+  it('responds to window online and offline events', () => {
+    let onlineState = true;
+    const goOffline = () => { onlineState = false; };
+    const goOnline = () => { onlineState = true; };
+
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+
+    window.dispatchEvent(new Event('offline'));
+    expect(onlineState).toBe(false);
+
+    window.dispatchEvent(new Event('online'));
+    expect(onlineState).toBe(true);
   });
 });

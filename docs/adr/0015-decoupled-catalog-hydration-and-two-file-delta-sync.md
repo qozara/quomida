@@ -37,7 +37,7 @@ We have implemented a **Decoupled Catalog Hydration Architecture** using a **Two
 
 4. **Infrastructure-Agnostic Hosting**:
    - The web application consumes the catalog via an environment variable: `VITE_CATALOG_BASE_URL`.
-   - In local development and CI: `VITE_CATALOG_BASE_URL=""` (served directly from `apps/webapp/public/` with graceful 404 degradation).
+   - In local development and CI: `VITE_CATALOG_BASE_URL=""` (served directly via Vite's proxy middleware linking to `apps/etl-pipeline/dist-cdn/` with graceful 404 degradation).
    - In production: `VITE_CATALOG_BASE_URL` can point to any static host (GitHub Pages, AWS S3, Cloudflare R2, Vercel Blob) without requiring webapp code changes or redeployments.
 
 5. **User Feedback & Manual Trigger**:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { validateMacroAlignment, type BaseIngredient } from '@quomida/domain-core';
-import { X, Plus, Utensils, AlertCircle, Search, Trash2 } from 'lucide-react';
+import { X, Plus, Utensils, AlertCircle, Search, Trash2, PlusCircle } from 'lucide-react';
 
 export const CatalogManager: React.FC = () => {
   const { ingredients, db, addCustomIngredient, removeCustomIngredient, isCatalogOpen, setIsCatalogOpen } = useApp();
@@ -19,6 +19,21 @@ export const CatalogManager: React.FC = () => {
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fats, setFats] = useState('');
+  const [portions, setPortions] = useState<{name: string, equivalent_weight_g: number}[]>([]);
+  const [portionName, setPortionName] = useState('');
+  const [portionWeight, setPortionWeight] = useState('');
+
+  const handleAddPortion = () => {
+    if (portionName && portionWeight) {
+      setPortions([...portions, { name: portionName, equivalent_weight_g: parseFloat(portionWeight) }]);
+      setPortionName('');
+      setPortionWeight('');
+    }
+  };
+
+  const handleRemovePortion = (index: number) => {
+    setPortions(portions.filter((_, i) => i !== index));
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -77,13 +92,14 @@ export const CatalogManager: React.FC = () => {
       protein_100g: pNum,
       carbs_100g: cNum,
       fats_100g: fNum
-    });
+    }, portions);
 
     setName('');
     setCalories('');
     setProtein('');
     setCarbs('');
     setFats('');
+    setPortions([]);
     setIsAdding(false);
   };
 
@@ -206,6 +222,48 @@ export const CatalogManager: React.FC = () => {
               </div>
             </div>
 
+            <div className="pt-2">
+              <label className="text-xs text-slate-400 font-semibold mb-2 block">Custom Portions (Optional)</label>
+              
+              <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
+                {portions.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg p-2 px-3">
+                    <span className="text-sm font-medium text-white">{p.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400">{p.equivalent_weight_g}g</span>
+                      <button type="button" onClick={() => handleRemovePortion(i)} className="text-rose-400 hover:text-rose-300 min-h-[32px] min-w-[32px] flex items-center justify-center">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="E.g., Slice, Cup, Tbsp"
+                  value={portionName}
+                  onChange={(e) => setPortionName(e.target.value)}
+                  className="flex-[2] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
+                />
+                <input
+                  type="number"
+                  placeholder="Grams"
+                  value={portionWeight}
+                  onChange={(e) => setPortionWeight(e.target.value)}
+                  className="flex-[1] bg-slate-900 border border-slate-800 rounded-xl px-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 text-center min-h-[44px]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPortion}
+                  disabled={!portionName || !portionWeight}
+                  className="px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 font-bold rounded-xl flex items-center justify-center min-h-[44px]"
+                >
+                  <PlusCircle className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"

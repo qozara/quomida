@@ -1,4 +1,4 @@
-export type IngredientSource = 'system' | 'custom';
+export type IngredientSource = 'system' | 'custom' | 'ai';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type MealType = 'meal_breakfast' | 'meal_lunch' | 'meal_dinner' | 'meal_snack';
 
@@ -32,6 +32,8 @@ export interface Portion {
   base_food_id: string;
   name: string;
   equivalent_weight_g: number;
+  source?: IngredientSource;
+  is_generic?: boolean;
   updatedAt?: number;
 }
 

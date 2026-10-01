@@ -108,24 +108,43 @@ TBCA_URL="https://example.com/actual_tbca.csv"
 SARA2_URL="https://example.com/actual_sara2.csv"
 ```
 
-### 2. Run the Full Pipeline
+### 2. The Dual-Pipeline Architecture
 
-To process all remote datasets (USDA, SARA2, TBCA, etc.) and generate both system and external catalogs:
+To ensure clean CI/CD deployments (like Vercel) and fast web app builds, the ETL pipeline is strictly split into two isolated flows:
+
+**Flow A: System Catalog (Built-in)**
+- Generates only the foundational `catalog_system.ndjson`.
+- Has **zero SQLite dependencies**. It bypasses `better-sqlite3` and any C++ native bindings.
+- Automatically executed by the webapp during Vercel builds (`npm run build:system`).
+
+**Flow B: External Catalog (Remote HTTP SQLite)**
+- Generates the massive 13GB `catalog.sqlite` containing OpenFoodFacts.
+- Uses `better-sqlite3` to construct FTS5 trigram indexes for sub-millisecond remote substring search.
+- Designed to be run on-demand locally or via a dedicated GitHub Action worker, *never* during a web frontend deployment.
+- Triggered manually using `npm run build:external`.
 
 ```bash
-npm run start --workspace=@quomida/etl-pipeline -- --with-off --with-system
+# Flow B: Process all external datasets locally (requires better-sqlite3)
+npm run build:external --workspace=@quomida/etl-pipeline
 ```
 
-*(Note: The `--with-off` flag downloads the 13GB OpenFoodFacts dataset. It takes time but is cached locally in `data/raw/`)*
+### 3. Understanding `data/raw/` & Handcrafted Files (Maintainer Guide)
 
-### 3. Build-Time System Generation
+In this ETL architecture, the `data/raw/` directory acts as a **pure data sink** for automated download scripts (`download_system.sh`, `download_off.sh`, etc.). When the pipeline runs, these scripts fetch datasets from the URLs configured in your `.env` and ruthlessly dump them into `data/raw/`.
+
+**If you are a maintainer building custom handcrafted CSVs, DO NOT place them in `data/raw/` blindly**, as the download scripts may overwrite them. Instead, use one of these intended workflows:
+
+- **The Safe Way (Recommended):** Place your handcrafted CSVs in a separate, version-controlled directory like `data/examples/` (or your own ignored `data/custom/`). Then, update your `.env` to point to them (e.g., `SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"`). The automated scripts will safely copy them into `raw/` for processing.
+- **The Direct Way:** You *can* place handcrafted files directly into `data/raw/system/`, **but you MUST comment out the corresponding URLs in your `.env`** (e.g., `# SYSTEM_INGREDIENTS_URL="..."`). When commented out, the download scripts will skip the fetch phase, safely leaving your manually placed files intact for the Node.js parser to process.
+
+### 4. Build-Time System Generation
 
 The web application's `prebuild` hook automatically runs this command to ensure `catalog_system.ndjson` is built into the app before Vite bundles it:
 ```bash
 npm run build:system --workspace=@quomida/etl-pipeline
 ```
 
-### 4. Cleaning Cached Data
+### 5. Cleaning Cached Data
 
 If you need to reset the pipeline (e.g. to redownload OpenFoodFacts or flush the state tracking):
 ```bash
@@ -133,7 +152,7 @@ npm run clean --workspace=@quomida/etl-pipeline
 ```
 *Note: This script will prompt you for confirmation because it deletes the 13GB downloaded OpenFoodFacts dataset and all intermediate JSONL files.*
 
-### 5. Generate a Custom System Catalog (Advanced)
+### 6. Generate a Custom System Catalog (Advanced)
 
 If you want to generate a rich foundational catalog containing all items for Latin America and Spain, you can instruct the pipeline to scan OpenFoodFacts and output clean **CSV** templates that you can edit in Excel or Google Sheets.
 
@@ -172,11 +191,26 @@ For the official Qozara deployment, we use **GitHub Actions** to build the ETL p
 
 **GitHub Actions Integration (`.github/workflows/etl.yml`):**
 - Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
-- Uses `cloudflare/wrangler-action` to upload the generated `apps/webapp/public` directory directly to Cloudflare Pages. Cloudflare automatically routes PRs to a Preview environment URL, and `main` to the Production URL.
+- Uses `cloudflare/wrangler-action` to upload the generated SQLite artifacts directly to Cloudflare R2.
 
 **Required GitHub Secrets:**
-- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with "Cloudflare Pages" edit permissions.
+- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with R2 edit permissions.
 - `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
+
+#### Local R2 Upload (Maintainers)
+Maintainers can manually upload the generated catalog to Cloudflare R2 using the provided unified command. This utilizes the same environment configuration without requiring any additional runtime dependencies.
+
+1. Ensure your `.env` contains the required credentials:
+   ```env
+   CLOUDFLARE_BUCKET_NAME="quomida-data"
+   CLOUDFLARE_ACCOUNT_ID="your_account_id"
+   CLOUDFLARE_API_TOKEN="your_api_token"
+   ```
+2. Run the upload command:
+   ```bash
+   npm run upload:r2 --workspace=@quomida/etl-pipeline
+   ```
+*(Note: If any of the three required environment variables are missing, the command will intentionally fail.)*
 
 ---
 

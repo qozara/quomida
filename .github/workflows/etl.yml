@@ -1,17 +1,6 @@
 name: ETL Pipeline
 
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'apps/etl-pipeline/**'
-      - 'packages/**'
-      - '.github/workflows/etl.yml'
-  pull_request:
-    paths:
-      - 'apps/etl-pipeline/**'
-      - 'packages/**'
-      - '.github/workflows/etl.yml'
   schedule:
     # Run every 6 months (Jan 1st and Jul 1st at midnight)
     - cron: '0 0 1 1,7 *'
@@ -91,31 +80,24 @@ jobs:
           SYSTEM_INGREDIENTS_URL: ${{ secrets.SYSTEM_INGREDIENTS_URL }}
           SYSTEM_PORTIONS_URL: ${{ secrets.SYSTEM_PORTIONS_URL }}
         run: |
-          FLAGS=""
+          FLAGS="--with-system"
           if [ "${{ github.event.inputs.include_openfoodfacts }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-off"
           fi
-          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_sara2 }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-sara2"
           fi
-          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_tbca }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-tbca"
           fi
-          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.inputs.include_usda }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FLAGS="$FLAGS --with-usda"
           fi
           npm run etl -- $FLAGS
 
-      - name: Upload Catalog to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog.json --file=apps/webapp/public/catalog.json --content-type=application/json
-
-      - name: Upload Catalog Meta to Cloudflare R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put quomida-data/catalog_meta.json --file=apps/webapp/public/catalog_meta.json --content-type=application/json
+      - name: Upload Artifacts to Cloudflare R2
+        env:
+          CLOUDFLARE_BUCKET_NAME: "quomida-data"
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run upload:r2 --workspace=@quomida/etl-pipeline
