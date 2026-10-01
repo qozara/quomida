@@ -1,4 +1,4 @@
-import { createSQLiteThread } from 'sqlite-wasm-http';
+import { createSQLiteThread, createHttpBackend } from 'sqlite-wasm-http';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 
 export class RemoteCatalogService {
@@ -21,7 +21,7 @@ export class RemoteCatalogService {
     try {
       // 1. Create a raw SQLite worker (supports both OPFS and HTTP VFS)
       const worker = await createSQLiteThread({ 
-        httpOptions: { backendType: 'sync', maxPageSize: 4096 } 
+        http: createHttpBackend({ maxPageSize: 4096 })
       });
 
       let useHttp = false;
@@ -31,8 +31,8 @@ export class RemoteCatalogService {
         await worker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
         
         // 3. Perform a quick count to see if the full catalog is present locally
-        const countRes = await worker('exec', { sql: 'SELECT count(*) FROM base_ingredients', rowMode: 'array' });
-        const count = countRes?.resultRows?.[0]?.[0] || 0;
+        const countRes = await worker('exec', { sql: 'SELECT count(*) FROM base_ingredients', rowMode: 'array' } as any);
+        const count = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
         
         if (count < 10000) {
           console.log('[RemoteCatalogService] OPFS catalog has < 10,000 items. Falling back to HTTP Range Requests.');
@@ -86,18 +86,18 @@ export class RemoteCatalogService {
     `;
     
     const results = await Promise.race([
-      worker('exec', { sql, rowMode: 'array' }),
+      worker('exec', { sql, rowMode: 'array' } as any),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 15000))
     ]).catch(err => {
       console.error('Remote search error:', err);
       this.workerPromise = null;
       try { worker('close', {}).catch(() => {}); } catch(e) {}
-      return { resultRows: [] };
+      return { result: { resultRows: [] } };
     });
     
-    if (!results || !results.resultRows || results.resultRows.length === 0) return [];
+    if (!results || !results.result || !results.result.resultRows || results.result.resultRows.length === 0) return [];
     
-    return results.resultRows.map((vals: any) => ({
+    return results.result.resultRows.map((vals: any) => ({
       id: vals[0],
       name: vals[1],
       source: vals[2],
@@ -124,18 +124,18 @@ export class RemoteCatalogService {
     `;
     
     const results = await Promise.race([
-      worker('exec', { sql, rowMode: 'array' }),
+      worker('exec', { sql, rowMode: 'array' } as any),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 10000))
     ]).catch(err => {
       console.error('Remote portions error:', err);
       this.workerPromise = null;
       try { worker('close', {}).catch(() => {}); } catch(e) {}
-      return { resultRows: [] };
+      return { result: { resultRows: [] } };
     });
     
-    if (!results || !results.resultRows || results.resultRows.length === 0) return [];
+    if (!results || !results.result || !results.result.resultRows || results.result.resultRows.length === 0) return [];
     
-    return results.resultRows.map((vals: any) => ({
+    return results.result.resultRows.map((vals: any) => ({
       id: vals[0],
       base_food_id: vals[1],
       name: vals[2],

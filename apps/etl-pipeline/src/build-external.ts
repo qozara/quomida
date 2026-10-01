@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
-import { exportSQLiteCatalog } from './exporters/SQLiteExporter.js';
 import { fetchPrebuiltSystemCatalog } from './utils/fetchPrebuiltSystem.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
@@ -223,6 +222,8 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     const systemDbPath = path.resolve(currentDir, '../../webapp/public/system.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
     
+    // Dynamic import to prevent Vercel CI from crashing due to better-sqlite3 native bindings
+    const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
     await exportSQLiteCatalog(intermediateFiles, catalogPath, systemDbPath, metaPath);
 
     // Generate _headers file for Cloudflare Pages

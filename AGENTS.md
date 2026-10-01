@@ -42,7 +42,11 @@ This document contains operational guidelines, architectural constraints, and st
    - It is NOT intended to be persisted or committed to the repository.
    - Its content may change completely as features evolve. Official documentation should go in `docs/`, ADRs in `docs/adr/`, and tasks in GitHub issues.
 
-9. **Local-First WebApp Security Posture**:
+9. **No Generated Data in Git (NON-NEGOTIABLE)**:
+   - True built-data, databases (`.sqlite`, `.ndjson`), and any other generated content MUST NEVER be committed to the git repository.
+   - The repository must remain pristine so that users can clone it and build their own catalogs. Sample data for quick local setups is acceptable, but actual ETL artifacts must be ignored.
+
+10. **Local-First WebApp Security Posture**:
    - Content Security Policy (CSP): `apps/webapp/index.html` MUST maintain a strict CSP preventing `unsafe-eval` and unauthorized domains.
    - Subresource Integrity (SRI): Vite MUST build with `@small-tech/vite-plugin-sri` to generate script/style integrity hashes.
    - XSS Prevention: NEVER use `dangerouslySetInnerHTML` or raw DOM injection in React.

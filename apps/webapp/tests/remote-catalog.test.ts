@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 
 vi.mock('sqlite-wasm-http', () => {
   return {
+    createHttpBackend: () => ({}),
     createSQLiteThread: async () => {
       const worker = async (action: string, payload: any) => {
         if (action === 'open') return;
@@ -12,21 +13,21 @@ vi.mock('sqlite-wasm-http', () => {
         if (action === 'exec') {
           const sql = payload.sql;
           if (sql.includes('SELECT count(*)')) {
-            return { resultRows: [[15000]] }; // Simulate OPFS having full catalog
+            return { result: { resultRows: [[15000]] } }; // Simulate OPFS having full catalog
           }
           if (sql.includes('FROM portions')) {
             if (sql.includes("'1'")) {
-              return { resultRows: [['p1', '1', 'Slice', 30, 'hash']] };
+              return { result: { resultRows: [['p1', '1', 'Slice', 30, 'hash']] } };
             }
-            return { resultRows: [] };
+            return { result: { resultRows: [] } };
           }
           if (sql.includes('FROM base_ingredients_fts')) {
             if (sql.toLowerCase().includes('avacado')) {
-              return { resultRows: [['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash']] };
+              return { result: { resultRows: [['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash']] } };
             }
-            return { resultRows: [] };
+            return { result: { resultRows: [] } };
           }
-          return { resultRows: [] };
+          return { result: { resultRows: [] } };
         }
       };
       return worker;
