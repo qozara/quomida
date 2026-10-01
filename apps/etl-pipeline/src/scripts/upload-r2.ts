@@ -18,17 +18,23 @@ const currentDir = path.dirname(currentFile);
 const rootDir = path.resolve(currentDir, '../../');
 
 const sqliteFile = path.join(rootDir, 'dist-cdn/catalog.sqlite');
+const sqliteGzFile = path.join(rootDir, 'dist-cdn/catalog.sqlite.gz');
 const metaFile = path.join(rootDir, 'dist-cdn/catalog_meta.json');
 
 console.log(`[R2 Upload] Uploading artifacts to Cloudflare R2 bucket: ${bucketName}...`);
 
 try {
-  const sqliteCmd = `npx wrangler r2 object put ${bucketName}/catalog.sqlite --file="${sqliteFile}" --content-type=application/x-sqlite3 --remote`;
-  console.log('\n[R2 Upload] Uploading catalog.sqlite...');
+  const sqliteCmd = `npx --yes wrangler r2 object put ${bucketName}/catalog.sqlite --file="${sqliteFile}" --content-type=application/x-sqlite3 --remote`;
+  console.log('\n[R2 Upload] Uploading catalog.sqlite (Uncompressed for HTTP VFS fallback)...');
   console.log(`[R2 Upload] Executing: ${sqliteCmd}`);
   execSync(sqliteCmd, { stdio: 'inherit' });
 
-  const metaCmd = `npx wrangler r2 object put ${bucketName}/catalog_meta.json --file="${metaFile}" --content-type=application/json --remote`;
+  const sqliteGzCmd = `npx --yes wrangler r2 object put ${bucketName}/catalog.sqlite.gz --file="${sqliteGzFile}" --content-type=application/gzip --remote`;
+  console.log('\n[R2 Upload] Uploading catalog.sqlite.gz (Compressed for OPFS Download)...');
+  console.log(`[R2 Upload] Executing: ${sqliteGzCmd}`);
+  execSync(sqliteGzCmd, { stdio: 'inherit' });
+
+  const metaCmd = `npx --yes wrangler r2 object put ${bucketName}/catalog_meta.json --file="${metaFile}" --content-type=application/json --remote`;
   console.log('\n[R2 Upload] Uploading catalog_meta.json...');
   console.log(`[R2 Upload] Executing: ${metaCmd}`);
   execSync(metaCmd, { stdio: 'inherit' });

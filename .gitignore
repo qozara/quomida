@@ -13,6 +13,8 @@ dev-dist/
 apps/webapp/src/generated/*.ndjson
 apps/webapp/src/generated/*_meta.json
 apps/webapp/public/_headers
+apps/webapp/public/*.sqlite
+apps/webapp/public/*.sqlite.gz
 
 # ETL Pipeline Workspaces
 apps/etl-pipeline/dist-cdn/

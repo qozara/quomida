@@ -65,7 +65,7 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
     expect(hashModified).not.toBe(hash1);
   });
 
-  it('generates catalog.sqlite and catalog_meta.json using SQLiteExporter', async () => {
+  it('generates catalog.sqlite.gz, system.sqlite, and catalog_meta.json using SQLiteExporter', async () => {
     const ndjsonPath = path.join(tempDir, 'source.ndjson');
     fs.writeFileSync(
       ndjsonPath,
@@ -78,33 +78,51 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
         protein_100g: 22.5,
         carbs_100g: 0,
         fats_100g: 13.4
+      }) + '\n' +
+      JSON.stringify({
+        id: "sys-1",
+        name: "System Apple",
+        originSource: "SYSTEM",
+        lang: "en",
+        calories_100g: 50,
+        protein_100g: 0,
+        carbs_100g: 10,
+        fats_100g: 0
       }) + '\n',
       'utf-8'
     );
     
     const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const systemPath = path.join(publicDir, 'system.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
 
-    await exportSQLiteCatalog([ndjsonPath], catalogPath, metaPath);
+    await exportSQLiteCatalog([ndjsonPath], catalogPath, systemPath, metaPath);
 
     expect(fs.existsSync(catalogPath)).toBe(true);
+    expect(fs.existsSync(systemPath)).toBe(true);
+    expect(fs.existsSync(`${catalogPath}.gz`)).toBe(true);
     expect(fs.existsSync(metaPath)).toBe(true);
 
     const { DatabaseSync } = await import('node:sqlite');
+    
+    // Check catalog.sqlite
     const db = new DatabaseSync(catalogPath);
     const items = db.prepare('SELECT * FROM base_ingredients').all() as any[];
     db.close();
+    
+    // Check system.sqlite
+    const sysDb = new DatabaseSync(systemPath);
+    const sysItems = sysDb.prepare('SELECT * FROM base_ingredients').all() as any[];
+    sysDb.close();
+
+    expect(items.length).toBe(2); // catalog has both SARA2 and SYSTEM
+    expect(sysItems.length).toBe(1); // system has only SYSTEM
+    expect(sysItems[0].source).toBe('system');
     
     const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
 
     expect(metaData.catalogVersion).toBeDefined();
     expect(metaData.generatedAt).toBeDefined();
-    expect(Array.isArray(items)).toBe(true);
-    expect(items.length).toBeGreaterThan(0);
-
-    const firstItem = items[0];
-    expect(firstItem.id).toBeDefined();
-    expect(firstItem.contentHash).toBeDefined();
-    expect(firstItem.source).toBe('sara2');
+    expect(metaData.itemCount).toBe(2);
   });
 });

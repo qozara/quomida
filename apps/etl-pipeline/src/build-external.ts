@@ -220,9 +220,10 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
       fs.mkdirSync(publicDir, { recursive: true });
     }
     const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const systemDbPath = path.resolve(currentDir, '../../webapp/public/system.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
     
-    await exportSQLiteCatalog(intermediateFiles, catalogPath, metaPath);
+    await exportSQLiteCatalog(intermediateFiles, catalogPath, systemDbPath, metaPath);
 
     // Generate _headers file for Cloudflare Pages
     const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;
