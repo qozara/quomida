@@ -5,27 +5,31 @@ import { vi } from 'vitest';
 
 vi.mock('sqlite-wasm-http', () => {
   return {
-    createSQLiteHTTPPool: async () => {
-      return {
-        open: async () => {},
-        close: async () => {},
-        exec: async (sql: string, bind: any, options: any) => {
+    createSQLiteThread: async () => {
+      const worker = async (action: string, payload: any) => {
+        if (action === 'open') return;
+        if (action === 'close') return;
+        if (action === 'exec') {
+          const sql = payload.sql;
+          if (sql.includes('SELECT count(*)')) {
+            return { resultRows: [[15000]] }; // Simulate OPFS having full catalog
+          }
           if (sql.includes('FROM portions')) {
-            if (bind && bind[0] === '1') {
-              // Return the worker message object shape
-              return [{ row: ['p1', '1', 'Slice', 30, 'hash'] }];
+            if (sql.includes("'1'")) {
+              return { resultRows: [['p1', '1', 'Slice', 30, 'hash']] };
             }
-            return [];
+            return { resultRows: [] };
           }
           if (sql.includes('FROM base_ingredients_fts')) {
             if (sql.toLowerCase().includes('avacado')) {
-              return [{ row: ['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash'] }];
+              return { resultRows: [['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash']] };
             }
-            return [];
+            return { resultRows: [] };
           }
-          return [];
+          return { resultRows: [] };
         }
       };
+      return worker;
     }
   };
 });
@@ -49,20 +53,18 @@ describe('RemoteCatalogService', () => {
   });
 
   it('should gracefully return empty array when the remote database is unreachable', async () => {
-    // Force a failure by hijacking the internal pool
-    const pool = await (service as any).getPool();
-    vi.spyOn(pool, 'exec').mockRejectedValueOnce(new Error('Network offline'));
+    // Force a failure by hijacking the internal worker
+    const worker = await (service as any).getWorker();
+    vi.spyOn(service as any, 'getWorker').mockResolvedValue(async (action: string) => {
+      if (action === 'exec') throw new Error('Network offline');
+    });
 
     const results = await service.searchIngredients('Avacado');
     expect(results).toEqual([]);
   });
 
   it('should search for portions linked to a base_food_id', async () => {
-    const pool = await (service as any).getPool();
-    await pool.exec("INSERT INTO portions (base_food_id, name, equivalent_weight_g) VALUES ('1', 'Slice', 30)", {});
-
     const portions = await service.getPortionsForIngredient('1');
-    console.log('PORTIONS', portions);
     expect(portions.length).toBe(1);
     expect(portions[0].name).toBe('Slice');
   });
