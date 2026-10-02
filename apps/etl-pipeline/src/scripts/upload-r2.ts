@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import '../config/env.js';
 
@@ -61,6 +61,29 @@ const s3Client = new S3Client({
 console.log(`[R2 Upload] Uploading artifacts to Cloudflare R2 bucket: ${bucketName}...`);
 console.log(`[R2 Upload] Using S3 multipart upload API to bypass 300MB limit.`);
 
+async function configureCors() {
+  console.log(`\n[R2 Upload] Configuring bucket CORS for HTTP Range Requests...`);
+  try {
+    await s3Client.send(new PutBucketCorsCommand({
+      Bucket: bucketName,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'HEAD'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length']
+          }
+        ]
+      }
+    }));
+    console.log(`[R2 Upload] ✅ Successfully configured CORS`);
+  } catch (err) {
+    console.error(`[R2 Upload] ❌ Failed to configure CORS:`, err);
+    throw err;
+  }
+}
+
 async function uploadFile(file: typeof filesToUpload[0]) {
   if (!fs.existsSync(file.path)) {
     console.warn(`[R2 Upload] WARNING: File not found, skipping: ${file.path}`);
@@ -103,6 +126,7 @@ async function uploadFile(file: typeof filesToUpload[0]) {
 
 async function main() {
   try {
+    await configureCors();
     for (const file of filesToUpload) {
       await uploadFile(file);
     }
