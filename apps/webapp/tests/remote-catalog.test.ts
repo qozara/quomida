@@ -21,7 +21,7 @@ vi.mock('sqlite-wasm-http', () => {
             }
             return { result: { resultRows: [] } };
           }
-          if (sql.includes('FROM base_ingredients_fts')) {
+          if (sql.includes('base_ingredients_fts')) {
             if (sql.toLowerCase().includes('avacado')) {
               return { result: { resultRows: [['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash']] } };
             }

@@ -39,13 +39,15 @@
     "esbuild": "0.25.0",
     "vite": "6.4.3",
     "@vitest/mocker": "5.0.0",
+    "serialize-javascript": "7.1.2",
     "@quomida/domain-core": {
       "ws": "8.21.3",
       "ajv": "8.20.0"
     },
     "@quomida/webapp": {
       "ws": "8.21.3",
-      "ajv": "8.20.0"
+      "ajv": "8.20.0",
+      "serialize-javascript": "7.1.2"
     }
   },
   "dependencies": {
