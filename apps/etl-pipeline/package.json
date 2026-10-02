@@ -15,6 +15,8 @@
     "start": "npx tsx src/build-external.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1145.0",
+    "@aws-sdk/lib-storage": "^3.1145.0",
     "@quomida/domain-core": "*",
     "better-sqlite3": "^13.0.3",
     "csv-parse": "^7.0.2",
