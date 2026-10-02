@@ -135,6 +135,10 @@ npm run etl:show-catalog-setup
 # Generate CSV templates from the OpenFoodFacts database
 npm run etl:generate-system
 
+# Upload compiled catalog artifacts to Cloudflare R2 (Preview or Prod)
+npm run etl:upload:preview
+npm run etl:upload:prod
+
 # Clean all downloaded datasets and generated ETL files
 npm run clean
 ```

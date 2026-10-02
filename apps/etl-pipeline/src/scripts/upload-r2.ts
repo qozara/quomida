@@ -5,18 +5,39 @@ import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import '../config/env.js';
 
-const bucketName = process.env.CLOUDFLARE_BUCKET_NAME;
+// Parse target mode: --preview, --prod, --production, or via environment variables
+const args = process.argv.slice(2);
+const isPreview = 
+  args.includes('--preview') || 
+  args.includes('preview') || 
+  args.includes('--env=preview') ||
+  process.env.R2_TARGET === 'preview' ||
+  process.env.APP_ENV === 'preview';
+
+const targetMode = isPreview ? 'preview' : 'production';
+const prefix = isPreview ? 'PREVIEW_' : 'PROD_';
+
+const bucketName = process.env[`${prefix}CLOUDFLARE_BUCKET_NAME`] || process.env.CLOUDFLARE_BUCKET_NAME;
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-// We now require S3-compatible credentials to bypass the 300MB Wrangler limit
-const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+const accessKeyId = process.env[`${prefix}R2_ACCESS_KEY_ID`] || process.env.R2_ACCESS_KEY_ID;
+const secretAccessKey = process.env[`${prefix}R2_SECRET_ACCESS_KEY`] || process.env.R2_SECRET_ACCESS_KEY;
 
 if (!bucketName || !accountId || !accessKeyId || !secretAccessKey) {
-  console.error('[R2 Upload] ERROR: Missing required environment variables for S3 API upload.');
-  console.error('Please ensure CLOUDFLARE_BUCKET_NAME, CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY are set in your .env file.');
-  console.error('Note: You must generate S3-compatible API credentials in the Cloudflare Dashboard (API Tokens -> R2 API Tokens).');
+  console.error(`[R2 Upload] ERROR: Missing required environment variables for target [${targetMode.toUpperCase()}].`);
+  console.error(`Please verify your environment configuration or .env file.`);
+  console.error(`Expected:`);
+  console.error(` - Bucket Name: ${prefix}CLOUDFLARE_BUCKET_NAME (or CLOUDFLARE_BUCKET_NAME)`);
+  console.error(` - Account ID: CLOUDFLARE_ACCOUNT_ID`);
+  console.error(` - Access Key ID: ${prefix}R2_ACCESS_KEY_ID (or R2_ACCESS_KEY_ID)`);
+  console.error(` - Secret Access Key: ${prefix}R2_SECRET_ACCESS_KEY (or R2_SECRET_ACCESS_KEY)`);
   process.exit(1);
 }
+
+console.log(`[R2 Upload] Target Environment: \x1b[36m${targetMode.toUpperCase()}\x1b[0m`);
+console.log(`[R2 Upload] Destination Bucket: \x1b[32m${bucketName}\x1b[0m`);
+console.log(`[R2 Upload] Account ID: ${accountId}`);
+console.log(`[R2 Upload] Access Key ID: ${accessKeyId.substring(0, 6)}...${accessKeyId.substring(accessKeyId.length - 4)}`);
+
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);

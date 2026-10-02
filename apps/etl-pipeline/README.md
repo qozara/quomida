@@ -184,31 +184,65 @@ Configure the client webapp `.env.production` to point to your provider:
 VITE_CATALOG_BASE_URL=https://data.yourdomain.com
 ```
 
-### 3. Qozara Official Infrastructure (Cloudflare Pages Direct Upload)
-For the official Qozara deployment, we use **GitHub Actions** to build the ETL pipeline and **Cloudflare Pages** strictly as the CDN. This is known as "Direct Upload" and prevents Cloudflare from needing to run build environments, while giving us full CI/CD control inside GitHub.
+### 3. Official Infrastructure: Cloudflare R2 Distribution
 
-**GitHub Actions Integration (`.github/workflows/etl.yml`):**
-- Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
-- Uses `cloudflare/wrangler-action` to upload the generated SQLite artifacts directly to Cloudflare R2.
+For the official Qozara deployment, the catalog is hosted on **Cloudflare R2 Object Storage** using multipart S3 uploads (bypassing the 300MB Wrangler CLI limit).
 
-**Required GitHub Secrets:**
-- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with R2 edit permissions.
-- `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
+The upload script deploys 4 artifacts:
+1. `catalog.sqlite`: Uncompressed SQLite database for HTTP VFS range requests.
+2. `catalog.sqlite.gz`: Compressed SQLite database with trigram indexing for browser OPFS downloads.
+3. `catalog_meta.json`: Catalog version, item count, and generation timestamp.
+4. `system.sqlite`: Built-in seed database referenced for offline boot and CI fast-paths.
+
+#### Environments: Preview vs Production
+
+We support two isolated environments:
+* **Preview (`preview-quomida-data`)**: Dedicated bucket for staging, PR testing, and preview webapp builds (`VITE_CATALOG_BASE_URL=https://preview.data.quomida.qozara.org`).
+* **Production (`quomida-data`)**: Public production CDN bucket (`VITE_CATALOG_BASE_URL=https://data.quomida.qozara.org`).
 
 #### Local R2 Upload (Maintainers)
-Maintainers can manually upload the generated catalog to Cloudflare R2 using the provided unified command. This utilizes the same environment configuration without requiring any additional runtime dependencies.
 
-1. Ensure your `.env` contains the required credentials:
+Maintainers can upload to either environment without having to edit or comment out lines in `.env`.
+
+1. Add your S3-compatible R2 credentials to `apps/etl-pipeline/.env`:
    ```env
-   CLOUDFLARE_BUCKET_NAME="quomida-data"
    CLOUDFLARE_ACCOUNT_ID="your_account_id"
-   CLOUDFLARE_API_TOKEN="your_api_token"
+
+   # Preview Target
+   PREVIEW_CLOUDFLARE_BUCKET_NAME="preview-quomida-data"
+   PREVIEW_R2_ACCESS_KEY_ID="your_preview_r2_access_key"
+   PREVIEW_R2_SECRET_ACCESS_KEY="your_preview_r2_secret_key"
+
+   # Production Target
+   PROD_CLOUDFLARE_BUCKET_NAME="quomida-data"
+   PROD_R2_ACCESS_KEY_ID="your_prod_r2_access_key"
+   PROD_R2_SECRET_ACCESS_KEY="your_prod_r2_secret_key"
    ```
-2. Run the upload command:
+
+2. Run the corresponding upload command:
    ```bash
-   npm run upload:r2 --workspace=@quomida/etl-pipeline
+   # Upload to Preview bucket:
+   npm run upload:r2:preview --workspace=@quomida/etl-pipeline
+   # (or from monorepo root: npm run etl:upload:preview)
+
+   # Upload to Production bucket:
+   npm run upload:r2:prod --workspace=@quomida/etl-pipeline
+   # (or from monorepo root: npm run etl:upload:prod)
    ```
-*(Note: If any of the three required environment variables are missing, the command will intentionally fail.)*
+
+#### GitHub Actions CI (`.github/workflows/etl.yml`)
+
+The ETL workflow automates catalog compilation and deployment:
+* **Automatic Target Selection**:
+  * Pushes/merges to `main` or scheduled 6-month cron runs automatically upload to **`prod`**.
+  * Pull request branches automatically upload to **`preview`**.
+* **Manual Execution (`workflow_dispatch`)**:
+  * Provides an interactive dropdown in GitHub Actions (`target_env: preview | prod`) allowing maintainers to re-run builds for any branch against either bucket.
+* **Required GitHub Secrets**:
+  * `CLOUDFLARE_ACCOUNT_ID`
+  * `PROD_R2_ACCESS_KEY_ID` & `PROD_R2_SECRET_ACCESS_KEY`
+  * `PREVIEW_R2_ACCESS_KEY_ID` & `PREVIEW_R2_SECRET_ACCESS_KEY`
+
 
 ---
 

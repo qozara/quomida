@@ -27,7 +27,9 @@
     "etl": "npm run build:external --workspace=@quomida/etl-pipeline",
     "etl:system": "npm run build:system --workspace=@quomida/etl-pipeline",
     "etl:generate-system": "npm run generate-system-catalog --workspace=@quomida/etl-pipeline",
-    "etl:show-catalog-setup": "npm run show-catalog-setup --workspace=@quomida/etl-pipeline"
+    "etl:show-catalog-setup": "npm run show-catalog-setup --workspace=@quomida/etl-pipeline",
+    "etl:upload:preview": "npm run upload:r2:preview --workspace=@quomida/etl-pipeline",
+    "etl:upload:prod": "npm run upload:r2:prod --workspace=@quomida/etl-pipeline"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
