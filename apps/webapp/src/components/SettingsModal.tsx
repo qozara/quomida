@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext.js';
 import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw, Download, CheckCircle } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 
-import systemMeta from '../generated/catalog_system_meta.json';
+
 
 export const SettingsModal: React.FC = () => {
   const {
