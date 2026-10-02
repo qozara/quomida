@@ -3,6 +3,7 @@ import type { BaseIngredient, Portion } from '@quomida/domain-core';
 
 export class RemoteCatalogService {
   private workerPromise: Promise<any> | null = null;
+  private isUsingHttpFallback = false;
   private catalogUrl: string;
 
   constructor(baseUrl: string) {
@@ -24,7 +25,7 @@ export class RemoteCatalogService {
         http: createHttpBackend({ maxPageSize: 4096 })
       });
 
-      let useHttp = false;
+      
 
       // 2. Attempt to mount the OPFS database (catalog.sqlite)
       try {
@@ -36,7 +37,7 @@ export class RemoteCatalogService {
         
         if (count < 10000) {
           console.log('[RemoteCatalogService] OPFS catalog has < 10,000 items. Falling back to HTTP Range Requests.');
-          useHttp = true;
+          this.isUsingHttpFallback = true;
           // Close OPFS DB to open HTTP one
           await worker('close', {});
         } else {
@@ -44,10 +45,10 @@ export class RemoteCatalogService {
         }
       } catch (err) {
         console.warn('[RemoteCatalogService] Failed to mount OPFS catalog, falling back to HTTP:', err);
-        useHttp = true;
+        this.isUsingHttpFallback = true;
       }
 
-      if (useHttp) {
+      if (this.isUsingHttpFallback) {
         // Fallback to HTTP Range Request VFS pointing to R2 URL
         await worker('open', { filename: this.catalogUrl, vfs: 'http' });
       }
@@ -66,6 +67,10 @@ export class RemoteCatalogService {
     
     if (!matchQuery) return [];
 
+    const matchCondition = this.isUsingHttpFallback 
+      ? `WHERE name LIKE '%${sanitizedQuery.replace(/'/g, "''")}%'`
+      : `JOIN base_ingredients_fts f ON b.id = f.id WHERE f.base_ingredients_fts MATCH '${matchQuery.replace(/'/g, "''")}'`;
+
     const sql = `
       SELECT 
         b.id as id,
@@ -77,23 +82,25 @@ export class RemoteCatalogService {
         b.carbs_100g as carbs_100g,
         b.fats_100g as fats_100g,
         b.contentHash as contentHash
-      FROM (
-        SELECT id FROM base_ingredients_fts 
-        WHERE base_ingredients_fts MATCH '${matchQuery.replace(/'/g, "''")}' 
-        LIMIT ${limit}
-      ) f
-      JOIN base_ingredients b ON f.id = b.id
+      FROM base_ingredients b
+      ${matchCondition}
+      LIMIT ${limit}
     `;
     
+    console.log('Executing search query:', sql);
     const results = await Promise.race([
       worker('exec', { sql, rowMode: 'array' } as any),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 15000))
     ]).catch(err => {
-      console.error('Remote search error:', err);
+      console.error('Remote search error keys:', Object.keys(err));
+      console.error('Remote search error string:', String(err));
+      if (err.result) console.error('err.result keys:', Object.keys(err.result));
+      if (err.message) console.error('err.message:', err.message);
       this.workerPromise = null;
       try { worker('close', {}).catch(() => {}); } catch(e) {}
       return { result: { resultRows: [] } };
     });
+    console.log('Search query result:', results);
     
     if (!results || !results.result || !results.result.resultRows || results.result.resultRows.length === 0) return [];
     

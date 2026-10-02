@@ -12,11 +12,9 @@ The pipeline is completely decoupled from the web application runtime, allowing 
 
 ---
 
-## 🏗️ Architecture: Two-File Delta Distribution
-
 To optimize client bandwidth and avoid downloading megabytes of static JSON on every application load, the pipeline outputs assets into two separate tiers:
 
-1. **`catalog_system.ndjson`**: Bundled directly into the web application at build time. It contains all foundational data (seeds and portions) and guarantees the web app is immediately functional on first boot, even without network access.
+1. **`system.sqlite`**: Bundled directly into the web application at build time. It contains all foundational data (seeds and portions) and guarantees the web app is immediately functional on first boot, even without network access.
 2. **`catalog_meta.json`**: A lightweight manifest (~50 bytes) for external data containing:
    ```json
    {
@@ -24,7 +22,7 @@ To optimize client bandwidth and avoid downloading megabytes of static JSON on e
      "generatedAt": "2026-09-20T12:00:00.000Z"
    }
    ```
-2. **`catalog.json`**: The complete, versioned payload containing all validated food items with source-based deterministic IDs and `contentHash` properties:
+2. **`catalog.sqlite`**: The complete, versioned payload containing all validated food items with source-based deterministic IDs and `contentHash` properties:
    ```json
    {
      "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
@@ -100,8 +98,8 @@ SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
 SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
 
 # Option 2: Fast-path using a finalized system catalog NDJSON (Skips CSV parsing)
-# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
-# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/catalog_system.ndjson"
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/system.sqlite"
+# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/system.sqlite"
 
 # External sources
 TBCA_URL="https://example.com/actual_tbca.csv"
@@ -113,7 +111,7 @@ SARA2_URL="https://example.com/actual_sara2.csv"
 To ensure clean CI/CD deployments (like Vercel) and fast web app builds, the ETL pipeline is strictly split into two isolated flows:
 
 **Flow A: System Catalog (Built-in)**
-- Generates only the foundational `catalog_system.ndjson`.
+- Generates only the foundational `system.sqlite`.
 - Has **zero SQLite dependencies**. It bypasses `better-sqlite3` and any C++ native bindings.
 - Automatically executed by the webapp during Vercel builds (`npm run build:system`).
 
@@ -139,7 +137,7 @@ In this ETL architecture, the `data/raw/` directory acts as a **pure data sink**
 
 ### 4. Build-Time System Generation
 
-The web application's `prebuild` hook automatically runs this command to ensure `catalog_system.ndjson` is built into the app before Vite bundles it:
+The web application's `prebuild` hook automatically runs this command to ensure `system.sqlite` is built into the app before Vite bundles it:
 ```bash
 npm run build:system --workspace=@quomida/etl-pipeline
 ```
@@ -172,13 +170,13 @@ The webapp consumes catalog updates via the `VITE_CATALOG_BASE_URL` environment 
 
 ### 1. Local Development & CI
 - `VITE_CATALOG_BASE_URL=""` (relative root path).
-- Vite serves `catalog_meta.json` and `catalog.json` statically from `apps/webapp/public/`.
+- Vite serves `catalog_meta.json` and `catalog.sqlite` statically from `apps/webapp/public/`.
 - In CI test runs, if the files are not generated, the hydration service degrades gracefully without throwing.
 
 ### 2. Production (Any Static CDN / Object Storage)
 Because the pipeline is decoupled, you can host the catalog on any static file provider:
 - **GitHub Pages**: A scheduled GitHub Action runs `npm run etl` and deploys to a static branch.
-- **AWS S3 / Cloudflare R2**: Upload `catalog.json` and `catalog_meta.json` to an S3 bucket with public read access.
+- **AWS S3 / Cloudflare R2**: Upload `catalog.sqlite` and `catalog_meta.json` to an S3 bucket with public read access.
 - **Vercel Blob / Static Storage**: Upload to Vercel Blob and set `VITE_CATALOG_BASE_URL=https://blob.vercel-storage.com/...`.
 
 Configure the client webapp `.env.production` to point to your provider:
@@ -221,3 +219,12 @@ When adding real API scrapers or new static CSV datasets (USDA, Latinfoots, BEDC
 2. Map raw source records to the `BaseIngredient` interface.
 3. Pass raw items through `sanitizeIngredient()` and `computeContentHash()`.
 4. Run `npm test` to verify deterministic hashing and schema compliance.
+
+## 🏗️ Architecture: Hybrid OPFS SQLite Distribution
+
+To optimize client bandwidth and memory, the pipeline outputs assets into three distinct SQLite artifacts:
+
+1. **`system.sqlite`**: Bundled directly into the web application at build time. Contains only essential System items (originating from `system_ingredients.csv`) and guarantees the web app is immediately functional on first boot.
+2. **`catalog.sqlite` (HTTP VFS)**: Uncompressed database using `unicode61`. Hosted on Cloudflare R2 and queried remotely via HTTP Range Requests when the user hasn't downloaded the full catalog over Wi-Fi.
+3. **`catalog.sqlite.gz` (OPFS Download)**: Compressed massive database utilizing the advanced `trigram` tokenizer for fuzzy search. Downloaded directly into the browser's OPFS by the client download manager.
+4. **`catalog_meta.json`**: A lightweight manifest containing the `catalogVersion` hash and total items.

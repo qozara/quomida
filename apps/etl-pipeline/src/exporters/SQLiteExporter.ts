@@ -9,7 +9,7 @@ import type { RawIngredientItem } from '../types.js';
 import type { CatalogMetaPayload } from '../index.js';
 import { sanitizeIngredient, computeContentHash } from '../utils/sanitizer.js';
 
-function initDb(path: string) {
+function initDb(path: string, tokenizer: string = 'unicode61 remove_diacritics 1') {
   if (fs.existsSync(path)) {
     fs.unlinkSync(path);
   }
@@ -39,7 +39,7 @@ function initDb(path: string) {
     CREATE VIRTUAL TABLE base_ingredients_fts USING fts5(
       name,
       id UNINDEXED,
-      tokenize="trigram"
+      tokenize="${tokenizer}"
     );
   `);
 
@@ -69,8 +69,9 @@ export async function exportSQLiteCatalog(
   const seenIds = new Set<string>();
   const externalCatalogItems: { id: string; hash: string }[] = [];
 
-  const catalog = initDb(outCatalogPath);
-  const system = initDb(outSystemPath);
+  const catalog = initDb(outCatalogPath, 'unicode61 remove_diacritics 1'); // For HTTP VFS
+  const catalogDownload = initDb(outCatalogPath.replace('catalog.sqlite', 'catalog_download.sqlite'), 'trigram'); // For OPFS Download
+  const system = initDb(outSystemPath, 'unicode61 remove_diacritics 1'); // Keep system small & HTTP-safe
 
   let externalExportedCount = 0;
   let systemExportedCount = 0;
@@ -111,8 +112,8 @@ export async function exportSQLiteCatalog(
         let contentHash = '';
 
         const targetDbs = item.originSource === 'SYSTEM' 
-          ? [catalog, system] 
-          : [catalog];
+          ? [catalog, catalogDownload, system] 
+          : [catalog, catalogDownload];
 
         if (item._type === 'portion') {
           finalItem = item;
@@ -162,7 +163,7 @@ export async function exportSQLiteCatalog(
     }
   }
 
-  for (const target of [catalog, system]) {
+  for (const target of [catalog, catalogDownload, system]) {
     target.db.exec(`
       CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
       CREATE INDEX idx_portion_base_food ON portions(base_food_id);
@@ -171,17 +172,23 @@ export async function exportSQLiteCatalog(
     target.db.close();
   }
 
+  const catalogDownloadPath = outCatalogPath.replace('catalog.sqlite', 'catalog_download.sqlite');
+  
   console.log(`[ETL Pipeline] Exported ${systemExportedCount} system items to ${outSystemPath}`);
   console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items (and ${systemExportedCount} system items) to ${outCatalogPath}`);
+  console.log(`[ETL Pipeline] Exported trigram-enabled copy to ${catalogDownloadPath}`);
 
-  // Compress catalog.sqlite to catalog.sqlite.gz
+  // Compress catalog_download.sqlite to catalog.sqlite.gz (so the frontend downloads the trigram version)
   const gzPath = `${outCatalogPath}.gz`;
-  console.log(`[ETL Pipeline] Compressing ${outCatalogPath} to ${gzPath}...`);
+  console.log(`[ETL Pipeline] Compressing ${catalogDownloadPath} to ${gzPath}...`);
   await pipeline(
-    fs.createReadStream(outCatalogPath),
+    fs.createReadStream(catalogDownloadPath),
     zlib.createGzip({ level: 9 }),
     fs.createWriteStream(gzPath)
   );
+  
+  // Clean up the uncompressed trigram DB to save disk space, keep the unicode61 catalog.sqlite
+  fs.unlinkSync(catalogDownloadPath);
   
   // Optionally delete uncompressed to save space, but keeping it helps debugging. We'll leave it.
 

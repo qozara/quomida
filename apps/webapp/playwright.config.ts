@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -22,9 +25,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run build && npm run preview',
+    command: 'npm run build -- --mode test && npm run preview',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      PREBUILT_SYSTEM_CATALOG_URL: process.env.PREBUILT_SYSTEM_CATALOG_URL || '',
+      VITE_CATALOG_BASE_URL: process.env.VITE_CATALOG_BASE_URL || ''
+    }
   },
 });

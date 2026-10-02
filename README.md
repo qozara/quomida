@@ -162,5 +162,5 @@ MIT License - free and open-source software built by Qozara.
 
 ## Local & Remote Catalog Architecture
 Quomida uses a Hybrid OPFS Strategy for handling 1M+ catalog entries:
-- **System Data (Offline/Search):** Stored in Origin Private File System (OPFS) as an SQLite database using `sqlite-wasm-http`. It uses HTTP Range Requests when querying the remote Cloudflare R2 bucket directly, ensuring users don't have to download the 200MB file unless they explicitly opt into Offline Mode.
+- **System Data (Offline/Search):** A dual-tier approach. The full catalog (`catalog.sqlite.gz` with Trigram fuzzy search) can be downloaded directly into the browser's Origin Private File System (OPFS) and queried via `sqlocal`. If not downloaded, it falls back to `sqlite-wasm-http` to execute HTTP Range Requests directly against the remote Cloudflare R2 bucket (`catalog.sqlite` with Unicode61), ensuring users don't have to download the 200MB file unless they explicitly opt into Offline Mode.
 - **User Data (Custom Ingredients & Logs):** Stored in IndexedDB via RxDB for real-time reactivity and synchronization with Google Drive.

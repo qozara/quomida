@@ -52,6 +52,7 @@ const filesToUpload = [
 const s3Client = new S3Client({
   region: 'auto',
   endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+  forcePathStyle: true,
   credentials: {
     accessKeyId,
     secretAccessKey,
@@ -78,9 +79,14 @@ async function configureCors() {
       }
     }));
     console.log(`[R2 Upload] ✅ Successfully configured CORS`);
-  } catch (err) {
-    console.error(`[R2 Upload] ❌ Failed to configure CORS:`, err);
-    throw err;
+  } catch (err: any) {
+    if (err.name === 'AccessDenied' || err.Code === 'AccessDenied') {
+      console.warn(`[R2 Upload] ⚠️ Could not automatically configure CORS (Access Denied).`);
+      console.warn(`[R2 Upload] ⚠️ Your R2 API Token lacks Bucket Admin permissions.`);
+      console.warn(`[R2 Upload] ⚠️ IMPORTANT: You must manually configure CORS in the Cloudflare Dashboard for HTTP VFS Range Requests to work!`);
+    } else {
+      console.warn(`[R2 Upload] ⚠️ Failed to configure CORS:`, err.message);
+    }
   }
 }
 
