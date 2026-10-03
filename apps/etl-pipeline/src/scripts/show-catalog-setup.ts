@@ -26,8 +26,8 @@ if (process.env.PREBUILT_SYSTEM_CATALOG_URL && !process.env.PREBUILT_SYSTEM_CATA
   console.log('   ℹ️  Note: Because PREBUILT_SYSTEM_CATALOG_URL is set, CSV generation will be bypassed.');
   
   let prebuiltUrl = process.env.PREBUILT_SYSTEM_CATALOG_URL;
-  if (prebuiltUrl.startsWith('http') && !prebuiltUrl.endsWith('.ndjson')) {
-    prebuiltUrl = prebuiltUrl.endsWith('/') ? prebuiltUrl + 'catalog_system.ndjson' : prebuiltUrl + '/catalog_system.ndjson';
+  if (prebuiltUrl.startsWith('http') && !prebuiltUrl.endsWith('.ndjson') && !prebuiltUrl.endsWith('.sqlite')) {
+    prebuiltUrl = prebuiltUrl.endsWith('/') ? prebuiltUrl + 'system.sqlite' : prebuiltUrl + '/system.sqlite';
   }
 
   try {
@@ -95,18 +95,21 @@ console.log();
 
 console.log('--- GENERATED WEBAPP ARTIFACTS ---');
 
-const systemMetaPath = path.resolve(rootDir, 'apps/webapp/src/generated/catalog_system_meta.json');
-if (fs.existsSync(systemMetaPath)) {
-  const meta = JSON.parse(fs.readFileSync(systemMetaPath, 'utf-8'));
+const webappSystemSqlite = path.resolve(rootDir, 'apps/webapp/public/system.sqlite');
+if (fs.existsSync(webappSystemSqlite)) {
+  const stats = fs.statSync(webappSystemSqlite);
   console.log(`✅ System Catalog (Built-in to Webapp)`);
-  console.log(`   File: apps/webapp/src/generated/catalog_system.ndjson`);
-  console.log(`   Status: Generated on ${new Date(meta.generatedAt).toLocaleDateString()} (Version: ${meta.catalogVersion.substring(0,8)})`);
-  console.log(`   Contents: \x1b[33m${meta.itemCount || meta.items?.length || 0} items\x1b[0m`);
-  if (meta.fileSizeBytes) {
-    console.log(`   Size: ${(meta.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB (${meta.fileSizeBytes} bytes)`);
+  console.log(`   File: apps/webapp/public/system.sqlite`);
+  console.log(`   Size: ${(stats.size / (1024 * 1024)).toFixed(2)} MB (${stats.size} bytes)`);
+  const systemMetaPath = path.resolve(rootDir, 'apps/webapp/src/generated/system_meta.json');
+  if (fs.existsSync(systemMetaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(systemMetaPath, 'utf-8'));
+      console.log(`   Contents: ${meta.itemCount} items (${meta.ingredientsCount} ingredients, ${meta.portionsCount} portions)`);
+    } catch {}
   }
-  if ((meta.itemCount || meta.items?.length || 0) === 0) {
-    console.log(`   \x1b[31mWARNING: Currently generated system catalog is empty!\x1b[0m`);
+  if (stats.size < 20480) { // < 20KB means it's just an empty schema or completely empty
+    console.log(`   \x1b[31mWARNING: Currently generated system.sqlite seems empty!\x1b[0m`);
   }
   
   console.log(`   Next Build Plan:`);
@@ -119,11 +122,11 @@ if (fs.existsSync(systemMetaPath)) {
   }
 } else {
   console.log(`❌ System Catalog (Built-in to Webapp)`);
-  console.log(`   File: apps/webapp/src/generated/catalog_system.ndjson (Missing)`);
-  console.log(`   \x1b[33mNote: File will be generated automatically during the build process.\x1b[0m`);
+  console.log(`   File: apps/webapp/public/system.sqlite (Missing)`);
+  console.log(`   \x1b[33mNote: File will be downloaded automatically during the build process if configured.\x1b[0m`);
   console.log(`   Next Build Plan:`);
   if (process.env.PREBUILT_SYSTEM_CATALOG_URL && !process.env.PREBUILT_SYSTEM_CATALOG_URL.startsWith('YOUR_')) {
-    console.log(`   \x1b[32m-> Will be built from prebuilt URL: ${process.env.PREBUILT_SYSTEM_CATALOG_URL}\x1b[0m`);
+    console.log(`   \x1b[32m-> Will be downloaded from prebuilt URL: ${process.env.PREBUILT_SYSTEM_CATALOG_URL}\x1b[0m`);
   } else if (process.env.SYSTEM_INGREDIENTS_URL && !process.env.SYSTEM_INGREDIENTS_URL.startsWith('YOUR_')) {
     console.log(`   \x1b[32m-> Will be built from configured CSV templates.\x1b[0m`);
   } else {

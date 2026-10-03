@@ -13,10 +13,37 @@ on:
       - 'apps/webapp/**'
       - 'packages/**'
       - '.github/workflows/ci.yml'
+  workflow_dispatch:
+    inputs:
+      prebuilt_system_catalog_url:
+        description: 'URL to prebuilt system catalog (Overrides PREBUILT_SYSTEM_CATALOG_URL)'
+        required: false
+        type: string
+        default: ''
+      system_ingredients_url:
+        description: 'URL to system ingredients CSV (Overrides SYSTEM_INGREDIENTS_URL)'
+        required: false
+        type: string
+        default: ''
+      system_portions_url:
+        description: 'URL to system portions CSV (Overrides SYSTEM_PORTIONS_URL)'
+        required: false
+        type: string
+        default: ''
+      vite_catalog_base_url:
+        description: 'Base CDN URL for external catalog (Overrides VITE_CATALOG_BASE_URL)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      SYSTEM_INGREDIENTS_URL: ${{ inputs.system_ingredients_url || vars.SYSTEM_INGREDIENTS_URL || secrets.SYSTEM_INGREDIENTS_URL }}
+      SYSTEM_PORTIONS_URL: ${{ inputs.system_portions_url || vars.SYSTEM_PORTIONS_URL || secrets.SYSTEM_PORTIONS_URL }}
+      PREBUILT_SYSTEM_CATALOG_URL: ${{ inputs.prebuilt_system_catalog_url || vars.PREBUILT_SYSTEM_CATALOG_URL || secrets.PREBUILT_SYSTEM_CATALOG_URL }}
+      VITE_CATALOG_BASE_URL: ${{ inputs.vite_catalog_base_url || vars.VITE_CATALOG_BASE_URL || secrets.VITE_CATALOG_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,18 +57,11 @@ jobs:
         run: npm ci
 
       - name: Generate System Catalog
-        env:
-          SYSTEM_INGREDIENTS_URL: ${{ vars.SYSTEM_INGREDIENTS_URL }}
-          SYSTEM_PORTIONS_URL: ${{ vars.SYSTEM_PORTIONS_URL }}
-          PREBUILT_SYSTEM_CATALOG_URL: ${{ vars.PREBUILT_SYSTEM_CATALOG_URL }}
         run: npm run build:catalog --workspace=@quomida/webapp
 
       - name: Run unit & domain tests
         run: npm run test
 
       - name: Build monorepo packages and apps
-        env:
-          SYSTEM_INGREDIENTS_URL: ${{ vars.SYSTEM_INGREDIENTS_URL }}
-          SYSTEM_PORTIONS_URL: ${{ vars.SYSTEM_PORTIONS_URL }}
-          PREBUILT_SYSTEM_CATALOG_URL: ${{ vars.PREBUILT_SYSTEM_CATALOG_URL }}
         run: npm run build
+

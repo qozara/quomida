@@ -12,11 +12,9 @@ The pipeline is completely decoupled from the web application runtime, allowing 
 
 ---
 
-## 🏗️ Architecture: Two-File Delta Distribution
-
 To optimize client bandwidth and avoid downloading megabytes of static JSON on every application load, the pipeline outputs assets into two separate tiers:
 
-1. **`catalog_system.ndjson`**: Bundled directly into the web application at build time. It contains all foundational data (seeds and portions) and guarantees the web app is immediately functional on first boot, even without network access.
+1. **`system.sqlite`**: Bundled directly into the web application at build time. It contains all foundational data (seeds and portions) and guarantees the web app is immediately functional on first boot, even without network access.
 2. **`catalog_meta.json`**: A lightweight manifest (~50 bytes) for external data containing:
    ```json
    {
@@ -24,7 +22,7 @@ To optimize client bandwidth and avoid downloading megabytes of static JSON on e
      "generatedAt": "2026-09-20T12:00:00.000Z"
    }
    ```
-2. **`catalog.json`**: The complete, versioned payload containing all validated food items with source-based deterministic IDs and `contentHash` properties:
+2. **`catalog.sqlite`**: The complete, versioned payload containing all validated food items with source-based deterministic IDs and `contentHash` properties:
    ```json
    {
      "catalogVersion": "4515bcadb9b677ed6b70167994c848e5",
@@ -100,8 +98,8 @@ SYSTEM_INGREDIENTS_URL="file://./data/examples/system_ingredients.csv"
 SYSTEM_PORTIONS_URL="file://./data/examples/system_portions.csv"
 
 # Option 2: Fast-path using a finalized system catalog NDJSON (Skips CSV parsing)
-# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/catalog_system.ndjson"
-# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/catalog_system.ndjson"
+# PREBUILT_SYSTEM_CATALOG_URL="https://example.com/system.sqlite"
+# PREBUILT_SYSTEM_CATALOG_URL="file://./data/generated/system.sqlite"
 
 # External sources
 TBCA_URL="https://example.com/actual_tbca.csv"
@@ -113,7 +111,7 @@ SARA2_URL="https://example.com/actual_sara2.csv"
 To ensure clean CI/CD deployments (like Vercel) and fast web app builds, the ETL pipeline is strictly split into two isolated flows:
 
 **Flow A: System Catalog (Built-in)**
-- Generates only the foundational `catalog_system.ndjson`.
+- Generates only the foundational `system.sqlite`.
 - Has **zero SQLite dependencies**. It bypasses `better-sqlite3` and any C++ native bindings.
 - Automatically executed by the webapp during Vercel builds (`npm run build:system`).
 
@@ -139,7 +137,7 @@ In this ETL architecture, the `data/raw/` directory acts as a **pure data sink**
 
 ### 4. Build-Time System Generation
 
-The web application's `prebuild` hook automatically runs this command to ensure `catalog_system.ndjson` is built into the app before Vite bundles it:
+The web application's `prebuild` hook automatically runs this command to ensure `system.sqlite` is built into the app before Vite bundles it:
 ```bash
 npm run build:system --workspace=@quomida/etl-pipeline
 ```
@@ -172,13 +170,13 @@ The webapp consumes catalog updates via the `VITE_CATALOG_BASE_URL` environment 
 
 ### 1. Local Development & CI
 - `VITE_CATALOG_BASE_URL=""` (relative root path).
-- Vite serves `catalog_meta.json` and `catalog.json` statically from `apps/webapp/public/`.
+- Vite serves `catalog_meta.json` and `catalog.sqlite` statically from `apps/webapp/public/`.
 - In CI test runs, if the files are not generated, the hydration service degrades gracefully without throwing.
 
 ### 2. Production (Any Static CDN / Object Storage)
 Because the pipeline is decoupled, you can host the catalog on any static file provider:
 - **GitHub Pages**: A scheduled GitHub Action runs `npm run etl` and deploys to a static branch.
-- **AWS S3 / Cloudflare R2**: Upload `catalog.json` and `catalog_meta.json` to an S3 bucket with public read access.
+- **AWS S3 / Cloudflare R2**: Upload `catalog.sqlite` and `catalog_meta.json` to an S3 bucket with public read access.
 - **Vercel Blob / Static Storage**: Upload to Vercel Blob and set `VITE_CATALOG_BASE_URL=https://blob.vercel-storage.com/...`.
 
 Configure the client webapp `.env.production` to point to your provider:
@@ -186,31 +184,65 @@ Configure the client webapp `.env.production` to point to your provider:
 VITE_CATALOG_BASE_URL=https://data.yourdomain.com
 ```
 
-### 3. Qozara Official Infrastructure (Cloudflare Pages Direct Upload)
-For the official Qozara deployment, we use **GitHub Actions** to build the ETL pipeline and **Cloudflare Pages** strictly as the CDN. This is known as "Direct Upload" and prevents Cloudflare from needing to run build environments, while giving us full CI/CD control inside GitHub.
+### 3. Official Infrastructure: Cloudflare R2 Distribution
 
-**GitHub Actions Integration (`.github/workflows/etl.yml`):**
-- Runs `npm run etl` on pushes to `main` (Production), Pull Requests (Previews), manually, or via a 6-month cron job.
-- Uses `cloudflare/wrangler-action` to upload the generated SQLite artifacts directly to Cloudflare R2.
+For the official Qozara deployment, the catalog is hosted on **Cloudflare R2 Object Storage** using multipart S3 uploads (bypassing the 300MB Wrangler CLI limit).
 
-**Required GitHub Secrets:**
-- `CLOUDFLARE_API_TOKEN`: A token from your Cloudflare profile with R2 edit permissions.
-- `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
+The upload script deploys 4 artifacts:
+1. `catalog.sqlite`: Uncompressed SQLite database for HTTP VFS range requests.
+2. `catalog.sqlite.gz`: Compressed SQLite database with trigram indexing for browser OPFS downloads.
+3. `catalog_meta.json`: Catalog version, item count, and generation timestamp.
+4. `system.sqlite`: Built-in seed database referenced for offline boot and CI fast-paths.
+
+#### Environments: Preview vs Production
+
+We support two isolated environments:
+* **Preview (`preview-quomida-data`)**: Dedicated bucket for staging, PR testing, and preview webapp builds (`VITE_CATALOG_BASE_URL=https://preview.data.quomida.qozara.org`).
+* **Production (`quomida-data`)**: Public production CDN bucket (`VITE_CATALOG_BASE_URL=https://data.quomida.qozara.org`).
 
 #### Local R2 Upload (Maintainers)
-Maintainers can manually upload the generated catalog to Cloudflare R2 using the provided unified command. This utilizes the same environment configuration without requiring any additional runtime dependencies.
 
-1. Ensure your `.env` contains the required credentials:
+Maintainers can upload to either environment without having to edit or comment out lines in `.env`.
+
+1. Add your S3-compatible R2 credentials to `apps/etl-pipeline/.env`:
    ```env
-   CLOUDFLARE_BUCKET_NAME="quomida-data"
    CLOUDFLARE_ACCOUNT_ID="your_account_id"
-   CLOUDFLARE_API_TOKEN="your_api_token"
+
+   # Preview Target
+   PREVIEW_CLOUDFLARE_BUCKET_NAME="preview-quomida-data"
+   PREVIEW_R2_ACCESS_KEY_ID="your_preview_r2_access_key"
+   PREVIEW_R2_SECRET_ACCESS_KEY="your_preview_r2_secret_key"
+
+   # Production Target
+   PROD_CLOUDFLARE_BUCKET_NAME="quomida-data"
+   PROD_R2_ACCESS_KEY_ID="your_prod_r2_access_key"
+   PROD_R2_SECRET_ACCESS_KEY="your_prod_r2_secret_key"
    ```
-2. Run the upload command:
+
+2. Run the corresponding upload command:
    ```bash
-   npm run upload:r2 --workspace=@quomida/etl-pipeline
+   # Upload to Preview bucket:
+   npm run upload:r2:preview --workspace=@quomida/etl-pipeline
+   # (or from monorepo root: npm run etl:upload:preview)
+
+   # Upload to Production bucket:
+   npm run upload:r2:prod --workspace=@quomida/etl-pipeline
+   # (or from monorepo root: npm run etl:upload:prod)
    ```
-*(Note: If any of the three required environment variables are missing, the command will intentionally fail.)*
+
+#### GitHub Actions CI (`.github/workflows/etl.yml`)
+
+The ETL workflow automates catalog compilation and deployment:
+* **Automatic Target Selection**:
+  * Pushes/merges to `main` or scheduled 6-month cron runs automatically upload to **`prod`**.
+  * Pull request branches automatically upload to **`preview`**.
+* **Manual Execution (`workflow_dispatch`)**:
+  * Provides an interactive dropdown in GitHub Actions (`target_env: preview | prod`) allowing maintainers to re-run builds for any branch against either bucket.
+* **Required GitHub Secrets**:
+  * `CLOUDFLARE_ACCOUNT_ID`
+  * `PROD_R2_ACCESS_KEY_ID` & `PROD_R2_SECRET_ACCESS_KEY`
+  * `PREVIEW_R2_ACCESS_KEY_ID` & `PREVIEW_R2_SECRET_ACCESS_KEY`
+
 
 ---
 
@@ -221,3 +253,12 @@ When adding real API scrapers or new static CSV datasets (USDA, Latinfoots, BEDC
 2. Map raw source records to the `BaseIngredient` interface.
 3. Pass raw items through `sanitizeIngredient()` and `computeContentHash()`.
 4. Run `npm test` to verify deterministic hashing and schema compliance.
+
+## 🏗️ Architecture: Hybrid OPFS SQLite Distribution
+
+To optimize client bandwidth and memory, the pipeline outputs assets into three distinct SQLite artifacts:
+
+1. **`system.sqlite`**: Bundled directly into the web application at build time. Contains only essential System items (originating from `system_ingredients.csv`) and guarantees the web app is immediately functional on first boot.
+2. **`catalog.sqlite` (HTTP VFS)**: Uncompressed database using `unicode61`. Hosted on Cloudflare R2 and queried remotely via HTTP Range Requests when the user hasn't downloaded the full catalog over Wi-Fi.
+3. **`catalog.sqlite.gz` (OPFS Download)**: Compressed massive database utilizing the advanced `trigram` tokenizer for fuzzy search. Downloaded directly into the browser's OPFS by the client download manager.
+4. **`catalog_meta.json`**: A lightweight manifest containing the `catalogVersion` hash and total items.

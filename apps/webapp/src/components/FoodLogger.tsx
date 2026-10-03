@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, MealType } from '@quomida/domain-core';
+import { CatalogSearchManager } from '@quomida/domain-core';
 import { parseNaturalLanguageLog, MockLLMProvider } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle } from 'lucide-react';
 
@@ -11,20 +12,19 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, t, dbService, db, isOnline } = useApp();
+  const { ingredients, t } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [filteredIngredients, setFilteredIngredients] = useState<BaseIngredient[]>([]);
-  const [remoteService] = useState(() => new RemoteCatalogService(
-    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
-  ));
-  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
+  const [searchManager] = useState(() => new CatalogSearchManager());
+  const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Search results dynamic filter against RxDB, Custom ingredients, and Remote SQLite
+  // Search results dynamic filter using domain CatalogSearchManager
   React.useEffect(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim();
     
     // Only search after 3 characters
     if (query.length < 3) {
@@ -35,57 +35,21 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     let isCancelled = false;
 
     const performSearch = async () => {
-      // 1. Search local custom ingredients (in-memory)
-      const customMatches = ingredients.filter(ing => 
-        ing.name.toLowerCase().includes(query)
-      );
+      try {
+        setIsSearching(true);
+        const result = await searchManager.search({
+          query,
+          customIngredients: ingredients,
+          limit: 30
+        }, remoteService);
 
-      let systemMatches: BaseIngredient[] = [];
-      let remoteMatches: BaseIngredient[] = [];
-      
-      // 2. Search local built-in system database
-      if (db) {
-        try {
-          const docs = await db.base_ingredients.find({
-            selector: { 
-              name: { $regex: query, $options: 'i' } 
-            },
-            limit: 10
-          }).exec();
-          
-          if (!isCancelled) {
-            systemMatches = docs.map((d: any) => d.toJSON() as BaseIngredient);
-            
-            // SHOW LOCAL RESULTS INSTANTLY
-            const localMatches = [...customMatches, ...systemMatches];
-            const localUnique = Array.from(new Map(localMatches.map(item => [item.id, item])).values());
-            setFilteredIngredients(localUnique.slice(0, 30));
-          }
-        } catch (e) {
-          console.error('Search query failed:', e);
+        if (!isCancelled) {
+          setFilteredIngredients(result.items);
         }
-      }
-
-      // 3. Search external remote database asynchronously
-      if (isOnline) {
-        try {
-          setIsSearchingRemote(true);
-          remoteMatches = await remoteService.searchIngredients(query, 10);
-          console.log('FoodLogger RECEIVED remoteMatches:', remoteMatches);
-          
-          if (!isCancelled && remoteMatches.length > 0) {
-            // Append remote results to the list
-            setFilteredIngredients(prev => {
-              const allMatches = [...prev, ...remoteMatches];
-              const unique = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
-              return unique.slice(0, 30);
-            });
-          }
-        } catch (e) {
-          console.error('Remote search query failed:', e);
-        } finally {
-          if (!isCancelled) setIsSearchingRemote(false);
-        }
+      } catch (e) {
+        console.error('Catalog search query failed:', e);
+      } finally {
+        if (!isCancelled) setIsSearching(false);
       }
     };
 
@@ -97,7 +61,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       isCancelled = true; 
       clearTimeout(timerId);
     };
-  }, [searchQuery, ingredients, db, isOnline]);
+  }, [searchQuery, ingredients, searchManager, remoteService]);
 
   const handleAiParse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,19 +73,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     setIsParsing(false);
 
     if (parsed && parsed.items.length > 0) {
-      const foodQuery = parsed.items[0].foodQuery.toLowerCase();
-      
-      let match = ingredients.find((ing) => ing.name.toLowerCase().includes(foodQuery));
-      
-      if (!match && db) {
-        try {
-          const docs = await db.base_ingredients.find({
-            selector: { name: { $regex: foodQuery, $options: 'i' } },
-            limit: 1
-          }).exec();
-          if (docs.length > 0) match = docs[0].toJSON() as BaseIngredient;
-        } catch (e) {}
-      }
+      const foodQuery = parsed.items[0].foodQuery;
+      const match = await searchManager.resolveAiMatch(foodQuery, ingredients, remoteService);
 
       if (match) {
         onSelectIngredient(match, 'meal_lunch');
@@ -181,7 +134,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           {/* Real-time search result list */}
           {searchQuery.trim() !== '' && (
             <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
-              {filteredIngredients.length === 0 && !isSearchingRemote ? (
+              {filteredIngredients.length === 0 && !isSearching ? (
                 <div className="p-4 text-center text-xs text-slate-500">
                   {t.search.noResults}
                 </div>
@@ -216,10 +169,10 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                       <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
                     </button>
                   ))}
-                  {isSearchingRemote && (
+                  {isSearching && (
                     <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
                       <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      Searching remote catalog...
+                      {remoteService.isHttpFallbackActive ? 'Searching remote catalog...' : 'Searching catalog...'}
                     </div>
                   )}
                 </>

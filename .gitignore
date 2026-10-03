@@ -10,9 +10,11 @@ dev-dist/
 *.tsbuildinfo
 
 # WebApp Artifacts
-apps/webapp/src/generated/*.ndjson
-apps/webapp/src/generated/*_meta.json
+apps/webapp/src/generated/
 apps/webapp/public/_headers
+apps/webapp/public/*.sqlite
+apps/webapp/public/*.sqlite.gz
+apps/webapp/public/*_meta.json
 
 # ETL Pipeline Workspaces
 apps/etl-pipeline/dist-cdn/

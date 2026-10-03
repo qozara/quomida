@@ -6,6 +6,14 @@ on:
     - cron: '0 0 1 1,7 *'
   workflow_dispatch:
     inputs:
+      target_env:
+        description: 'Upload Destination Bucket'
+        required: true
+        type: choice
+        options:
+          - preview
+          - prod
+        default: 'preview'
       include_openfoodfacts:
         description: 'Download & process Open Food Facts (13GB .gz)'
         required: true
@@ -97,7 +105,23 @@ jobs:
 
       - name: Upload Artifacts to Cloudflare R2
         env:
-          CLOUDFLARE_BUCKET_NAME: "quomida-data"
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npm run upload:r2 --workspace=@quomida/etl-pipeline
+          # Production Credentials
+          PROD_CLOUDFLARE_BUCKET_NAME: ${{ vars.PROD_CLOUDFLARE_BUCKET_NAME || 'quomida-data' }}
+          PROD_R2_ACCESS_KEY_ID: ${{ secrets.PROD_R2_ACCESS_KEY_ID || secrets.R2_ACCESS_KEY_ID }}
+          PROD_R2_SECRET_ACCESS_KEY: ${{ secrets.PROD_R2_SECRET_ACCESS_KEY || secrets.R2_SECRET_ACCESS_KEY }}
+          # Preview Credentials
+          PREVIEW_CLOUDFLARE_BUCKET_NAME: ${{ vars.PREVIEW_CLOUDFLARE_BUCKET_NAME || 'preview-quomida-data' }}
+          PREVIEW_R2_ACCESS_KEY_ID: ${{ secrets.PREVIEW_R2_ACCESS_KEY_ID || secrets.R2_ACCESS_KEY_ID }}
+          PREVIEW_R2_SECRET_ACCESS_KEY: ${{ secrets.PREVIEW_R2_SECRET_ACCESS_KEY || secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          TARGET="${{ github.event.inputs.target_env }}"
+          if [ -z "$TARGET" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+              TARGET="prod"
+            else
+              TARGET="preview"
+            fi
+          fi
+          echo "Uploading catalog to target: $TARGET"
+          npm run upload:r2 --workspace=@quomida/etl-pipeline -- --$TARGET

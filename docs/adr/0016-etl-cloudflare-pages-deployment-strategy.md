@@ -25,19 +25,26 @@ We have decided to split our CDN infrastructure:
 **Why Cloudflare R2 for ETL?**
 - **Zero Egress Fees**: Serving large, static `.sqlite` databases via Cloudflare's R2 is highly performant and avoids eating into Vercel's bandwidth limits or incurring traditional S3 egress costs.
 - **Decoupling**: The WebApp and ETL data build processes remain completely isolated.
-- **Unified Upload Interface**: By using an R2 bucket (`quomida-data`), we bypass complex Pages build limits and push artifacts directly.
+- **Dual Bucket Architecture**: We maintain two isolated buckets:
+  - `preview-quomida-data`: Targeted during Pull Requests and manual preview testing (`preview.data.quomida.qozara.org`).
+  - `quomida-data`: Targeted for production releases upon merge to `main` (`data.quomida.qozara.org`).
+- **S3 Multipart Upload**: For datasets exceeding 300MB, we utilize the AWS S3 SDK with R2 S3-compatible credentials to bypass Wrangler CLI file size limitations.
 
 **Workflow Integration (Unified NPM Script):**
-- **Pull Requests, Pushes to Main, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It is responsible for building the pipeline (`npm run etl`) directly in the GitHub Actions Ubuntu runner.
-- **Deployment**: After a successful build, the Action executes the unified `npm run upload:r2` script. This executes `npx wrangler r2 object put` to push the SQLite catalog and its metadata directly to the Cloudflare R2 bucket.
+- **Pull Requests, Pushes to Main, Cron Jobs & Manual Triggers**: We retain the `.github/workflows/etl.yml` GitHub Action. It builds the pipeline (`npm run etl`) directly in the GitHub Actions runner.
+- **Deployment**: After a successful build, the Action executes the unified upload scripts:
+  - `npm run upload:r2:preview` (or `npm run upload:r2 -- --preview`) for Pull Requests and staging.
+  - `npm run upload:r2:prod` (or `npm run upload:r2 -- --prod`) for `main` and production releases.
 - **Standard Practice (DRY)**: Abstracting the CLI upload commands into the `package.json` script ensures that maintainers running local uploads execute the exact same logic as the CI environment, adhering to single-source-of-truth principles.
 
 ## Consequences
 
 **Positive:**
 - Complete CI/CD control remains in GitHub Actions.
-- Cloudflare is used strictly as a highly-performant static CDN.
-- Avoids Cloudflare Pages build environment debugging and limits.
+- Production and preview datasets remain safely isolated.
+- Maintainers can upload locally without modifying or commenting out lines in `.env`.
+- Cloudflare R2 provides zero-egress hosting with instant updates.
 
 **Negative:**
-- Requires managing Cloudflare API Tokens and Account IDs in GitHub Secrets.
+- Requires managing S3-compatible R2 API credentials (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) and Account IDs in GitHub Secrets.
+

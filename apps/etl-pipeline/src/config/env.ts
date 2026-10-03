@@ -7,10 +7,15 @@ import { fileURLToPath } from 'url';
 export function loadEnv() {
   const currentFile = fileURLToPath(import.meta.url);
   const currentDir = path.dirname(currentFile);
-  const envPath = path.resolve(currentDir, '../../.env');
+  const rootDir = path.resolve(currentDir, '../../');
+  const localEnvPath = path.resolve(rootDir, '.env.local');
+  const envPath = path.resolve(rootDir, '.env');
   
+  // .env.local takes precedence over .env (process.loadEnvFile does not overwrite already loaded keys)
+  if (fs.existsSync(localEnvPath)) {
+    process.loadEnvFile(localEnvPath);
+  }
   if (fs.existsSync(envPath)) {
-    // process.loadEnvFile is natively supported in modern Node.js (20.12+)
     process.loadEnvFile(envPath);
   }
 }

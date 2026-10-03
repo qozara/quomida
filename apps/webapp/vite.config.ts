@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import sri from 'vite-plugin-sri';
 import path from 'path';
@@ -88,6 +89,7 @@ export default defineConfig(({ mode }) => {
         }
       },
       react(),
+      tailwindcss(),
       sri(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -129,7 +131,7 @@ export default defineConfig(({ mode }) => {
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB limit
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,sqlite}'],
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
@@ -171,10 +173,18 @@ export default defineConfig(({ mode }) => {
     exclude: ['@sqlite.org/sqlite-wasm', 'sqlite-wasm-http']
   },
   server: {
-    port: 3000
+    port: 3000,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
   },
   preview: {
-    port: 3000
+    port: 3000,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
   }
   };
 });

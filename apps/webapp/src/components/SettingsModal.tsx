@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw } from 'lucide-react';
+import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw, Download, CheckCircle } from 'lucide-react';
+import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 
-import systemMeta from '../generated/catalog_system_meta.json';
+
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -24,6 +25,13 @@ export const SettingsModal: React.FC = () => {
     refreshCatalog,
     t
   } = useApp();
+
+  const {
+    status: downloadStatus,
+    progress: downloadProgress,
+    error: downloadError,
+    downloadCatalog
+  } = useCatalogDownload();
 
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
 
@@ -248,20 +256,72 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4: App Version & Catalog Info */}
-        <div className="pt-2 border-t border-slate-800/80 text-center flex flex-col gap-1">
+        {/* Section 4: Offline Catalog Download */}
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span>Offline Database</span>
+            </div>
+            {catalogVersion && (
+              <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-950 px-1.5 py-0.5 rounded">
+                v: {catalogVersion.substring(0, 8)}
+              </span>
+            )}
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Quomida supports downloading the massive 1.1 million item database directly to your device for instant sub-millisecond offline searches without using your cellular data.
+            </p>
+            
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/50">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-300">Status</span>
+                <span className="text-[11px] font-mono mt-0.5 text-emerald-400">
+                  {downloadStatus === 'idle' && 'Not Downloaded'}
+                  {downloadStatus === 'fetching' && `Downloading ${downloadProgress}%`}
+                  {downloadStatus === 'decompressing_and_writing' && 'Installing...'}
+                  {downloadStatus === 'complete' && 'Available Offline'}
+                  {downloadStatus === 'error' && 'Download Failed'}
+                </span>
+                {downloadError && <span className="text-[10px] text-rose-400 mt-1 max-w-[150px] truncate" title={downloadError}>{downloadError}</span>}
+              </div>
+
+              {downloadStatus === 'idle' || downloadStatus === 'error' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
+                    const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+                    downloadCatalog(targetUrl);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download (~55MB)
+                </button>
+              ) : downloadStatus === 'complete' ? (
+                <span className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-900/50">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Installed
+                </span>
+              ) : (
+                <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-300" 
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5: App Version Info */}
+        <div className="pt-2 text-center flex flex-col gap-1">
           <span className="text-xs text-slate-500 font-mono">
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
-          </span>
-          <span className="text-[10px] text-slate-600 font-mono uppercase">
-            External: {catalogVersion ? catalogVersion.substring(0, 8) : 'None'} 
-            {catalogGeneratedAt ? ` • ${new Date(catalogGeneratedAt).toLocaleDateString()}` : ''}
-            {catalogFileSizeBytes ? ` • ${(catalogFileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : ''}
-          </span>
-          <span className="text-[10px] text-slate-600 font-mono uppercase">
-            System: {systemMeta?.catalogVersion ? systemMeta.catalogVersion.substring(0, 8) : 'None'}
-            {systemMeta?.generatedAt ? ` • ${new Date(systemMeta.generatedAt).toLocaleDateString()}` : ''}
-            {(systemMeta as any)?.fileSizeBytes ? ` • ${((systemMeta as any).fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : ''}
           </span>
         </div>
 
