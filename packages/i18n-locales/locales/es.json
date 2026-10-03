@@ -36,7 +36,11 @@
     "tabSearch": "Búsqueda en Catálogo",
     "tabAi": "Registro IA",
     "parseButton": "Analizar Comida",
-    "noResults": "No se encontraron alimentos en el catálogo."
+    "noResults": "No se encontraron alimentos en el catálogo.",
+    "remoteSearchFailed": "Catálogo remoto no disponible. Mostrando resultados locales.",
+    "searchingRemote": "Buscando en catálogo remoto...",
+    "searchingLocal": "Buscando en catálogo...",
+    "retry": "Reintentar"
   },
   "portionModal": {
     "title": "Porción y Cantidad",

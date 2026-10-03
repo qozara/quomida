@@ -21,6 +21,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [isSearching, setIsSearching] = useState(false);
+  const [remoteSearchFailed, setRemoteSearchFailed] = useState(false);
 
   // Search results dynamic filter using domain CatalogSearchManager
   React.useEffect(() => {
@@ -29,6 +30,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     // Only search after 3 characters
     if (query.length < 3) {
       setFilteredIngredients([]);
+      setRemoteSearchFailed(false);
       return;
     }
 
@@ -45,6 +47,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
         if (!isCancelled) {
           setFilteredIngredients(result.items);
+          setRemoteSearchFailed(remoteService.hasRemoteFailed);
         }
       } catch (e) {
         console.error('Catalog search query failed:', e);
@@ -134,6 +137,38 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           {/* Real-time search result list */}
           {searchQuery.trim() !== '' && (
             <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
+              {/* Subtle inline notice when remote search fails - NO popup dialog */}
+              {remoteSearchFailed && !isSearching && (
+                <div className="p-2.5 px-3 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-300 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span>{t.search.remoteSearchFailed}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      remoteService.resetCircuitBreaker();
+                      setRemoteSearchFailed(false);
+                      const q = searchQuery.trim();
+                      if (q.length >= 3) {
+                        setIsSearching(true);
+                        searchManager.search({
+                          query: q,
+                          customIngredients: ingredients,
+                          limit: 30
+                        }, remoteService).then(result => {
+                          setFilteredIngredients(result.items);
+                          setRemoteSearchFailed(remoteService.hasRemoteFailed);
+                        }).finally(() => setIsSearching(false));
+                      }
+                    }}
+                    className="min-h-[44px] px-2 text-[11px] font-semibold text-amber-400 hover:text-amber-200 underline decoration-amber-400/50 flex items-center"
+                  >
+                    {t.search.retry}
+                  </button>
+                </div>
+              )}
+
               {filteredIngredients.length === 0 && !isSearching ? (
                 <div className="p-4 text-center text-xs text-slate-500">
                   {t.search.noResults}
@@ -147,6 +182,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                       onClick={() => {
                         onSelectIngredient(ing, 'meal_lunch');
                         setSearchQuery('');
+                        setRemoteSearchFailed(false);
                       }}
                       className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
                     >
@@ -172,7 +208,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                   {isSearching && (
                     <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
                       <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      {remoteService.isHttpFallbackActive ? 'Searching remote catalog...' : 'Searching catalog...'}
+                      {remoteService.isHttpFallbackActive ? t.search.searchingRemote : t.search.searchingLocal}
                     </div>
                   )}
                 </>
