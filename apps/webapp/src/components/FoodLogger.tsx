@@ -19,16 +19,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
   const [isParsing, setIsParsing] = useState(false);
   const [filteredIngredients, setFilteredIngredients] = useState<BaseIngredient[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
-  const [remoteService] = useState(() => new RemoteCatalogService(
-    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
-  ));
-  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
-
-  React.useEffect(() => {
-    return () => {
-      remoteService.destroy();
-    };
-  }, [remoteService]);
+  const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [isSearching, setIsSearching] = useState(false);
 
   // Search results dynamic filter using domain CatalogSearchManager
   React.useEffect(() => {
@@ -44,7 +36,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
     const performSearch = async () => {
       try {
-        setIsSearchingRemote(true);
+        setIsSearching(true);
         const result = await searchManager.search({
           query,
           customIngredients: ingredients,
@@ -57,7 +49,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       } catch (e) {
         console.error('Catalog search query failed:', e);
       } finally {
-        if (!isCancelled) setIsSearchingRemote(false);
+        if (!isCancelled) setIsSearching(false);
       }
     };
 
@@ -142,7 +134,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           {/* Real-time search result list */}
           {searchQuery.trim() !== '' && (
             <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
-              {filteredIngredients.length === 0 && !isSearchingRemote ? (
+              {filteredIngredients.length === 0 && !isSearching ? (
                 <div className="p-4 text-center text-xs text-slate-500">
                   {t.search.noResults}
                 </div>
@@ -177,10 +169,10 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                       <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
                     </button>
                   ))}
-                  {isSearchingRemote && (
+                  {isSearching && (
                     <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
                       <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      Searching remote catalog...
+                      {remoteService.isHttpFallbackActive ? 'Searching remote catalog...' : 'Searching catalog...'}
                     </div>
                   )}
                 </>

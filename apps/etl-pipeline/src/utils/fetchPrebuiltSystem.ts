@@ -22,7 +22,12 @@ export async function fetchPrebuiltSystemCatalog(
       const localPath = urlToFetch.startsWith('file://') ? urlToFetch.replace('file://', '') : urlToFetch;
       fs.copyFileSync(path.resolve(currentDir, '../../', localPath), systemOutPath);
     }
-    console.log(`[ETL Pipeline] Successfully loaded prebuilt system catalog.`);
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(systemOutPath);
+    const { writeSystemCatalogMetadata } = await import('../exporters/SQLiteExporter.js');
+    const meta = writeSystemCatalogMetadata(db, systemOutPath);
+    db.close();
+    console.log(`[ETL Pipeline] Successfully loaded prebuilt system catalog (${meta.itemCount} items).`);
   } catch (e) {
     console.error(`[ETL Pipeline] Failed to load prebuilt system catalog:`, e);
     process.exit(1);

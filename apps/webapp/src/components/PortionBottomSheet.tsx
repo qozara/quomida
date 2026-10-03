@@ -39,9 +39,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         customPortions = localDocs.map((d: any) => d.toJSON ? d.toJSON() : d);
       } catch (e) {}
 
-      const remoteService = new (await import('../services/RemoteCatalogService.js')).RemoteCatalogService(
-        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
-      );
+      const remoteService = (await import('../services/RemoteCatalogService.js')).RemoteCatalogService.getInstance();
 
       const resolved = await portionManager.resolvePortions({
         ingredient,

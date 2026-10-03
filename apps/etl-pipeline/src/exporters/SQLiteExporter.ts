@@ -170,6 +170,9 @@ export async function exportSQLiteCatalog(
       CREATE INDEX idx_portion_base_food ON portions(base_food_id);
       VACUUM;
     `);
+    if (target === system) {
+      writeSystemCatalogMetadata(system.db, outSystemPath);
+    }
     target.db.close();
   }
 
@@ -212,9 +215,37 @@ export async function exportSQLiteCatalog(
     sources,
     fileSizeBytes: fs.statSync(gzPath).size
   };
+
   fs.writeFileSync(metaPath, JSON.stringify(externalMeta, null, 2), 'utf-8');
 
   return externalMeta;
+}
+
+export function writeSystemCatalogMetadata(
+  systemDb: any,
+  outSystemPath: string
+) {
+  const portionsCountRes = systemDb.prepare('SELECT count(*) as count FROM portions').get() as { count: number };
+  const ingredientsCountRes = systemDb.prepare('SELECT count(*) as count FROM base_ingredients').get() as { count: number };
+  const totalItems = (ingredientsCountRes?.count || 0) + (portionsCountRes?.count || 0);
+
+  const generatedAt = new Date().toISOString();
+  const systemMeta = {
+    itemCount: totalItems,
+    ingredientsCount: ingredientsCountRes?.count || 0,
+    portionsCount: portionsCountRes?.count || 0,
+    generatedAt,
+    catalogVersion: crypto.createHash('md5').update(`system:${totalItems}`).digest('hex').slice(0, 8),
+  };
+
+  const webappGeneratedDir = path.resolve(path.dirname(outSystemPath), '../src/generated');
+  if (!fs.existsSync(webappGeneratedDir)) {
+    fs.mkdirSync(webappGeneratedDir, { recursive: true });
+  }
+  const metaJsonPath = path.join(webappGeneratedDir, 'system_meta.json');
+  fs.writeFileSync(metaJsonPath, JSON.stringify(systemMeta, null, 2), 'utf-8');
+
+  return systemMeta;
 }
 
 export async function exportSystemSQLiteCatalog(
@@ -288,8 +319,10 @@ export async function exportSystemSQLiteCatalog(
     CREATE INDEX idx_portion_base_food ON portions(base_food_id);
     VACUUM;
   `);
+
+  const meta = writeSystemCatalogMetadata(system.db, outSystemPath);
   system.db.close();
 
-  console.log(`[ETL Pipeline] Exported ${systemExportedCount} items to ${outSystemPath}`);
+  console.log(`[ETL Pipeline] Exported ${systemExportedCount} items to ${outSystemPath} (Total with portions: ${meta.itemCount})`);
   return systemExportedCount;
 }

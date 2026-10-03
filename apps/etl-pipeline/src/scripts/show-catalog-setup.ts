@@ -101,6 +101,13 @@ if (fs.existsSync(webappSystemSqlite)) {
   console.log(`✅ System Catalog (Built-in to Webapp)`);
   console.log(`   File: apps/webapp/public/system.sqlite`);
   console.log(`   Size: ${(stats.size / (1024 * 1024)).toFixed(2)} MB (${stats.size} bytes)`);
+  const systemMetaPath = path.resolve(rootDir, 'apps/webapp/src/generated/system_meta.json');
+  if (fs.existsSync(systemMetaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(systemMetaPath, 'utf-8'));
+      console.log(`   Contents: ${meta.itemCount} items (${meta.ingredientsCount} ingredients, ${meta.portionsCount} portions)`);
+    } catch {}
+  }
   if (stats.size < 20480) { // < 20KB means it's just an empty schema or completely empty
     console.log(`   \x1b[31mWARNING: Currently generated system.sqlite seems empty!\x1b[0m`);
   }

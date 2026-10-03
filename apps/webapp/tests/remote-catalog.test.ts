@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { RemoteCatalogService } from '../src/services/RemoteCatalogService.js';
+import { RemoteCatalogService, SYSTEM_CATALOG_META } from '../src/services/RemoteCatalogService.js';
 
 let mockOpenedVfs: string[] = [];
 let mockClosedCount = 0;
-let mockLocalCount = 885;
+let mockLocalCount: number = SYSTEM_CATALOG_META.itemCount || 965;
 
 vi.mock('sqlite-wasm-http', () => {
   return {
@@ -58,9 +58,10 @@ describe('RemoteCatalogService', () => {
   beforeEach(() => {
     mockOpenedVfs = [];
     mockClosedCount = 0;
-    mockLocalCount = 885;
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
     originalFetch = global.fetch;
     RemoteCatalogService.clearListeners();
+    RemoteCatalogService.resetInstance();
     vi.stubGlobal('navigator', { onLine: true });
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -96,12 +97,10 @@ describe('RemoteCatalogService', () => {
     expect(mockOpenedVfs).toEqual(['opfs']);
   });
 
-  it('uses only local OPFS when full catalog is hydrated locally (localTotal >= remoteItemCount)', async () => {
+  it('uses only local OPFS with zero network calls when full catalog is hydrated locally', async () => {
     mockLocalCount = 1122244;
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
-    });
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy;
 
     const service = new RemoteCatalogService('https://data.example.com');
     const results = await service.searchIngredients('Avacado');
@@ -110,10 +109,12 @@ describe('RemoteCatalogService', () => {
     expect(results[0].name).toBe('Avacado Test');
     // Kept OPFS, did not close to open HTTP
     expect(mockOpenedVfs).toEqual(['opfs']);
+    // ZERO network calls made
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('switches to HTTP range requests when online and local catalog is partial (localTotal < remoteItemCount)', async () => {
-    mockLocalCount = 885; // Built-in system catalog only
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount; // Built-in system catalog only
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
@@ -130,7 +131,7 @@ describe('RemoteCatalogService', () => {
   });
 
   it('falls back to local OPFS if remote metadata fetch fails (404 or network error)', async () => {
-    mockLocalCount = 885;
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
     global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
 
     const service = new RemoteCatalogService('https://data.example.com');
@@ -161,7 +162,7 @@ describe('RemoteCatalogService', () => {
   });
 
   it('hot-switches from HTTP to OPFS without page reload when catalog download completes', async () => {
-    mockLocalCount = 885;
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
