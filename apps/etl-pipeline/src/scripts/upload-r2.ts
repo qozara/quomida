@@ -45,12 +45,6 @@ const rootDir = path.resolve(currentDir, '../../');
 
 const filesToUpload = [
   {
-    path: path.join(rootDir, 'dist-cdn/catalog.sqlite'),
-    key: 'catalog.sqlite',
-    contentType: 'application/x-sqlite3',
-    description: 'catalog.sqlite (Uncompressed for HTTP VFS fallback)'
-  },
-  {
     path: path.join(rootDir, 'dist-cdn/catalog.sqlite.gz'),
     key: 'catalog.sqlite.gz',
     contentType: 'application/gzip',

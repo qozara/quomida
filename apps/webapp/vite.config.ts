@@ -173,18 +173,10 @@ export default defineConfig(({ mode }) => {
     exclude: ['@sqlite.org/sqlite-wasm', 'sqlite-wasm-http']
   },
   server: {
-    port: 3000,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-    }
+    port: 3000
   },
   preview: {
-    port: 3000,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-    }
+    port: 3000
   }
   };
 });

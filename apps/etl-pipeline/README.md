@@ -254,11 +254,11 @@ When adding real API scrapers or new static CSV datasets (USDA, Latinfoots, BEDC
 3. Pass raw items through `sanitizeIngredient()` and `computeContentHash()`.
 4. Run `npm test` to verify deterministic hashing and schema compliance.
 
-## 🏗️ Architecture: Hybrid OPFS SQLite Distribution
+## 🏗️ Architecture: Unified Single-SQLite Local Distribution
 
-To optimize client bandwidth and memory, the pipeline outputs assets into three distinct SQLite artifacts:
+To optimize client bandwidth, storage, and zero-network privacy, the pipeline outputs assets into focused SQLite artifacts:
 
-1. **`system.sqlite`**: Bundled directly into the web application at build time. Contains only essential System items (originating from `system_ingredients.csv`) and guarantees the web app is immediately functional on first boot.
-2. **`catalog.sqlite` (HTTP VFS)**: Uncompressed database using `unicode61`. Hosted on Cloudflare R2 and queried remotely via HTTP Range Requests when the user hasn't downloaded the full catalog over Wi-Fi.
-3. **`catalog.sqlite.gz` (OPFS Download)**: Compressed massive database utilizing the advanced `trigram` tokenizer for fuzzy search. Downloaded directly into the browser's OPFS by the client download manager.
-4. **`catalog_meta.json`**: A lightweight manifest containing the `catalogVersion` hash and total items.
+1. **`system.sqlite`**: Bundled directly into the web application at build time. Contains essential System items (originating from `system_ingredients.csv`) and guarantees the web app is immediately functional on first boot offline.
+2. **`catalog.sqlite.gz` (OPFS Full Catalog)**: Compressed SQLite database utilizing the advanced FTS5 `trigram` tokenizer for fuzzy search across over 1.1 million items. Downloaded directly into the browser's OPFS by the client download manager in Settings.
+3. **`catalog_meta.json`**: A lightweight manifest containing the `catalogVersion` hash, item counts, and file size.
+4. **`system_meta.json`**: Companion manifest detailing system catalog metrics for UI display.

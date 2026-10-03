@@ -70,9 +70,8 @@ export async function exportSQLiteCatalog(
   const seenIds = new Set<string>();
   const externalCatalogItems: { id: string; hash: string }[] = [];
 
-  const catalog = initDb(outCatalogPath, 'unicode61 remove_diacritics 1'); // For HTTP VFS
-  const catalogDownload = initDb(outCatalogPath.replace('catalog.sqlite', 'catalog_download.sqlite'), 'trigram'); // For OPFS Download
-  const system = initDb(outSystemPath, 'unicode61 remove_diacritics 1'); // Keep system small & HTTP-safe
+  const catalog = initDb(outCatalogPath, 'trigram');
+  const system = initDb(outSystemPath, 'trigram');
 
   let externalExportedCount = 0;
   let systemExportedCount = 0;
@@ -113,8 +112,8 @@ export async function exportSQLiteCatalog(
         let contentHash = '';
 
         const targetDbs = item.originSource === 'SYSTEM' 
-          ? [catalog, catalogDownload, system] 
-          : [catalog, catalogDownload];
+          ? [catalog, system] 
+          : [catalog];
 
         if (item._type === 'portion') {
           finalItem = item;
@@ -164,7 +163,7 @@ export async function exportSQLiteCatalog(
     }
   }
 
-  for (const target of [catalog, catalogDownload, system]) {
+  for (const target of [catalog, system]) {
     target.db.exec(`
       CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
       CREATE INDEX idx_portion_base_food ON portions(base_food_id);
@@ -176,23 +175,17 @@ export async function exportSQLiteCatalog(
     target.db.close();
   }
 
-  const catalogDownloadPath = outCatalogPath.replace('catalog.sqlite', 'catalog_download.sqlite');
-  
   console.log(`[ETL Pipeline] Exported ${systemExportedCount} system items to ${outSystemPath}`);
   console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items (and ${systemExportedCount} system items) to ${outCatalogPath}`);
-  console.log(`[ETL Pipeline] Exported trigram-enabled copy to ${catalogDownloadPath}`);
 
-  // Compress catalog_download.sqlite to catalog.sqlite.gz (so the frontend downloads the trigram version)
+  // Compress catalog.sqlite to catalog.sqlite.gz for frontend OPFS download
   const gzPath = `${outCatalogPath}.gz`;
-  console.log(`[ETL Pipeline] Compressing ${catalogDownloadPath} to ${gzPath}...`);
+  console.log(`[ETL Pipeline] Compressing ${outCatalogPath} to ${gzPath}...`);
   await pipeline(
-    fs.createReadStream(catalogDownloadPath),
+    fs.createReadStream(outCatalogPath),
     zlib.createGzip({ level: 9 }),
     fs.createWriteStream(gzPath)
   );
-  
-  // Clean up the uncompressed trigram DB to save disk space, keep the unicode61 catalog.sqlite
-  fs.unlinkSync(catalogDownloadPath);
   
   // Optionally delete uncompressed to save space, but keeping it helps debugging. We'll leave it.
 

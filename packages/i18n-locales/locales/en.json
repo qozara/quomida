@@ -37,10 +37,9 @@
     "tabAi": "AI Natural Log",
     "parseButton": "Parse Meal",
     "noResults": "No ingredients found matching your search.",
-    "remoteSearchFailed": "Remote catalog unreachable. Showing local results.",
-    "searchingRemote": "Searching remote catalog...",
-    "searchingLocal": "Searching catalog...",
-    "retry": "Retry"
+    "noResultsBasic": "No items found in basic catalog. Download the full 1.1M offline database in Settings for comprehensive search.",
+    "downloadFullCatalog": "Download Full Catalog",
+    "searchingLocal": "Searching catalog..."
   },
   "portionModal": {
     "title": "Portion & Quantity",

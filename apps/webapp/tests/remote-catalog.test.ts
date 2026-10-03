@@ -4,11 +4,10 @@ import { RemoteCatalogService, SYSTEM_CATALOG_META } from '../src/services/Remot
 let mockOpenedVfs: string[] = [];
 let mockClosedCount = 0;
 let mockLocalCount: number = SYSTEM_CATALOG_META.itemCount || 965;
-let mockShouldFailRemoteExec = false;
+let mockFtsThrows = false;
 
 vi.mock('sqlite-wasm-http', () => {
   return {
-    createHttpBackend: () => ({}),
     createSQLiteThread: async () => {
       const worker = async (action: string, payload: any) => {
         if (action === 'open') {
@@ -34,17 +33,17 @@ vi.mock('sqlite-wasm-http', () => {
             return { result: { resultRows: [] } };
           }
           if (sql.includes('base_ingredients_fts')) {
-            if (sql.toLowerCase().includes('avacado')) {
-              return { result: { resultRows: [['1', 'Avacado Test', 'source', 'en', 100, 1, 1, 1, 'hash']] } };
+            if (mockFtsThrows) {
+              throw new Error('FTS5 syntax error test');
+            }
+            if (sql.toLowerCase().includes('avocado')) {
+              return { result: { resultRows: [['1', 'Avocado Test', 'system', 'en', 160, 2, 8, 15, 'hash']] } };
             }
             return { result: { resultRows: [] } };
           }
           if (sql.includes('WHERE name LIKE')) {
-            if (mockShouldFailRemoteExec) {
-              throw new Error('Remote range request timeout / SQLITE_IOERR');
-            }
-            if (sql.toLowerCase().includes('avacado')) {
-              return { result: { resultRows: [['1', 'Avacado Remote', 'system', 'en', 100, 1, 1, 1, 'hash']] } };
+            if (sql.toLowerCase().includes('avocado')) {
+              return { result: { resultRows: [['1', 'Avocado Test LIKE', 'system', 'en', 160, 2, 8, 15, 'hash']] } };
             }
             return { result: { resultRows: [] } };
           }
@@ -56,14 +55,14 @@ vi.mock('sqlite-wasm-http', () => {
   };
 });
 
-describe('RemoteCatalogService', () => {
+describe('RemoteCatalogService (Unified Single SQLite Architecture)', () => {
   let originalFetch: any;
 
   beforeEach(() => {
     mockOpenedVfs = [];
     mockClosedCount = 0;
-    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
-    mockShouldFailRemoteExec = false;
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount || 965;
+    mockFtsThrows = false;
     originalFetch = global.fetch;
     RemoteCatalogService.clearListeners();
     RemoteCatalogService.resetInstance();
@@ -80,167 +79,88 @@ describe('RemoteCatalogService', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses only local OPFS when no remote URL is configured', async () => {
-    const service = new RemoteCatalogService('');
-    const results = await service.searchIngredients('Avacado');
+  it('initializes single local worker and queries catalog via FTS5', async () => {
+    const service = RemoteCatalogService.getInstance();
+    const results = await service.searchIngredients('Avocado');
 
     expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
+    expect(results[0].name).toBe('Avocado Test');
+    expect(mockOpenedVfs).toEqual(['opfs']);
+    expect(service.isFullCatalogLoaded).toBe(false); // only basic catalog
+    expect(service.itemCount).toBe(mockLocalCount);
+  });
+
+  it('falls back to LIKE query if FTS5 query throws', async () => {
+    mockFtsThrows = true;
+    const service = RemoteCatalogService.getInstance();
+    const results = await service.searchIngredients('Avocado');
+
+    expect(results.length).toBe(1);
+    expect(results[0].name).toBe('Avocado Test LIKE');
     expect(mockOpenedVfs).toEqual(['opfs']);
   });
 
-  it('uses only local OPFS when the app is offline', async () => {
-    vi.stubGlobal('navigator', { onLine: false });
-    const fetchSpy = vi.fn();
-    global.fetch = fetchSpy;
-
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
-
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockOpenedVfs).toEqual(['opfs']);
+  it('returns empty array when query has no searchable characters', async () => {
+    const service = RemoteCatalogService.getInstance();
+    const results = await service.searchIngredients('   $$$   ');
+    expect(results).toEqual([]);
+    expect(mockOpenedVfs.length).toBe(0); // did not even need to query
   });
 
-  it('uses only local OPFS with zero network calls when full catalog is hydrated locally', async () => {
-    mockLocalCount = 1122244;
-    const fetchSpy = vi.fn();
-    global.fetch = fetchSpy;
-
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
-
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
-    // Kept OPFS, did not close to open HTTP
-    expect(mockOpenedVfs).toEqual(['opfs']);
-    // ZERO network calls made
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('switches to HTTP range requests when online and local catalog is partial (localTotal < remoteItemCount)', async () => {
-    mockLocalCount = SYSTEM_CATALOG_META.itemCount; // Built-in system catalog only
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
-    });
-
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
-
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Remote');
-    // Both OPFS and HTTP workers opened, local OPFS kept open for resilience
-    expect(mockOpenedVfs).toEqual(['opfs', 'http']);
-    expect(mockClosedCount).toBe(0);
-    expect(service.hasRemoteFailed).toBe(false);
-  });
-
-  it('falls back to local OPFS if remote metadata fetch fails (404 or network error)', async () => {
-    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
-    global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
-
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
-
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
-    expect(mockOpenedVfs).toEqual(['opfs']);
-  });
-
-  it('falls back to local OPFS and flags hasRemoteFailed when remote search query throws or times out', async () => {
-    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
-    });
-
-    mockShouldFailRemoteExec = true; // Simulate remote range failure / timeout
-
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
-
-    // Consolidated results return local ingredient
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
-    // Error state flagged for non-intrusive UI notice
-    expect(service.hasRemoteFailed).toBe(true);
-    expect(service.isCircuitBreakerOpen()).toBe(true);
-
-    // Subsequent search uses local immediately without hanging
-    const subsequentResults = await service.searchIngredients('Avacado');
-    expect(subsequentResults.length).toBe(1);
-    expect(subsequentResults[0].name).toBe('Avacado Test');
-
-    // Resetting circuit breaker allows retrying remote
-    service.resetCircuitBreaker();
-    expect(service.hasRemoteFailed).toBe(false);
-    expect(service.isCircuitBreakerOpen()).toBe(false);
-
-    mockShouldFailRemoteExec = false;
-    const retryResults = await service.searchIngredients('Avacado');
-    expect(retryResults.length).toBe(1);
-    expect(retryResults[0].name).toBe('Avacado Remote');
-    expect(service.hasRemoteFailed).toBe(false);
-  });
-
-  it('returns empty array when query does not match', async () => {
-    const service = new RemoteCatalogService('');
-    const results = await service.searchIngredients('NonExistentFood');
+  it('returns empty array when no ingredients match query', async () => {
+    const service = RemoteCatalogService.getInstance();
+    const results = await service.searchIngredients('NonExistentFoodItem');
     expect(results).toEqual([]);
   });
 
   it('searches portions linked to base_food_id', async () => {
-    const service = new RemoteCatalogService('');
+    const service = RemoteCatalogService.getInstance();
     const portions = await service.getPortionsForIngredient('1');
     expect(portions.length).toBe(1);
     expect(portions[0].name).toBe('Slice');
+    expect(portions[0].equivalent_weight_g).toBe(30);
   });
 
   it('returns empty array for portions when none exist', async () => {
-    const service = new RemoteCatalogService('');
+    const service = RemoteCatalogService.getInstance();
     const portions = await service.getPortionsForIngredient('999');
     expect(portions).toEqual([]);
   });
 
-  it('hot-switches from HTTP to OPFS without page reload when catalog download completes', async () => {
-    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ itemCount: 1122244, catalogVersion: 'v1' })
-    });
+  it('hot-switches and updates item count when catalog download completes', async () => {
+    const service = RemoteCatalogService.getInstance();
+    await service.searchIngredients('Avocado');
 
-    const service = new RemoteCatalogService('https://data.example.com');
-    const firstResults = await service.searchIngredients('Avacado');
+    expect(service.isFullCatalogLoaded).toBe(false);
+    expect(mockOpenedVfs).toEqual(['opfs']);
 
-    expect(firstResults[0].name).toBe('Avacado Remote');
-    expect(service.isHttpFallbackActive).toBe(true);
-    expect(mockOpenedVfs).toEqual(['opfs', 'http']);
-
-    // Simulate user downloading full catalog into OPFS
+    // Simulate user downloading full catalog (1.1M items) into OPFS
     mockLocalCount = 1122244;
     mockOpenedVfs = [];
     mockClosedCount = 0;
 
-    // Trigger download completion event without page reload
-    RemoteCatalogService.notifyCatalogDownloaded();
+    let listenerTriggered = false;
+    RemoteCatalogService.onCatalogDownloaded(() => {
+      listenerTriggered = true;
+    });
 
-    // Give event loop tick to process event handler
+    // Notify catalog downloaded
+    RemoteCatalogService.notifyCatalogDownloaded();
+    expect(listenerTriggered).toBe(true);
+
+    // Give event loop tick to process async reset
     await new Promise((r) => setTimeout(r, 10));
 
-    // Next search should seamlessly use OPFS now!
-    const secondResults = await service.searchIngredients('Avacado');
-
-    expect(secondResults[0].name).toBe('Avacado Test');
-    expect(service.isHttpFallbackActive).toBe(false);
+    // Next search re-opens local SQLite worker with full database
+    const results = await service.searchIngredients('Avocado');
+    expect(results.length).toBe(1);
+    expect(service.isFullCatalogLoaded).toBe(true);
+    expect(service.itemCount).toBe(1122244);
     expect(mockOpenedVfs).toEqual(['opfs']);
-    expect(mockClosedCount).toBe(2); // Both OPFS and HTTP workers closed on reset
-
-    service.destroy();
+    expect(mockClosedCount).toBe(1); // Previous worker closed
   });
 
-  it('runs in zero-header mode: loads built-in system.sqlite via byteArray when crossOriginIsolated is false, keeping remote search disabled', async () => {
+  it('runs in zero-header mode: loads built-in system.sqlite via byteArray when crossOriginIsolated is false', async () => {
     vi.stubGlobal('window', { crossOriginIsolated: false });
     mockLocalCount = SYSTEM_CATALOG_META.itemCount;
 
@@ -255,17 +175,13 @@ describe('RemoteCatalogService', () => {
     });
     global.fetch = fetchSpy;
 
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
+    const service = new RemoteCatalogService();
+    const results = await service.searchIngredients('Avocado');
 
     expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
-    // Opened worker using byteArray in-memory SQLite, never opened OPFS or HTTP VFS
+    expect(results[0].name).toBe('Avocado Test');
     expect(mockOpenedVfs).toEqual(['memory-bytearray']);
-    // Remote search is disabled as progressive enhancement
-    expect(service.isHttpFallbackActive).toBe(false);
-    expect(service.hasRemoteFailed).toBe(false);
-    expect(mockClosedCount).toBe(0);
+    expect(service.isFullCatalogLoaded).toBe(false);
 
     service.destroy();
   });
@@ -290,14 +206,24 @@ describe('RemoteCatalogService', () => {
       }
     });
 
-    const service = new RemoteCatalogService('https://data.example.com');
-    const results = await service.searchIngredients('Avacado');
+    const service = new RemoteCatalogService();
+    const results = await service.searchIngredients('Avocado');
 
     expect(results.length).toBe(1);
-    expect(results[0].name).toBe('Avacado Test');
+    expect(results[0].name).toBe('Avocado Test');
     expect(mockOpenedVfs).toEqual(['memory-bytearray']);
-    expect(service.isHttpFallbackActive).toBe(false);
+    expect(service.isFullCatalogLoaded).toBe(true);
 
     service.destroy();
+  });
+
+  it('destroys instance and cleans up worker and listeners cleanly', async () => {
+    const service = new RemoteCatalogService();
+    await service.searchIngredients('Avocado');
+    expect(mockOpenedVfs).toEqual(['opfs']);
+
+    service.destroy();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockClosedCount).toBe(1);
   });
 });
