@@ -108,7 +108,8 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
       await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, webappSystemSqlite, currentDir);
     } else {
       console.warn(`[ETL Pipeline] WARNING: PREBUILT_SYSTEM_CATALOG_URL not set! Falling back to empty system.sqlite to prevent Vercel crash.`);
-      fs.writeFileSync(webappSystemSqlite, '');
+      const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
+      await exportSQLiteCatalog([], webappSystemSqlite, webappSystemSqlite, path.join(path.dirname(webappSystemSqlite), 'catalog_meta.json'));
     }
     console.log('[ETL Pipeline] --system-only fast path complete. Exiting.');
     return;
