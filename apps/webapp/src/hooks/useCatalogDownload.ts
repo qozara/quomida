@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 export type DownloadStatus = 'idle' | 'fetching' | 'decompressing_and_writing' | 'complete' | 'error';
 
@@ -44,6 +45,7 @@ export function useCatalogDownload() {
         setStatus('complete');
         setProgress(100);
         worker.terminate();
+        RemoteCatalogService.notifyCatalogDownloaded();
       } else if (type === 'ERROR') {
         setStatus('error');
         setError(payload);

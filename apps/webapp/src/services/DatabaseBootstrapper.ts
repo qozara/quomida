@@ -2,7 +2,6 @@ export class DatabaseBootstrapper {
   static async ensureSystemCatalogOPFS(): Promise<void> {
     try {
       if (typeof navigator === 'undefined' || !navigator.storage) {
-        console.warn('[DatabaseBootstrapper] navigator.storage is not available. Skipping OPFS bootstrap.');
         return;
       }
       const opfsRoot = await navigator.storage.getDirectory();
@@ -10,18 +9,15 @@ export class DatabaseBootstrapper {
       // Check if catalog.sqlite already exists in OPFS
       try {
         await opfsRoot.getFileHandle('catalog.sqlite');
-        // File exists, bootstrapper is done.
-        // It could be the small system catalog or the massive external one.
-        console.log('[DatabaseBootstrapper] catalog.sqlite already exists in OPFS. Skipping bootstrap.');
+        // File already exists in OPFS, nothing to do
         return;
       } catch (err: any) {
         if (err.name !== 'NotFoundError') {
           throw err;
         }
-        // File doesn't exist, we must fetch system.sqlite
       }
 
-      console.log('[DatabaseBootstrapper] OPFS is empty. Bootstrapping with built-in system.sqlite...');
+      // First run only: copy built-in static /system.sqlite into OPFS
       const res = await fetch('/system.sqlite');
       if (!res.ok) {
         throw new Error(`Failed to fetch /system.sqlite: ${res.status}`);
@@ -37,10 +33,8 @@ export class DatabaseBootstrapper {
         await writable.write(buffer);
         await writable.close();
       }
-
-      console.log('[DatabaseBootstrapper] Successfully bootstrapped system.sqlite into OPFS as catalog.sqlite.');
     } catch (err) {
-      console.error('[DatabaseBootstrapper] Error during bootstrap:', err);
+      console.warn('[DatabaseBootstrapper] OPFS seed notice:', err);
     }
   }
 }

@@ -19,6 +19,19 @@ export function calculateItemMacros(ingredient: BaseIngredient, weightGrams: num
 }
 
 /**
+ * Calculates nutritional macros for a portion and quantity of a base ingredient.
+ */
+export function calculatePortionMacros(
+  food: BaseIngredient,
+  portion: Partial<Portion>,
+  quantity: number
+): MacroSnapshot {
+  const portionWeight = portion.equivalent_weight_g || 100;
+  const totalWeightGrams = portionWeight * quantity;
+  return calculateItemMacros(food, totalWeightGrams);
+}
+
+/**
  * Calculates total yield cooked weight and cumulative nutritional macros for a compound recipe
  * considering cooking yield factor (FAO/INFOODS standard).
  */

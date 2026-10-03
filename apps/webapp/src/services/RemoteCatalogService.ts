@@ -1,14 +1,100 @@
 import { createSQLiteThread, createHttpBackend } from 'sqlite-wasm-http';
-import type { BaseIngredient, Portion } from '@quomida/domain-core';
+import type { BaseIngredient, Portion, ICatalogProvider } from '@quomida/domain-core';
+import { DatabaseBootstrapper } from './DatabaseBootstrapper.js';
 
-export class RemoteCatalogService {
+export class RemoteCatalogService implements ICatalogProvider {
+  public static readonly CATALOG_DOWNLOADED_EVENT = 'quomida:catalog-downloaded';
+  private static listeners = new Set<() => void>();
+
+  public static onCatalogDownloaded(listener: () => void): () => void {
+    RemoteCatalogService.listeners.add(listener);
+    return () => RemoteCatalogService.listeners.delete(listener);
+  }
+
+  public static clearListeners(): void {
+    RemoteCatalogService.listeners.clear();
+  }
+
+  public static notifyCatalogDownloaded(): void {
+    // 1. Dispatch custom event on window if in DOM
+    const target = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+    if (target && typeof (target as any).dispatchEvent === 'function') {
+      try {
+        const event = typeof CustomEvent !== 'undefined'
+          ? new CustomEvent(RemoteCatalogService.CATALOG_DOWNLOADED_EVENT)
+          : { type: RemoteCatalogService.CATALOG_DOWNLOADED_EVENT };
+        (target as any).dispatchEvent(event);
+      } catch {}
+    }
+
+    // 2. Directly notify all registered active listeners
+    RemoteCatalogService.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.warn('[RemoteCatalogService] Error in download listener:', err);
+      }
+    });
+  }
+
   private workerPromise: Promise<any> | null = null;
   private isUsingHttpFallback = false;
+  private baseUrl: string;
   private catalogUrl: string;
+  private metaUrl: string;
+  private removeStaticListener: (() => void) | null = null;
+
+  private onCatalogDownloadedHandler = () => {
+    this.reset().catch((err) => {
+      console.warn('[RemoteCatalogService] Error resetting worker after catalog download:', err);
+    });
+  };
 
   constructor(baseUrl: string) {
-    const rawBaseUrl = baseUrl.replace(/\/+$/, '');
-    this.catalogUrl = rawBaseUrl ? `${rawBaseUrl}/catalog.sqlite` : '/catalog.sqlite';
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.catalogUrl = this.baseUrl ? `${this.baseUrl}/catalog.sqlite` : '/catalog.sqlite';
+    this.metaUrl = this.baseUrl ? `${this.baseUrl}/catalog_meta.json` : '/catalog_meta.json';
+
+    this.removeStaticListener = RemoteCatalogService.onCatalogDownloaded(this.onCatalogDownloadedHandler);
+
+    const target = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+    if (target && typeof (target as any).addEventListener === 'function') {
+      try {
+        (target as any).addEventListener(RemoteCatalogService.CATALOG_DOWNLOADED_EVENT, this.onCatalogDownloadedHandler);
+      } catch {}
+    }
+  }
+
+  get isHttpFallbackActive(): boolean {
+    return this.isUsingHttpFallback;
+  }
+
+  public async reset(): Promise<void> {
+    const currentWorkerPromise = this.workerPromise;
+    this.workerPromise = null;
+    this.isUsingHttpFallback = false;
+    if (currentWorkerPromise) {
+      try {
+        const worker = await currentWorkerPromise;
+        await worker('close', {});
+      } catch (e) {
+        // Ignore close error on reset
+      }
+    }
+  }
+
+  public destroy(): void {
+    if (this.removeStaticListener) {
+      this.removeStaticListener();
+      this.removeStaticListener = null;
+    }
+    const target = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+    if (target && typeof (target as any).removeEventListener === 'function') {
+      try {
+        (target as any).removeEventListener(RemoteCatalogService.CATALOG_DOWNLOADED_EVENT, this.onCatalogDownloadedHandler);
+      } catch {}
+    }
+    this.reset().catch(() => {});
   }
 
   private getWorker() {
@@ -20,28 +106,60 @@ export class RemoteCatalogService {
 
   private async initializeWorker() {
     try {
-      // 1. Create a raw SQLite worker (supports both OPFS and HTTP VFS)
+      // 1. Ensure OPFS has been bootstrapped with system.sqlite if needed
+      await DatabaseBootstrapper.ensureSystemCatalogOPFS().catch((err) => {
+        console.warn('[RemoteCatalogService] ensureSystemCatalogOPFS notice:', err);
+      });
+
+      // 2. Create a raw SQLite worker (supports both OPFS and HTTP VFS)
       const worker = await createSQLiteThread({ 
         http: createHttpBackend({ maxPageSize: 4096 })
       });
 
-      
-
-      // 2. Attempt to mount the OPFS database (catalog.sqlite)
+      // 3. Attempt to mount the local OPFS database (catalog.sqlite)
       try {
         await worker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
         
-        // 3. Perform a quick count to see if the full catalog is present locally
-        const countRes = await worker('exec', { sql: 'SELECT count(*) FROM base_ingredients', rowMode: 'array' } as any);
-        const count = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
+        // 4. Query total count in local SQLite (ingredients + portions)
+        const countRes = await worker('exec', { 
+          sql: 'SELECT (SELECT count(*) FROM base_ingredients) + (SELECT count(*) FROM portions)', 
+          rowMode: 'array' 
+        } as any);
+        const localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
         
-        if (count < 10000) {
-          console.log('[RemoteCatalogService] OPFS catalog has < 10,000 items. Falling back to HTTP Range Requests.');
+        // 5. Determine whether to use remote HTTP range requests:
+        // App is local-first: condition to NOT use network is to have the full catalog downloaded locally.
+        // If offline or no remote URL, use only local SQLite in OPFS.
+        // If online and remote catalog metadata has more items than local SQLite, use HTTP range requests.
+        const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+        let shouldUseHttp = false;
+
+        if (isOnline && this.baseUrl) {
+          try {
+            const metaRes = await fetch(this.metaUrl, { 
+              cache: 'no-cache', 
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(3000) : undefined 
+            });
+            if (metaRes.ok) {
+              const meta = await metaRes.json();
+              const remoteItemCount = Number(meta?.itemCount);
+              if (remoteItemCount && localTotal < remoteItemCount) {
+                console.log(`[RemoteCatalogService] Local SQLite has ${localTotal} items, remote has ${remoteItemCount}. Using HTTP Range Requests while online.`);
+                shouldUseHttp = true;
+              } else {
+                console.log(`[RemoteCatalogService] Full catalog hydrated locally (${localTotal} items). Zero network needed.`);
+              }
+            }
+          } catch {
+            console.log('[RemoteCatalogService] Remote catalog metadata unreachable. Using local OPFS catalog.');
+          }
+        }
+
+        if (shouldUseHttp) {
           this.isUsingHttpFallback = true;
-          // Close OPFS DB to open HTTP one
           await worker('close', {});
         } else {
-          console.log(`[RemoteCatalogService] Successfully mounted full OPFS catalog locally (${count} items). Zero network needed.`);
+          this.isUsingHttpFallback = false;
         }
       } catch (err) {
         console.warn('[RemoteCatalogService] Failed to mount OPFS catalog, falling back to HTTP:', err);
@@ -87,20 +205,34 @@ export class RemoteCatalogService {
       LIMIT ${limit}
     `;
     
-    console.log('Executing search query:', sql);
     const results = await Promise.race([
       worker('exec', { sql, rowMode: 'array' } as any),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 15000))
-    ]).catch(err => {
-      console.error('Remote search error keys:', Object.keys(err));
-      console.error('Remote search error string:', String(err));
-      if (err.result) console.error('err.result keys:', Object.keys(err.result));
-      if (err.message) console.error('err.message:', err.message);
+    ]).catch(async (err) => {
+      console.error('Remote search error:', err);
       this.workerPromise = null;
-      try { worker('close', {}).catch(() => {}); } catch(e) {}
+      try { await worker('close', {}); } catch(e) {}
+
+      // Fallback: If HTTP search failed (e.g. offline during session), try searching local OPFS
+      if (this.isUsingHttpFallback) {
+        try {
+          const fallbackWorker = await createSQLiteThread({ http: createHttpBackend({ maxPageSize: 4096 }) });
+          await fallbackWorker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
+          const localSql = `
+            SELECT b.id, b.name, b.source, b.lang, b.calories_100g, b.protein_100g, b.carbs_100g, b.fats_100g, b.contentHash
+            FROM base_ingredients b
+            JOIN base_ingredients_fts f ON b.id = f.id WHERE f.base_ingredients_fts MATCH '${matchQuery.replace(/'/g, "''")}'
+            LIMIT ${limit}
+          `;
+          const localRes = await fallbackWorker('exec', { sql: localSql, rowMode: 'array' } as any);
+          await fallbackWorker('close', {});
+          return localRes;
+        } catch {
+          // Ignore fallback error
+        }
+      }
       return { result: { resultRows: [] } };
     });
-    console.log('Search query result:', results);
     
     if (!results || !results.result || !results.result.resultRows || results.result.resultRows.length === 0) return [];
     
@@ -133,10 +265,23 @@ export class RemoteCatalogService {
     const results = await Promise.race([
       worker('exec', { sql, rowMode: 'array' } as any),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Remote search timeout')), 10000))
-    ]).catch(err => {
+    ]).catch(async (err) => {
       console.error('Remote portions error:', err);
       this.workerPromise = null;
-      try { worker('close', {}).catch(() => {}); } catch(e) {}
+      try { await worker('close', {}); } catch(e) {}
+
+      // Fallback: If HTTP search failed, try local OPFS
+      if (this.isUsingHttpFallback) {
+        try {
+          const fallbackWorker = await createSQLiteThread({ http: createHttpBackend({ maxPageSize: 4096 }) });
+          await fallbackWorker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
+          const localRes = await fallbackWorker('exec', { sql, rowMode: 'array' } as any);
+          await fallbackWorker('close', {});
+          return localRes;
+        } catch {
+          // Ignore
+        }
+      }
       return { result: { resultRows: [] } };
     });
     

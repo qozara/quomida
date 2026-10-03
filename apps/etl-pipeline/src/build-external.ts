@@ -107,9 +107,29 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
       await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, webappSystemSqlite, currentDir);
     } else {
-      console.warn(`[ETL Pipeline] ⚠️ WARNING: PREBUILT_SYSTEM_CATALOG_URL not set! Falling back to an empty system.sqlite database.`);
-      const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
-      await exportSQLiteCatalog([], webappSystemSqlite, webappSystemSqlite, path.join(path.dirname(webappSystemSqlite), 'catalog_meta.json'));
+      const scriptDir = path.resolve(currentDir, '../scripts');
+      if (process.env.SYSTEM_INGREDIENTS_URL && !process.env.SYSTEM_INGREDIENTS_URL.startsWith('YOUR_')) {
+        const { execSync } = await import('child_process');
+        try {
+          execSync(`bash "${path.join(scriptDir, 'download_system.sh')}"`, { stdio: 'inherit' });
+        } catch (err: any) {
+          console.warn(`[ETL Pipeline] download_system.sh notice: ${err.message}`);
+        }
+      }
+
+      const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
+      const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
+      const { exportSystemSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
+
+      if (fs.existsSync(systemIngredientsCsv)) {
+        const { ingredientsCount, portionsCount } = await parseSystemCSV(systemIngredientsCsv, systemPortionsCsv, systemOut);
+        console.log(`[ETL Pipeline] Loaded ${ingredientsCount} ingredients and ${portionsCount} portions from SYSTEM CSV`);
+        await exportSystemSQLiteCatalog(systemOut, webappSystemSqlite);
+      } else {
+        console.warn(`[ETL Pipeline] ⚠️ WARNING: Neither PREBUILT_SYSTEM_CATALOG_URL nor system CSV templates are configured/found!`);
+        console.warn(`[ETL Pipeline] ⚠️ Falling back to an empty system.sqlite database.`);
+        await exportSystemSQLiteCatalog(null, webappSystemSqlite);
+      }
     }
     console.log('[ETL Pipeline] --system-only fast path complete. Exiting.');
     return;

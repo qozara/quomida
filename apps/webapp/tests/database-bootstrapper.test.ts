@@ -19,8 +19,10 @@ describe('DatabaseBootstrapper', () => {
 
   it('skips bootstrap if navigator.storage is unavailable', async () => {
     vi.stubGlobal('navigator', {});
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy;
     await DatabaseBootstrapper.ensureSystemCatalogOPFS();
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('not available'));
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('skips bootstrap if catalog.sqlite already exists in OPFS', async () => {
@@ -33,10 +35,11 @@ describe('DatabaseBootstrapper', () => {
       }
     });
 
+    global.fetch = vi.fn();
     await DatabaseBootstrapper.ensureSystemCatalogOPFS();
 
     expect(mockGetFileHandle).toHaveBeenCalledWith('catalog.sqlite');
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('already exists'));
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('fetches system.sqlite and writes to OPFS if catalog.sqlite is missing', async () => {
@@ -73,6 +76,5 @@ describe('DatabaseBootstrapper', () => {
     expect(mockGetFileHandle).toHaveBeenCalledWith('catalog.sqlite', { create: true });
     expect(mockWrite).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Successfully bootstrapped'));
   });
 });

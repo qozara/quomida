@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import readline from 'readline';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
@@ -214,4 +215,81 @@ export async function exportSQLiteCatalog(
   fs.writeFileSync(metaPath, JSON.stringify(externalMeta, null, 2), 'utf-8');
 
   return externalMeta;
+}
+
+export async function exportSystemSQLiteCatalog(
+  inputFile: string | null,
+  outSystemPath: string
+): Promise<number> {
+  const dir = path.dirname(outSystemPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const system = initDb(outSystemPath, 'unicode61 remove_diacritics 1');
+  let systemExportedCount = 0;
+
+  if (inputFile && fs.existsSync(inputFile)) {
+    const fileStream = fs.createReadStream(inputFile);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+    const seenKeys = new Set<string>();
+    const seenIds = new Set<string>();
+
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      const item: RawIngredientItem & { _type?: string } = JSON.parse(line);
+
+      const key = item._type === 'portion'
+        ? `portion:${item.id}`
+        : item.barcode
+          ? `barcode:${item.barcode.trim()}`
+          : `name:${normalizeFoodName(item.name)}`;
+
+      if (!seenKeys.has(key) && !seenIds.has(item.id)) {
+        seenKeys.add(key);
+        seenIds.add(item.id);
+
+        if (item._type === 'portion') {
+          const contentHash = crypto.createHash('md5').update(`${item.id}|${item.name}|${(item as any).equivalent_weight_g}`, 'utf8').digest('hex');
+          system.insertPortionStmt.run(
+            item.id,
+            (item as any).base_food_id,
+            item.name,
+            (item as any).equivalent_weight_g,
+            contentHash
+          );
+        } else {
+          const sanitized = sanitizeIngredient(item);
+          const contentHash = computeContentHash(sanitized);
+          system.insertStmt.run(
+            sanitized.id,
+            sanitized.name,
+            sanitized.source,
+            sanitized.lang,
+            sanitized.calories_100g,
+            sanitized.protein_100g,
+            sanitized.carbs_100g,
+            sanitized.fats_100g,
+            contentHash
+          );
+          system.insertFtsStmt.run(
+            sanitized.id,
+            sanitized.name
+          );
+          systemExportedCount++;
+        }
+      }
+    }
+  }
+
+  system.db.exec(`
+    CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
+    CREATE INDEX idx_portion_base_food ON portions(base_food_id);
+    VACUUM;
+  `);
+  system.db.close();
+
+  console.log(`[ETL Pipeline] Exported ${systemExportedCount} items to ${outSystemPath}`);
+  return systemExportedCount;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { BaseIngredient, MealType } from '@quomida/domain-core';
-import { calculateItemMacros, convertPortionToGrams } from '@quomida/domain-core';
+import type { BaseIngredient, MealType, Portion, TaggedPortion } from '@quomida/domain-core';
+import { calculateItemMacros, convertPortionToGrams, PortionManager } from '@quomida/domain-core';
 import { X, Minus, Plus, Check } from 'lucide-react';
 
 interface PortionBottomSheetProps {
@@ -15,13 +15,14 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   defaultMealType,
   onClose
 }) => {
-  const { db, logFoodItem, t, isOnline } = useApp();
+  const { db, logFoodItem, t } = useApp();
+  const [portionManager] = useState(() => new PortionManager());
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedPortionName, setSelectedPortionName] = useState<string>('g');
-  const [availablePortions, setAvailablePortions] = useState<any[]>([]);
+  const [availablePortions, setAvailablePortions] = useState<TaggedPortion[]>([]);
 
-  // Fetch available portions dynamically
+  // Fetch available portions dynamically using domain PortionManager
   useEffect(() => {
     let isCancelled = false;
     const fetchAllPortions = async () => {
@@ -30,42 +31,32 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         return;
       }
       
-      const portions: any[] = [];
-      
-      // 1. Fetch specific custom portions from local RxDB
+      let customPortions: Portion[] = [];
       try {
-        const localDocs = await db.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
-        const custom = localDocs.map((d: any) => d.toJSON ? d.toJSON() : d).map((p: any) => ({ ...p, tag: 'Custom' }));
-        portions.push(...custom);
+        const localDocs = await db.portions.find({
+          selector: { base_food_id: { $in: [ingredient.id, 'generic'] } }
+        }).exec();
+        customPortions = localDocs.map((d: any) => d.toJSON ? d.toJSON() : d);
       } catch (e) {}
 
-      // 2. Fetch remote portions if ingredient is from system
-      if (ingredient.source === 'system' && isOnline) {
-        try {
-          const remoteService = new (await import('../services/RemoteCatalogService.js')).RemoteCatalogService(
-            (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
-          );
-          const remoteDocs = await remoteService.getPortionsForIngredient(ingredient.id);
-          const external = remoteDocs.map(p => ({ ...p, tag: 'External' }));
-          portions.push(...external);
-        } catch (e) {}
-      }
+      const remoteService = new (await import('../services/RemoteCatalogService.js')).RemoteCatalogService(
+        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CATALOG_BASE_URL) || ''
+      );
 
-      // 3. Fetch generic fallback portions from local RxDB
-      try {
-        const genericDocs = await db.portions.find({ selector: { base_food_id: 'generic' } }).exec();
-        const generic = genericDocs.map((d: any) => d.toJSON ? d.toJSON() : d).map((p: any) => ({ ...p, tag: 'Generic' }));
-        portions.push(...generic);
-      } catch (e) {}
+      const resolved = await portionManager.resolvePortions({
+        ingredient,
+        customPortions,
+        catalogProvider: remoteService
+      });
       
       if (!isCancelled) {
-        setAvailablePortions(portions);
+        setAvailablePortions(resolved);
       }
     };
     
     fetchAllPortions();
     return () => { isCancelled = true; };
-  }, [ingredient, db, isOnline]);
+  }, [ingredient, db, portionManager]);
 
   useEffect(() => {
     if (availablePortions.length > 0) {
