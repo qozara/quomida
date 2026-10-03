@@ -12,7 +12,7 @@ vi.mock('sqlite-wasm-http', () => {
     createSQLiteThread: async () => {
       const worker = async (action: string, payload: any) => {
         if (action === 'open') {
-          mockOpenedVfs.push(payload.vfs);
+          mockOpenedVfs.push(payload.vfs || (payload.byteArray ? 'memory-bytearray' : 'memory'));
           return;
         }
         if (action === 'close') {
@@ -68,6 +68,7 @@ describe('RemoteCatalogService', () => {
     RemoteCatalogService.clearListeners();
     RemoteCatalogService.resetInstance();
     vi.stubGlobal('navigator', { onLine: true });
+    vi.stubGlobal('window', { crossOriginIsolated: true });
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -235,6 +236,67 @@ describe('RemoteCatalogService', () => {
     expect(service.isHttpFallbackActive).toBe(false);
     expect(mockOpenedVfs).toEqual(['opfs']);
     expect(mockClosedCount).toBe(2); // Both OPFS and HTTP workers closed on reset
+
+    service.destroy();
+  });
+
+  it('runs in zero-header mode: loads built-in system.sqlite via byteArray when crossOriginIsolated is false, keeping remote search disabled', async () => {
+    vi.stubGlobal('window', { crossOriginIsolated: false });
+    mockLocalCount = SYSTEM_CATALOG_META.itemCount;
+
+    const fetchSpy = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/system.sqlite')) {
+        return Promise.resolve({
+          ok: true,
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(100))
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+    global.fetch = fetchSpy;
+
+    const service = new RemoteCatalogService('https://data.example.com');
+    const results = await service.searchIngredients('Avacado');
+
+    expect(results.length).toBe(1);
+    expect(results[0].name).toBe('Avacado Test');
+    // Opened worker using byteArray in-memory SQLite, never opened OPFS or HTTP VFS
+    expect(mockOpenedVfs).toEqual(['memory-bytearray']);
+    // Remote search is disabled as progressive enhancement
+    expect(service.isHttpFallbackActive).toBe(false);
+    expect(service.hasRemoteFailed).toBe(false);
+    expect(mockClosedCount).toBe(0);
+
+    service.destroy();
+  });
+
+  it('runs in zero-header mode: loads downloaded catalog from OPFS via standard FileSystem API without vfs:opfs', async () => {
+    vi.stubGlobal('window', { crossOriginIsolated: false });
+    mockLocalCount = 1122244;
+
+    const mockFile = {
+      size: 15 * 1024 * 1024,
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(200))
+    };
+    const mockFileHandle = {
+      getFile: vi.fn().mockResolvedValue(mockFile)
+    };
+    vi.stubGlobal('navigator', {
+      onLine: true,
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue({
+          getFileHandle: vi.fn().mockResolvedValue(mockFileHandle)
+        })
+      }
+    });
+
+    const service = new RemoteCatalogService('https://data.example.com');
+    const results = await service.searchIngredients('Avacado');
+
+    expect(results.length).toBe(1);
+    expect(results[0].name).toBe('Avacado Test');
+    expect(mockOpenedVfs).toEqual(['memory-bytearray']);
+    expect(service.isHttpFallbackActive).toBe(false);
 
     service.destroy();
   });

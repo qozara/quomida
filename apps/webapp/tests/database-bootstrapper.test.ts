@@ -77,4 +77,43 @@ describe('DatabaseBootstrapper', () => {
     expect(mockWrite).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();
   });
+
+  it('supports createSyncAccessHandle fallback for mobile Safari when createWritable is undefined', async () => {
+    const mockWriteSync = vi.fn();
+    const mockFlushSync = vi.fn();
+    const mockCloseSync = vi.fn();
+    const mockAccessHandle = { write: mockWriteSync, flush: mockFlushSync, close: mockCloseSync };
+
+    const mockGetFileHandle = vi.fn().mockImplementation((name, options) => {
+      if (options?.create) {
+        return Promise.resolve({
+          createWritable: undefined, // Simulates mobile Safari 15.2 - 16.3
+          createSyncAccessHandle: vi.fn().mockResolvedValue(mockAccessHandle)
+        });
+      }
+      const err = new Error('Not found');
+      err.name = 'NotFoundError';
+      return Promise.reject(err);
+    });
+
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue({
+          getFileHandle: mockGetFileHandle
+        })
+      }
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(12))
+    });
+
+    await DatabaseBootstrapper.ensureSystemCatalogOPFS();
+
+    expect(global.fetch).toHaveBeenCalledWith('/system.sqlite');
+    expect(mockWriteSync).toHaveBeenCalled();
+    expect(mockFlushSync).toHaveBeenCalled();
+    expect(mockCloseSync).toHaveBeenCalled();
+  });
 });

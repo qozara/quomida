@@ -54,9 +54,20 @@ self.onmessage = async (e: MessageEvent) => {
       const opfsRoot = await navigator.storage.getDirectory();
       
       const fileHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
-      const writable = await fileHandle.createWritable();
-      
-      await decompressedStream.pipeTo(writable);
+      if (typeof fileHandle.createWritable === 'function') {
+        const writable = await fileHandle.createWritable();
+        await decompressedStream.pipeTo(writable);
+      } else if (typeof (fileHandle as any).createSyncAccessHandle === 'function') {
+        const accessHandle = await (fileHandle as any).createSyncAccessHandle();
+        const reader = decompressedStream.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          accessHandle.write(value);
+        }
+        accessHandle.flush();
+        accessHandle.close();
+      }
 
       self.postMessage({ type: 'COMPLETE' });
     } catch (err: any) {

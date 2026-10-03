@@ -20,18 +20,25 @@ export class DatabaseBootstrapper {
       // First run only: copy built-in static /system.sqlite into OPFS
       const res = await fetch('/system.sqlite');
       if (!res.ok) {
-        throw new Error(`Failed to fetch /system.sqlite: ${res.status}`);
+        return;
       }
 
       const fileHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
-      const writable = await fileHandle.createWritable();
-      
-      if (res.body) {
-        await res.body.pipeTo(writable);
-      } else {
+      if (typeof fileHandle.createWritable === 'function') {
+        const writable = await fileHandle.createWritable();
+        if (res.body) {
+          await res.body.pipeTo(writable);
+        } else {
+          const buffer = await res.arrayBuffer();
+          await writable.write(buffer);
+          await writable.close();
+        }
+      } else if (typeof (fileHandle as any).createSyncAccessHandle === 'function') {
+        const accessHandle = await (fileHandle as any).createSyncAccessHandle();
         const buffer = await res.arrayBuffer();
-        await writable.write(buffer);
-        await writable.close();
+        accessHandle.write(new Uint8Array(buffer));
+        accessHandle.flush();
+        accessHandle.close();
       }
     } catch (err) {
       console.warn('[DatabaseBootstrapper] OPFS seed notice:', err);

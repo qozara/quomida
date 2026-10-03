@@ -18,6 +18,15 @@ export const SYSTEM_CATALOG_META = {
   catalogVersion: metaEntry?.catalogVersion ?? metaEntry?.default?.catalogVersion ?? '',
 };
 
+export function isCrossOriginIsolated(): boolean {
+  if (typeof SharedArrayBuffer === 'undefined') return false;
+  const target = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+  if (target && 'crossOriginIsolated' in target) {
+    return Boolean((target as any).crossOriginIsolated);
+  }
+  return true;
+}
+
 export class RemoteCatalogService implements ICatalogProvider {
   public static readonly CATALOG_DOWNLOADED_EVENT = 'quomida:catalog-downloaded';
   private static listeners = new Set<() => void>();
@@ -204,28 +213,79 @@ export class RemoteCatalogService implements ICatalogProvider {
         console.warn('[RemoteCatalogService] ensureSystemCatalogOPFS notice:', err);
       });
 
-      // 2. Open dedicated local SQLite worker for OPFS
-      const localWorker = await createSQLiteThread({ 
-        http: createHttpBackend({ maxPageSize: 4096 })
-      });
+      // 2. Open dedicated local SQLite worker (pure local, zero http backend needed)
+      const localWorker = await createSQLiteThread();
       let localTotal = 0;
-      try {
-        await localWorker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
-        // 3. Query total count in local SQLite (ingredients + portions)
-        const countRes = await localWorker('exec', { 
-          sql: 'SELECT (SELECT count(*) FROM base_ingredients) + (SELECT count(*) FROM portions)', 
-          rowMode: 'array' 
-        } as any);
-        localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
-      } catch (opfsErr) {
-        console.warn('[RemoteCatalogService] Could not mount OPFS database (Missing SharedArrayBuffer or COOP/COEP headers):', opfsErr);
+      let opfsOpened = false;
+
+      const hasIsolation = isCrossOriginIsolated();
+
+      if (hasIsolation) {
         try {
-          await localWorker('open', { filename: ':memory:' });
-        } catch {}
+          await localWorker('open', { filename: 'catalog.sqlite', vfs: 'opfs' });
+          const countRes = await localWorker('exec', { 
+            sql: 'SELECT (SELECT count(*) FROM base_ingredients) + (SELECT count(*) FROM portions)', 
+            rowMode: 'array' 
+          } as any);
+          localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
+          if (localTotal > 0) {
+            opfsOpened = true;
+          }
+        } catch (opfsErr) {
+          console.warn('[RemoteCatalogService] OPFS mount via vfs:opfs unavailable, falling back to zero-header loading:', opfsErr);
+        }
       }
+
+      // If OPFS was not opened (zero-header mode without COOP/COEP, or OPFS not yet seeded):
+      if (!opfsOpened) {
+        let catalogBytes: Uint8Array | null = null;
+
+        // Try reading existing catalog.sqlite from OPFS (standard FileSystem API requires zero headers)
+        if (typeof navigator !== 'undefined' && navigator.storage) {
+          try {
+            const root = await navigator.storage.getDirectory();
+            const handle = await root.getFileHandle('catalog.sqlite');
+            const file = await handle.getFile();
+            if (file.size > 0) {
+              const buffer = await file.arrayBuffer();
+              catalogBytes = new Uint8Array(buffer);
+            }
+          } catch {
+            // Not in OPFS yet
+          }
+        }
+
+        // If not in OPFS, fetch the static /system.sqlite (240 KB built-in catalog)
+        if (!catalogBytes) {
+          try {
+            const res = await fetch('/system.sqlite');
+            if (res.ok) {
+              const buffer = await res.arrayBuffer();
+              catalogBytes = new Uint8Array(buffer);
+            }
+          } catch (fetchErr) {
+            console.warn('[RemoteCatalogService] Failed to fetch /system.sqlite:', fetchErr);
+          }
+        }
+
+        if (catalogBytes) {
+          try {
+            await (localWorker as any)('open', { filename: 'catalog.sqlite', byteArray: catalogBytes });
+            const countRes = await localWorker('exec', { 
+              sql: 'SELECT (SELECT count(*) FROM base_ingredients) + (SELECT count(*) FROM portions)', 
+              rowMode: 'array' 
+            } as any);
+            localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
+            console.log(`[RemoteCatalogService] Initialized zero-header local catalog with ${localTotal} items.`);
+          } catch (memErr) {
+            console.warn('[RemoteCatalogService] Failed to load catalog via byteArray:', memErr);
+          }
+        }
+      }
+
       this.localWorkerPromise = Promise.resolve(localWorker);
 
-      // 4. Condition to NOT use network is to have the full catalog downloaded locally.
+      // 3. Condition to NOT use network is to have the full catalog downloaded locally.
       // If localTotal > SYSTEM_CATALOG_META.itemCount (the built-in catalog count generated at build-time),
       // we know the full external catalog was downloaded and is available locally in OPFS.
       // ZERO network calls needed!
@@ -235,10 +295,12 @@ export class RemoteCatalogService implements ICatalogProvider {
         return;
       }
 
+      // 4. Remote search as an OPTIONAL progressive enhancement:
+      // Only attempted if environment has crossOriginIsolated (SharedArrayBuffer), browser is online, and baseUrl is configured.
       const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
       let shouldUseHttp = false;
 
-      if (isOnline && this.baseUrl) {
+      if (hasIsolation && isOnline && this.baseUrl) {
         try {
           const metaRes = await fetch(this.metaUrl, { 
             cache: 'no-cache', 
@@ -248,15 +310,17 @@ export class RemoteCatalogService implements ICatalogProvider {
             const meta = await metaRes.json();
             const remoteItemCount = Number(meta?.itemCount);
             if (remoteItemCount && localTotal < remoteItemCount) {
-              console.log(`[RemoteCatalogService] Local SQLite has ${localTotal} items, remote has ${remoteItemCount}. Using HTTP Range Requests while online.`);
+              console.log(`[RemoteCatalogService] Local SQLite has ${localTotal} items, remote has ${remoteItemCount}. Using progressive HTTP Range Requests.`);
               shouldUseHttp = true;
             } else {
               console.log(`[RemoteCatalogService] Full catalog hydrated locally (${localTotal} items). Zero network needed.`);
             }
           }
         } catch {
-          console.log('[RemoteCatalogService] Remote catalog metadata unreachable. Using local OPFS catalog.');
+          console.log('[RemoteCatalogService] Remote catalog metadata unreachable. Using local catalog.');
         }
+      } else if (!hasIsolation && this.baseUrl) {
+        console.log('[RemoteCatalogService] Zero-header mode: crossOriginIsolated is false. Local built-in catalog handles all instant offline searches.');
       }
 
       this.isUsingHttpFallback = shouldUseHttp;
