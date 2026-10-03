@@ -107,7 +107,7 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
       await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, webappSystemSqlite, currentDir);
     } else {
-      console.warn(`[ETL Pipeline] WARNING: PREBUILT_SYSTEM_CATALOG_URL not set! Falling back to empty system.sqlite to prevent Vercel crash.`);
+      console.warn(`[ETL Pipeline] ⚠️ WARNING: PREBUILT_SYSTEM_CATALOG_URL not set! Falling back to an empty system.sqlite database.`);
       const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
       await exportSQLiteCatalog([], webappSystemSqlite, webappSystemSqlite, path.join(path.dirname(webappSystemSqlite), 'catalog_meta.json'));
     }
