@@ -159,9 +159,13 @@ async function uploadFile(file: typeof filesToUpload[0]) {
 
 async function main() {
   try {
-    const fileFilter = args.find(a => a.startsWith('--file='))?.split('=')[1] 
-      || args.find(a => a.startsWith('--only='))?.split('=')[1];
-    const isSystemOnly = args.includes('--system-only');
+    const fileFilter = 
+      process.env.FILE ||
+      process.env.UPLOAD_FILE ||
+      process.env.ONLY ||
+      args.find(a => a.startsWith('--file='))?.split('=')[1] ||
+      args.find(a => a.startsWith('--only='))?.split('=')[1];
+    const isSystemOnly = args.includes('--system-only') || process.env.SYSTEM_ONLY === 'true';
 
     const targetFiles = filesToUpload.filter(file => {
       if (fileFilter) {
@@ -175,6 +179,14 @@ async function main() {
 
     if (targetFiles.length === 0) {
       console.warn(`[R2 Upload] No files matched filter criteria.`);
+      return;
+    }
+
+    const isDryRun = args.includes('--dry-run') || process.env.DRY_RUN === 'true';
+    if (isDryRun) {
+      console.log(`\n[R2 Upload] 🔍 DRY RUN MODE ACTIVATED - No files will be uploaded.`);
+      console.log(`[R2 Upload] Target files (${targetFiles.length}):`);
+      targetFiles.forEach(f => console.log(`   - ${f.key} (${f.path})`));
       return;
     }
 
