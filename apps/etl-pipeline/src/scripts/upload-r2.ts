@@ -159,11 +159,30 @@ async function uploadFile(file: typeof filesToUpload[0]) {
 
 async function main() {
   try {
+    const fileFilter = args.find(a => a.startsWith('--file='))?.split('=')[1] 
+      || args.find(a => a.startsWith('--only='))?.split('=')[1];
+    const isSystemOnly = args.includes('--system-only');
+
+    const targetFiles = filesToUpload.filter(file => {
+      if (fileFilter) {
+        return file.key === fileFilter || path.basename(file.path) === fileFilter;
+      }
+      if (isSystemOnly) {
+        return file.key === 'system.sqlite' || file.key === 'system_meta.json';
+      }
+      return true;
+    });
+
+    if (targetFiles.length === 0) {
+      console.warn(`[R2 Upload] No files matched filter criteria.`);
+      return;
+    }
+
     await configureCors();
-    for (const file of filesToUpload) {
+    for (const file of targetFiles) {
       await uploadFile(file);
     }
-    console.log('\n[R2 Upload] 🎉 Successfully uploaded all artifacts to R2 using S3 Multipart Upload!');
+    console.log('\n[R2 Upload] 🎉 Successfully uploaded artifacts to R2 using S3 Multipart Upload!');
   } catch (error) {
     console.error('\n[R2 Upload] Error during upload process:', error);
     process.exit(1);
