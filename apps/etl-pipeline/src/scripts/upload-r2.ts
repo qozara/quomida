@@ -67,6 +67,12 @@ const filesToUpload = [
     key: 'system.sqlite',
     contentType: 'application/x-sqlite3',
     description: 'system.sqlite'
+  },
+  {
+    path: path.join(rootDir, '../webapp/src/generated/system_meta.json'),
+    key: 'system_meta.json',
+    contentType: 'application/json',
+    description: 'system_meta.json'
   }
 ];
 
