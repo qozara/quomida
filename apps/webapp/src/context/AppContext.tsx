@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db/rxdb.js';
 import { syncDatabaseWithRemote } from '../db/replication.js';
 import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
@@ -264,6 +264,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setActiveAdapter(newAdapter);
             if (navigator.onLine) {
               setSyncStatus(newAdapter.getStatus());
+              runWithSyncLock(async () => {
+                setSyncStatus('syncing');
+                try {
+                  await syncDatabaseWithRemote(rxdb, newAdapter);
+                } finally {
+                  setSyncStatus(newAdapter.getStatus());
+                  setLastSyncedTime(newAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+                }
+              }, syncLock).catch(console.error);
             }
           } catch (err) {
             console.error('Failed to restore adapter', err);
@@ -396,6 +405,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [forceSync]);
 
+  // Auto-sync when transitioning back to online
+  const prevOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (!prevOnlineRef.current && isOnline) {
+      if (activeProvider && activeProvider.isInitialized()) {
+        forceSync().catch(console.error);
+      }
+    }
+    prevOnlineRef.current = isOnline;
+  }, [isOnline, activeProvider, forceSync]);
+
   const reconnectProvider = async () => {
     if (!activeProvider) return;
     if (activeProvider.reauthenticate) {
@@ -403,6 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setSyncStatus(activeProvider.getStatus());
     setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
+    forceSync().catch(console.error);
   };
 
   const repairSync = async () => {
@@ -449,6 +470,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveAdapter(adapter);
     setSyncStatus(adapter.getStatus());
     setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+
+    // Immediately trigger initial bidirectional sync to pull existing cloud data
+    if (db && isOnline) {
+      runWithSyncLock(async () => {
+        setSyncStatus('syncing');
+        try {
+          await syncDatabaseWithRemote(db, adapter);
+        } finally {
+          setSyncStatus(adapter.getStatus());
+          setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
+        }
+      }, syncLock).catch(console.error);
+    }
   };
 
   const logFoodItem = async (

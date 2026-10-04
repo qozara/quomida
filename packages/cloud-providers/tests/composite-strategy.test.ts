@@ -322,4 +322,28 @@ describe('CompositeCloudSyncProvider & Strategy Pattern', () => {
     expect(rows.find(r => r.id === 'log_day1')).toBeDefined();
     expect(rows.find(r => r.id === 'log_day2')).toBeDefined();
   });
+
+  it('gracefully skips unrouted collections on push instead of throwing an unhandled exception', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(adapter.push({
+      collection: 'system_metadata',
+      documents: [{ key: 'v', value: '1' }]
+    })).resolves.not.toThrow();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping unrouted collection "system_metadata"'));
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('preserves idle status on transient network disconnection errors instead of marking as fatal error', async () => {
+    // Force writeTable to fail with a TypeError: Failed to fetch (simulating network disconnection)
+    vi.spyOn(tabularDriver, 'writeTable').mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(adapter.push({
+      collection: 'daily_logs',
+      documents: [{ id: 'log_net_err', timestamp: '2026-09-15', date: '2026-09-15', meal_type: 'meal_lunch', food_reference_id: 'f1', food_name: 'F', quantity: 1, portion_name: 'P', macros: { calories: 10, protein: 1, carbs: 1, fats: 1 }, updatedAt: 100 }]
+    })).rejects.toThrow('Failed to fetch');
+
+    // Should NOT be set to 'error' (which would trigger the "Session expired / re-authenticate" banner)
+    expect(adapter.getStatus()).toBe('idle');
+  });
 });
+

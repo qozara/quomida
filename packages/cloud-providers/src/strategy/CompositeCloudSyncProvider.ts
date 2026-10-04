@@ -7,6 +7,25 @@ import type {
 } from './types.js';
 import { collectionSerializers } from './serializers.js';
 
+export function isNetworkError(err: any): boolean {
+  if (!err) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return true;
+  }
+  const msg = err?.message || String(err);
+  return (
+    (err?.name === 'TypeError' && (msg.includes('fetch') || msg.includes('Failed to fetch'))) ||
+    msg.includes('net::ERR_INTERNET_DISCONNECTED') ||
+    msg.includes('NetworkError') ||
+    msg.includes('network error') ||
+    msg.includes('ERR_CONNECTION_') ||
+    msg.includes('ERR_NETWORK_CHANGED') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ENOTFOUND') ||
+    msg.includes('ETIMEDOUT')
+  );
+}
+
 export const DEFAULT_COLLECTION_ROUTES: Record<string, CollectionRoute> = {
   user_settings: {
     target: 'blob',
@@ -272,7 +291,8 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
     try {
       const route = this.routes[payload.collection];
       if (!route) {
-        throw new Error(`No sync route defined for collection "${payload.collection}"`);
+        console.warn(`[CompositeCloudSyncProvider] Skipping unrouted collection "${payload.collection}"`);
+        return;
       }
 
       if (route.target === 'blob') {
@@ -350,6 +370,20 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         err?.message?.includes('SchemaUpgradeRequired')
       ) {
         this.setStatus('upgrade_required');
+      } else if (
+        err?.message?.includes('Google Auth Failed') ||
+        err?.message?.includes('401') ||
+        err?.message?.includes('unauthorized')
+      ) {
+        this.setStatus('auth_failed');
+      } else if (
+        err?.message?.includes('Rate Limit') ||
+        err?.message?.includes('429')
+      ) {
+        this.setStatus('throttled');
+      } else if (isNetworkError(err)) {
+        // Transient network disconnection: keep adapter status intact (idle)
+        this.setStatus('idle');
       } else {
         this.setStatus('error');
       }
@@ -419,6 +453,20 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         err?.message?.includes('SchemaUpgradeRequired')
       ) {
         this.setStatus('upgrade_required');
+      } else if (
+        err?.message?.includes('Google Auth Failed') ||
+        err?.message?.includes('401') ||
+        err?.message?.includes('unauthorized')
+      ) {
+        this.setStatus('auth_failed');
+      } else if (
+        err?.message?.includes('Rate Limit') ||
+        err?.message?.includes('429')
+      ) {
+        this.setStatus('throttled');
+      } else if (isNetworkError(err)) {
+        // Transient network disconnection: keep adapter status intact (idle)
+        this.setStatus('idle');
       } else {
         this.setStatus('error');
       }

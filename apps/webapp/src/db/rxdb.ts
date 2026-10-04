@@ -350,11 +350,14 @@ export class LocalDBService {
     await this.db!.base_ingredients.insert(newFood);
 
     if (portions && portions.length > 0) {
+      const now = Date.now();
       const portionsToUpsert = portions.map((p, i) => ({
         id: `port-${id}-${i}`,
         base_food_id: id,
         name: p.name,
-        equivalent_weight_g: p.equivalent_weight_g
+        equivalent_weight_g: p.equivalent_weight_g,
+        source: 'custom' as const,
+        updatedAt: now
       }));
       await this.db!.portions.bulkUpsert(portionsToUpsert);
     }

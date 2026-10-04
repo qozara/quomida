@@ -1,6 +1,14 @@
 import { type QuomidaDatabase, prepareQuery } from './rxdb.js';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
 
+export const SYNCABLE_COLLECTIONS = new Set([
+  'daily_logs',
+  'base_ingredients',
+  'recipes',
+  'portions',
+  'user_settings'
+]);
+
 export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: CloudSyncProvider) {
   if (!adapter.isInitialized()) return;
 
@@ -9,18 +17,29 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
     const payloadMap = new Map(payloads.map(p => [p.collection, p]));
 
     for (const [collectionName, collection] of Object.entries(db.collections)) {
+      if (!SYNCABLE_COLLECTIONS.has(collectionName)) {
+        continue;
+      }
+
+      const isCustomOnlyCollection = collectionName === 'base_ingredients' || collectionName === 'portions';
       const payload = payloadMap.get(collectionName) || { collection: collectionName, documents: [] };
 
-      // 1. Fetch all active local documents
-      const localDocs = await collection.find().exec();
+      // 1. Fetch active local documents
+      const localDocs = isCustomOnlyCollection
+        ? await collection.find({ selector: { source: 'custom' } }).exec()
+        : await collection.find().exec();
       const localDocsMap = new Map(localDocs.map((d: any) => [d.id, d.toJSON()]));
 
       // 1b. Fetch local tombstones (soft deleted)
       try {
+        const selector: any = { _deleted: true };
+        if (isCustomOnlyCollection) {
+          selector.source = 'custom';
+        }
         const q = prepareQuery(
           collection.schema.jsonSchema,
           {
-            selector: { _deleted: true },
+            selector,
             skip: 0,
             limit: 100000,
             sort: [{ id: 'asc' }]
@@ -28,7 +47,9 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
         );
         const tombstoneResult = await collection.storageInstance.query(q);
         for (const t of tombstoneResult.documents) {
-          localDocsMap.set(t.id, t);
+          if (!isCustomOnlyCollection || t.source === 'custom') {
+            localDocsMap.set(t.id, t);
+          }
         }
       } catch (err) {
         console.warn(`[SyncEngine] Failed to fetch tombstones for ${collectionName}:`, err);
@@ -48,6 +69,10 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
 
       // 2. Iterate remote documents
       for (const remoteDoc of deduplicatedRemoteDocs.values()) {
+        if (isCustomOnlyCollection && remoteDoc.source && remoteDoc.source !== 'custom') {
+          continue;
+        }
+
         const localDoc = localDocsMap.get(remoteDoc.id);
 
         if (localDoc) {
@@ -98,6 +123,10 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
       // 3. Local documents that do not exist AT ALL in the remote payload
       // These were created locally and never pushed successfully.
       for (const localDoc of localDocsMap.values()) {
+        const docObj = localDoc as any;
+        if (isCustomOnlyCollection && docObj.source && docObj.source !== 'custom') {
+          continue;
+        }
         pushBacks.push(localDoc);
       }
 
@@ -115,5 +144,6 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
     }
   } catch (error) {
     console.error('[SyncEngine] Failed to sync database with remote:', error);
+    throw error;
   }
 }
