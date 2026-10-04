@@ -345,5 +345,139 @@ describe('CompositeCloudSyncProvider & Strategy Pattern', () => {
     // Should NOT be set to 'error' (which would trigger the "Session expired / re-authenticate" banner)
     expect(adapter.getStatus()).toBe('idle');
   });
+
+  it('self-heals and recreates remote documents when remote files are trashed (404 Not Found)', async () => {
+    // 1. Initial push to populate cache with first document
+    await adapter.push({
+      collection: 'daily_logs',
+      documents: [
+        {
+          id: 'log_initial',
+          timestamp: '2026-09-15T12:00:00.000Z',
+          date: '2026-09-15',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'food_1',
+          food_name: 'Pollo',
+          quantity: 1,
+          portion_name: 'Plato',
+          macros: { calories: 200, protein: 40, carbs: 0, fats: 5 },
+          updatedAt: 100
+        }
+      ]
+    });
+
+    const initialDocId = await tabularDriver.ensureDocument('Quomida Daily Logs', ['daily_logs']);
+    expect(initialDocId).toBeDefined();
+
+    // 2. Simulate user trashing the document in Google Drive:
+    // Any read/write with initialDocId throws 404 Not Found
+    const originalWriteTable = tabularDriver.writeTable.bind(tabularDriver);
+    const originalReadTable = tabularDriver.readTable.bind(tabularDriver);
+
+    vi.spyOn(tabularDriver, 'writeTable').mockImplementation(async (documentId, tabName, headers, rows) => {
+      if (documentId === initialDocId) {
+        throw new Error('Google Sheets API Error (404) during writing table "daily_logs". Details: Requested entity was not found.');
+      }
+      return originalWriteTable(documentId, tabName, headers, rows);
+    });
+
+    vi.spyOn(tabularDriver, 'readTable').mockImplementation(async (documentId, tabName) => {
+      if (documentId === initialDocId) {
+        throw new Error('Google Sheets API Error (404) during reading table "daily_logs". Details: Requested entity was not found.');
+      }
+      return originalReadTable(documentId, tabName);
+    });
+
+    tabularDriver.documents.delete(initialDocId);
+
+    // Also simulate ensureDocument creating a fresh ID when called next time
+    const recreatedDocId = 'doc_recreated_after_trash';
+    vi.spyOn(tabularDriver, 'ensureDocument').mockImplementation(async (title, tabs) => {
+      const tabsMap = new Map<string, { headers: string[]; rows: TabularRow[] }>();
+      for (const tab of tabs) {
+        tabsMap.set(tab, { headers: [], rows: [] });
+      }
+      tabularDriver.documents.set(recreatedDocId, { title, tabs: tabsMap });
+      return recreatedDocId;
+    });
+
+    // 3. Push a new log while old document was trashed
+    await expect(adapter.push({
+      collection: 'daily_logs',
+      documents: [
+        {
+          id: 'log_after_trash',
+          timestamp: '2026-09-16T12:00:00.000Z',
+          date: '2026-09-16',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'food_2',
+          food_name: 'Pescado',
+          quantity: 1,
+          portion_name: 'Plato',
+          macros: { calories: 150, protein: 30, carbs: 0, fats: 3 },
+          updatedAt: 200
+        }
+      ]
+    })).resolves.not.toThrow();
+
+    // 4. Verify adapter status remained 'idle' (did NOT go into 'error' / session expired state)
+    expect(adapter.getStatus()).toBe('idle');
+
+    // 5. Verify data was written to the recreated document
+    const recreatedRows = await tabularDriver.readTable(recreatedDocId, 'daily_logs');
+    expect(recreatedRows.find(r => r.id === 'log_after_trash')).toBeDefined();
+  });
+
+  it('self-heals and recreates remote documents during pull when remote files return 404', async () => {
+    // 1. Initial push to populate cache
+    await adapter.push({
+      collection: 'daily_logs',
+      documents: [
+        {
+          id: 'log_before_trash_pull',
+          timestamp: '2026-09-15T12:00:00.000Z',
+          date: '2026-09-15',
+          meal_type: 'meal_breakfast',
+          food_reference_id: 'food_1',
+          food_name: 'Avena',
+          quantity: 1,
+          portion_name: 'Taza',
+          macros: { calories: 300, protein: 10, carbs: 50, fats: 5 },
+          updatedAt: 100
+        }
+      ]
+    });
+
+    const initialDocId = await tabularDriver.ensureDocument('Quomida Daily Logs', ['daily_logs']);
+
+    // 2. Simulate 404 on reading initialDocId
+    const originalReadTable = tabularDriver.readTable.bind(tabularDriver);
+    vi.spyOn(tabularDriver, 'readTable').mockImplementation(async (documentId, tabName) => {
+      if (documentId === initialDocId) {
+        throw new Error('Google Sheets API Error (404) during reading table "daily_logs". Details: Requested entity was not found.');
+      }
+      return originalReadTable(documentId, tabName);
+    });
+
+    tabularDriver.documents.delete(initialDocId);
+
+    const freshDocId = 'doc_fresh_after_pull_trash';
+    vi.spyOn(tabularDriver, 'ensureDocument').mockImplementation(async (title, tabs) => {
+      const tabsMap = new Map<string, { headers: string[]; rows: TabularRow[] }>();
+      for (const tab of tabs) {
+        tabsMap.set(tab, { headers: [], rows: [] });
+      }
+      tabularDriver.documents.set(freshDocId, { title, tabs: tabsMap });
+      return freshDocId;
+    });
+
+    // 3. Pull from remote
+    const pulled = await adapter.pull();
+    expect(adapter.getStatus()).toBe('idle');
+    const logsPayload = pulled.find(p => p.collection === 'daily_logs');
+    expect(logsPayload).toBeDefined();
+    expect(logsPayload?.documents).toEqual([]);
+  });
 });
+
 

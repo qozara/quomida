@@ -8,7 +8,9 @@ export async function fetchPrebuiltSystemCatalog(
 ): Promise<void> {
   console.log(`[ETL Pipeline] PREBUILT_SYSTEM_CATALOG_URL detected: ${prebuiltUrl}`);
   let urlToFetch = prebuiltUrl;
-  if (urlToFetch.startsWith('http') && !urlToFetch.endsWith('.ndjson') && !urlToFetch.endsWith('.sqlite')) {
+  if (urlToFetch.endsWith('system_meta.json')) {
+    urlToFetch = urlToFetch.replace(/system_meta\.json$/, 'system.sqlite');
+  } else if (urlToFetch.startsWith('http') && !urlToFetch.endsWith('.ndjson') && !urlToFetch.endsWith('.sqlite')) {
     urlToFetch = urlToFetch.endsWith('/') ? urlToFetch + 'system.sqlite' : urlToFetch + '/system.sqlite';
   }
   

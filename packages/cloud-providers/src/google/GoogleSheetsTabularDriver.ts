@@ -87,11 +87,22 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
         }
         throw new Error(`Google Auth Failed (${res.status}) during ${context}. Details: ${errText}`);
       }
+      if (res.status === 404) {
+        for (const docId of Array.from(this.documentSchemas.keys())) {
+          if (context.includes(docId)) {
+            this.documentSchemas.delete(docId);
+          }
+        }
+      }
       if (res.status === 429) {
         throw new Error(`Google Sheets API Rate Limit / Quota Exceeded (429) during ${context}`);
       }
       throw new Error(`Google Sheets API Error (${res.status}) during ${context}. Details: ${errText}`);
     }
+  }
+
+  invalidateDocument(documentId: string): void {
+    this.documentSchemas.delete(documentId);
   }
 
   private async resolveSchemaForDocument(documentId: string): Promise<SchemaDefinition> {

@@ -2,6 +2,7 @@ import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from '../types.j
 import type {
   BlobStorageDriver,
   TabularStorageDriver,
+  TabularRow,
   CollectionRoute,
   CompositeCloudSyncProviderOptions
 } from './types.js';
@@ -23,6 +24,20 @@ export function isNetworkError(err: any): boolean {
     msg.includes('ECONNRESET') ||
     msg.includes('ENOTFOUND') ||
     msg.includes('ETIMEDOUT')
+  );
+}
+
+export function isEntityNotFoundError(err: any): boolean {
+  if (!err) return false;
+  if (err.status === 404 || err.code === 404 || err.statusCode === 404) {
+    return true;
+  }
+  const msg = err?.message || String(err);
+  return (
+    msg.includes('404') ||
+    msg.includes('NOT_FOUND') ||
+    msg.includes('Requested entity was not found') ||
+    msg.includes('File not found')
   );
 }
 
@@ -318,8 +333,8 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
           throw new Error(`No tabular serializer registered for collection "${payload.collection}"`);
         }
 
-        const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-        const cacheKey = `${docId}_${route.tabName}`;
+        let docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
+        let cacheKey = `${docId}_${route.tabName}`;
 
         let existingDocs: Record<string, any>[] = [];
         if (this.tabularCache.has(cacheKey)) {
@@ -334,6 +349,12 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
               err?.message?.includes('missing required column')
             ) {
               throw err;
+            }
+            if (isEntityNotFoundError(err)) {
+              this.invalidateDocument(route.documentKey, docId);
+              docId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
+              cacheKey = `${docId}_${route.tabName}`;
+              existingDocs = [];
             }
             // If table doesn't exist or is empty, we start with empty existingDocs
           }
@@ -354,7 +375,19 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         this.tabularCache.set(cacheKey, mergedDocs);
 
         const rows = mergedDocs.map(doc => serializer.docToRow(doc));
-        await this.tabularDriver.writeTable(docId, route.tabName, serializer.headers, rows);
+        try {
+          await this.tabularDriver.writeTable(docId, route.tabName, serializer.headers, rows);
+        } catch (writeErr: any) {
+          if (isEntityNotFoundError(writeErr)) {
+            this.invalidateDocument(route.documentKey, docId);
+            const freshDocId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
+            const freshCacheKey = `${freshDocId}_${route.tabName}`;
+            this.tabularCache.set(freshCacheKey, mergedDocs);
+            await this.tabularDriver.writeTable(freshDocId, route.tabName, serializer.headers, rows);
+          } else {
+            throw writeErr;
+          }
+        }
       }
 
       this.lastSyncedTime = new Date().toISOString();
@@ -381,8 +414,8 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         err?.message?.includes('429')
       ) {
         this.setStatus('throttled');
-      } else if (isNetworkError(err)) {
-        // Transient network disconnection: keep adapter status intact (idle)
+      } else if (isNetworkError(err) || isEntityNotFoundError(err)) {
+        // Transient network disconnection or self-healing entity 404: keep status intact (idle)
         this.setStatus('idle');
       } else {
         this.setStatus('error');
@@ -419,8 +452,19 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
           const serializer = collectionSerializers[collection];
           if (serializer) {
             try {
-              const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-              const rows = await this.tabularDriver.readTable(docId, route.tabName);
+              let docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
+              let rows: TabularRow[];
+              try {
+                rows = await this.tabularDriver.readTable(docId, route.tabName);
+              } catch (readErr: any) {
+                if (isEntityNotFoundError(readErr)) {
+                  this.invalidateDocument(route.documentKey, docId);
+                  docId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
+                  rows = await this.tabularDriver.readTable(docId, route.tabName);
+                } else {
+                  throw readErr;
+                }
+              }
               const documents = rows.map(r => serializer.rowToDoc(r));
               const cacheKey = `${docId}_${route.tabName}`;
               this.tabularCache.set(cacheKey, documents);
@@ -464,8 +508,8 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         err?.message?.includes('429')
       ) {
         this.setStatus('throttled');
-      } else if (isNetworkError(err)) {
-        // Transient network disconnection: keep adapter status intact (idle)
+      } else if (isNetworkError(err) || isEntityNotFoundError(err)) {
+        // Transient network disconnection or self-healing entity 404: keep status intact (idle)
         this.setStatus('idle');
       } else {
         this.setStatus('error');
@@ -474,8 +518,19 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
     }
   }
 
-  protected async resolveDocumentId(documentKey: string, documentTitle: string): Promise<string> {
-    if (this.documentIdCache.has(documentKey)) {
+  invalidateDocument(documentKey: string, staleDocId?: string): void {
+    this.documentIdCache.delete(documentKey);
+    if (staleDocId) {
+      for (const key of Array.from(this.tabularCache.keys())) {
+        if (key.startsWith(`${staleDocId}_`)) {
+          this.tabularCache.delete(key);
+        }
+      }
+    }
+  }
+
+  protected async resolveDocumentId(documentKey: string, documentTitle: string, bypassCache = false): Promise<string> {
+    if (!bypassCache && this.documentIdCache.has(documentKey)) {
       return this.documentIdCache.get(documentKey)!;
     }
     if (!this.tabularDriver) {
