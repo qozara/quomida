@@ -12,9 +12,13 @@
     "clean:all": "tsx src/scripts/clean.ts --all",
     "show-catalog-setup": "tsx src/scripts/show-catalog-setup.ts",
     "upload:r2": "tsx src/scripts/upload-r2.ts",
+    "upload:r2:preview": "tsx src/scripts/upload-r2.ts --preview",
+    "upload:r2:prod": "tsx src/scripts/upload-r2.ts --prod",
     "start": "npx tsx src/build-external.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1145.0",
+    "@aws-sdk/lib-storage": "^3.1145.0",
     "@quomida/domain-core": "*",
     "better-sqlite3": "^13.0.3",
     "csv-parse": "^7.0.2",

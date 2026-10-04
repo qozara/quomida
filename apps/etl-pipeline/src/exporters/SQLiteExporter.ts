@@ -1,27 +1,22 @@
 import fs from 'fs';
+import path from 'path';
 import readline from 'readline';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
+import zlib from 'zlib';
+import { pipeline } from 'stream/promises';
 import { normalizeFoodName } from '../utils/parserUtils.js';
 import type { RawIngredientItem } from '../types.js';
 import type { CatalogMetaPayload } from '../index.js';
 import { sanitizeIngredient, computeContentHash } from '../utils/sanitizer.js';
 
-export async function exportSQLiteCatalog(
-  inputFiles: string[],
-  outPath: string,
-  metaPath: string
-): Promise<CatalogMetaPayload> {
-  const seenKeys = new Set<string>();
-  const externalCatalogItems: { id: string; hash: string }[] = [];
-
-  if (fs.existsSync(outPath)) {
-    fs.unlinkSync(outPath);
+function initDb(path: string, tokenizer: string = 'unicode61 remove_diacritics 1') {
+  if (fs.existsSync(path)) {
+    fs.unlinkSync(path);
   }
-  
-  const db = new Database(outPath);
+  const db = new Database(path);
   db.exec(`
-    PRAGMA page_size = 4096;
+    PRAGMA page_size = 1024;
     PRAGMA journal_mode = OFF;
     PRAGMA synchronous = OFF;
     CREATE TABLE base_ingredients (
@@ -44,10 +39,11 @@ export async function exportSQLiteCatalog(
     );
     CREATE VIRTUAL TABLE base_ingredients_fts USING fts5(
       name,
-      id UNINDEXED
+      id UNINDEXED,
+      tokenize="${tokenizer}"
     );
   `);
-  
+
   const insertStmt = db.prepare(`
     INSERT INTO base_ingredients (id, name, source, lang, calories_100g, protein_100g, carbs_100g, fats_100g, contentHash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -61,7 +57,24 @@ export async function exportSQLiteCatalog(
     VALUES (?, ?, ?, ?, ?)
   `);
 
+  return { db, insertStmt, insertFtsStmt, insertPortionStmt };
+}
+
+export async function exportSQLiteCatalog(
+  inputFiles: string[],
+  outCatalogPath: string,
+  outSystemPath: string,
+  metaPath: string
+): Promise<CatalogMetaPayload> {
+  const seenKeys = new Set<string>();
+  const seenIds = new Set<string>();
+  const externalCatalogItems: { id: string; hash: string }[] = [];
+
+  const catalog = initDb(outCatalogPath, 'trigram');
+  const system = initDb(outSystemPath, 'trigram');
+
   let externalExportedCount = 0;
+  let systemExportedCount = 0;
 
   for (const file of inputFiles) {
     if (!fs.existsSync(file)) continue;
@@ -91,62 +104,90 @@ export async function exportSQLiteCatalog(
           ? `barcode:${item.barcode.trim()}`
           : `name:${normalizeFoodName(item.name)}`;
 
-      if (!seenKeys.has(key)) {
+      if (!seenKeys.has(key) && !seenIds.has(item.id)) {
         seenKeys.add(key);
+        seenIds.add(item.id);
         
-        // If it's a SYSTEM item, we just add it to seenKeys to prevent duplicates later,
-        // but we do NOT insert it into the SQLite database.
-        if (item.originSource === 'SYSTEM') continue;
-
         let finalItem: any;
         let contentHash = '';
+
+        const targetDbs = item.originSource === 'SYSTEM' 
+          ? [catalog, system] 
+          : [catalog];
 
         if (item._type === 'portion') {
           finalItem = item;
           contentHash = crypto.createHash('md5').update(`${item.id}|${item.name}|${(item as any).equivalent_weight_g}`, 'utf8').digest('hex');
           finalItem.contentHash = contentHash;
           
-          insertPortionStmt.run(
-            finalItem.id,
-            finalItem.base_food_id,
-            finalItem.name,
-            finalItem.equivalent_weight_g,
-            finalItem.contentHash
-          );
+          for (const target of targetDbs) {
+            target.insertPortionStmt.run(
+              finalItem.id,
+              finalItem.base_food_id,
+              finalItem.name,
+              finalItem.equivalent_weight_g,
+              finalItem.contentHash
+            );
+          }
         } else {
           const sanitized = sanitizeIngredient(item);
           contentHash = computeContentHash(sanitized);
           finalItem = { ...sanitized, contentHash };
 
-          insertStmt.run(
-            finalItem.id,
-            finalItem.name,
-            finalItem.source,
-            finalItem.lang,
-            finalItem.calories_100g,
-            finalItem.protein_100g,
-            finalItem.carbs_100g,
-            finalItem.fats_100g,
-            finalItem.contentHash
-          );
-          insertFtsStmt.run(
-            finalItem.id,
-            finalItem.name
-          );
+          for (const target of targetDbs) {
+            target.insertStmt.run(
+              finalItem.id,
+              finalItem.name,
+              finalItem.source,
+              finalItem.lang,
+              finalItem.calories_100g,
+              finalItem.protein_100g,
+              finalItem.carbs_100g,
+              finalItem.fats_100g,
+              finalItem.contentHash
+            );
+            target.insertFtsStmt.run(
+              finalItem.id,
+              finalItem.name
+            );
+          }
         }
-        externalCatalogItems.push({ id: finalItem.id, hash: contentHash });
-        externalExportedCount++;
+        
+        if (item.originSource === 'SYSTEM') {
+          systemExportedCount++;
+        } else {
+          externalCatalogItems.push({ id: finalItem.id, hash: contentHash });
+          externalExportedCount++;
+        }
       }
     }
   }
 
-  db.exec(`
-    CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
-    CREATE INDEX idx_portion_base_food ON portions(base_food_id);
-  `);
-  db.close();
+  for (const target of [catalog, system]) {
+    target.db.exec(`
+      CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
+      CREATE INDEX idx_portion_base_food ON portions(base_food_id);
+      VACUUM;
+    `);
+    if (target === system) {
+      writeSystemCatalogMetadata(system.db, outSystemPath);
+    }
+    target.db.close();
+  }
 
-  console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items to ${outPath}`);
+  console.log(`[ETL Pipeline] Exported ${systemExportedCount} system items to ${outSystemPath}`);
+  console.log(`[ETL Pipeline] Exported ${externalExportedCount} external items (and ${systemExportedCount} system items) to ${outCatalogPath}`);
+
+  // Compress catalog.sqlite to catalog.sqlite.gz for frontend OPFS download
+  const gzPath = `${outCatalogPath}.gz`;
+  console.log(`[ETL Pipeline] Compressing ${outCatalogPath} to ${gzPath}...`);
+  await pipeline(
+    fs.createReadStream(outCatalogPath),
+    zlib.createGzip({ level: 9 }),
+    fs.createWriteStream(gzPath)
+  );
+  
+  // Optionally delete uncompressed to save space, but keeping it helps debugging. We'll leave it.
 
   const sources = inputFiles
     .filter(file => fs.existsSync(file))
@@ -163,11 +204,118 @@ export async function exportSQLiteCatalog(
   const externalMeta: CatalogMetaPayload = { 
     catalogVersion: externalVersion, 
     generatedAt,
-    itemCount: externalExportedCount,
+    itemCount: externalExportedCount + systemExportedCount,
     sources,
-    fileSizeBytes: fs.statSync(outPath).size
+    fileSizeBytes: fs.statSync(gzPath).size
   };
+
   fs.writeFileSync(metaPath, JSON.stringify(externalMeta, null, 2), 'utf-8');
 
   return externalMeta;
+}
+
+export function writeSystemCatalogMetadata(
+  systemDb: any,
+  outSystemPath: string
+) {
+  const portionsCountRes = systemDb.prepare('SELECT count(*) as count FROM portions').get() as { count: number };
+  const ingredientsCountRes = systemDb.prepare('SELECT count(*) as count FROM base_ingredients').get() as { count: number };
+  const totalItems = (ingredientsCountRes?.count || 0) + (portionsCountRes?.count || 0);
+
+  const generatedAt = new Date().toISOString();
+  const systemMeta = {
+    itemCount: totalItems,
+    ingredientsCount: ingredientsCountRes?.count || 0,
+    portionsCount: portionsCountRes?.count || 0,
+    generatedAt,
+    catalogVersion: crypto.createHash('md5').update(`system:${totalItems}`).digest('hex').slice(0, 8),
+  };
+
+  const webappGeneratedDir = path.resolve(path.dirname(outSystemPath), '../src/generated');
+  if (!fs.existsSync(webappGeneratedDir)) {
+    fs.mkdirSync(webappGeneratedDir, { recursive: true });
+  }
+  const metaJsonPath = path.join(webappGeneratedDir, 'system_meta.json');
+  fs.writeFileSync(metaJsonPath, JSON.stringify(systemMeta, null, 2), 'utf-8');
+
+  return systemMeta;
+}
+
+export async function exportSystemSQLiteCatalog(
+  inputFile: string | null,
+  outSystemPath: string
+): Promise<number> {
+  const dir = path.dirname(outSystemPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const system = initDb(outSystemPath, 'unicode61 remove_diacritics 1');
+  let systemExportedCount = 0;
+
+  if (inputFile && fs.existsSync(inputFile)) {
+    const fileStream = fs.createReadStream(inputFile);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+    const seenKeys = new Set<string>();
+    const seenIds = new Set<string>();
+
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      const item: RawIngredientItem & { _type?: string } = JSON.parse(line);
+
+      const key = item._type === 'portion'
+        ? `portion:${item.id}`
+        : item.barcode
+          ? `barcode:${item.barcode.trim()}`
+          : `name:${normalizeFoodName(item.name)}`;
+
+      if (!seenKeys.has(key) && !seenIds.has(item.id)) {
+        seenKeys.add(key);
+        seenIds.add(item.id);
+
+        if (item._type === 'portion') {
+          const contentHash = crypto.createHash('md5').update(`${item.id}|${item.name}|${(item as any).equivalent_weight_g}`, 'utf8').digest('hex');
+          system.insertPortionStmt.run(
+            item.id,
+            (item as any).base_food_id,
+            item.name,
+            (item as any).equivalent_weight_g,
+            contentHash
+          );
+        } else {
+          const sanitized = sanitizeIngredient(item);
+          const contentHash = computeContentHash(sanitized);
+          system.insertStmt.run(
+            sanitized.id,
+            sanitized.name,
+            sanitized.source,
+            sanitized.lang,
+            sanitized.calories_100g,
+            sanitized.protein_100g,
+            sanitized.carbs_100g,
+            sanitized.fats_100g,
+            contentHash
+          );
+          system.insertFtsStmt.run(
+            sanitized.id,
+            sanitized.name
+          );
+          systemExportedCount++;
+        }
+      }
+    }
+  }
+
+  system.db.exec(`
+    CREATE INDEX idx_name ON base_ingredients(name COLLATE NOCASE);
+    CREATE INDEX idx_portion_base_food ON portions(base_food_id);
+    VACUUM;
+  `);
+
+  const meta = writeSystemCatalogMetadata(system.db, outSystemPath);
+  system.db.close();
+
+  console.log(`[ETL Pipeline] Exported ${systemExportedCount} items to ${outSystemPath} (Total with portions: ${meta.itemCount})`);
+  return systemExportedCount;
 }

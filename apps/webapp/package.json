@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:catalog": "npm run show-catalog-setup --workspace=@quomida/etl-pipeline && npm run build:system --workspace=@quomida/etl-pipeline",
+    "build:catalog": "npm run show-catalog-setup --workspace=@quomida/etl-pipeline && npm run build:external --workspace=@quomida/etl-pipeline -- --system-only",
     "build": "npm run build:catalog && tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test"
@@ -24,17 +24,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.3",
-    "autoprefixer": "^10.4.20",
     "csv-parse": "^7.0.2",
     "jsdom": "^29.1.1",
     "ndjson": "^2.0.0",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vite": "^6.4.3",

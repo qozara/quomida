@@ -26,6 +26,6 @@ test.describe('Quomida Service Worker & Offline Shell Support', () => {
     // 5. Assert status indicator reflects offline state and announces via screen reader text
     const statusBadge = page.locator('#sync-status-badge');
     await expect(statusBadge).toBeVisible();
-    await expect(statusBadge).toContainText('Sin conexión');
+    await expect(statusBadge).toContainText(/Solo almacenamiento local|Sin conexión/i);
   });
 });

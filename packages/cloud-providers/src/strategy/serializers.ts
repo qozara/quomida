@@ -6,21 +6,57 @@ export interface CollectionSerializer {
   rowToDoc(row: TabularRow): Record<string, any>;
 }
 
-function createFieldGetter(row: TabularRow) {
+export function createFieldGetter(row: TabularRow) {
   const headers = row.headers;
   const v = row.values;
-  return (colName: string, fallbackIndex: number) => {
-    if (headers && headers.length > 0) {
-      const idx = headers.indexOf(colName);
-      if (idx !== -1) return v[idx];
+
+  if (headers && headers.length > 0) {
+    const map = new Map<string, number>();
+    for (let i = 0; i < headers.length; i++) {
+      const h = String(headers[i] ?? '').trim().toLowerCase();
+      if (h && !map.has(h)) {
+        map.set(h, i);
+      }
     }
+    return (colName: string, _fallbackIndex: number) => {
+      const target = colName.trim().toLowerCase();
+      const idx = map.get(target);
+      return idx !== undefined ? v[idx] : undefined;
+    };
+  }
+
+  return (_colName: string, fallbackIndex: number) => {
     return v[fallbackIndex];
   };
 }
 
-const parseBool = (val: any) => {
+export const parseBool = (val: any) => {
   if (typeof val === 'string') return val.toLowerCase() === 'true';
   return Boolean(val);
+};
+
+export const parseNumber = (val: any, fallback: number = 0): number => {
+  if (val === null || val === undefined || val === '') return fallback;
+  const n = typeof val === 'number' ? val : Number(val);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
+export const escapeFormulaInjection = (val: any): any => {
+  if (typeof val !== 'string') return val;
+  if (/^[=+\-@\t\r]/.test(val)) {
+    return `'${val}`;
+  }
+  return val;
+};
+
+export const sanitizeString = (val: any, fallback: string = ''): string => {
+  if (val === null || val === undefined) return fallback;
+  let str = String(val);
+  if (str.startsWith("'") && /^[=+\-@\t\r]/.test(str.slice(1))) {
+    str = str.slice(1);
+  }
+  // Strip raw HTML / script tags
+  return str.replace(/<[^>]*>/g, '').trim();
 };
 
 export const dailyLogsSerializer: CollectionSerializer = {
@@ -51,19 +87,19 @@ export const dailyLogsSerializer: CollectionSerializer = {
       updatedAt: doc.updatedAt,
       _deleted: doc._deleted,
       values: [
-        doc.id,
+        escapeFormulaInjection(doc.id),
         doc.timestamp,
         doc.date,
         doc.meal_type,
         doc.food_reference_id,
-        doc.food_name ?? '',
-        doc.quantity,
-        doc.portion_name,
-        macros.calories ?? 0,
-        macros.protein ?? 0,
-        macros.carbs ?? 0,
-        macros.fats ?? 0,
-        denormalized,
+        escapeFormulaInjection(doc.food_name ?? ''),
+        parseNumber(doc.quantity, 0),
+        escapeFormulaInjection(doc.portion_name ?? ''),
+        parseNumber(macros.calories, 0),
+        parseNumber(macros.protein, 0),
+        parseNumber(macros.carbs, 0),
+        parseNumber(macros.fats, 0),
+        escapeFormulaInjection(denormalized),
         doc.updatedAt ?? Date.now(),
         Boolean(doc._deleted)
       ]
@@ -87,22 +123,22 @@ export const dailyLogsSerializer: CollectionSerializer = {
     const deletedVal = getField('_deleted', 14);
 
     const doc: Record<string, any> = {
-      id: String(idVal || row.id),
+      id: sanitizeString(idVal || row.id),
       timestamp: String(timestampVal || ''),
       date: String(dateVal || ''),
       meal_type: String(mealTypeVal || 'meal_lunch'),
-      food_reference_id: String(foodRefIdVal || ''),
-      quantity: Number(quantityVal || 0),
-      portion_name: String(portionNameVal || ''),
+      food_reference_id: sanitizeString(foodRefIdVal || ''),
+      quantity: parseNumber(quantityVal, 0),
+      portion_name: sanitizeString(portionNameVal || ''),
       macros: {
-        calories: Number(caloriesVal || 0),
-        protein: Number(proteinVal || 0),
-        carbs: Number(carbsVal || 0),
-        fats: Number(fatsVal || 0)
+        calories: parseNumber(caloriesVal, 0),
+        protein: parseNumber(proteinVal, 0),
+        carbs: parseNumber(carbsVal, 0),
+        fats: parseNumber(fatsVal, 0)
       }
     };
-    if (foodNameVal) {
-      doc.food_name = String(foodNameVal);
+    if (foodNameVal !== undefined && foodNameVal !== null) {
+      doc.food_name = sanitizeString(foodNameVal);
     }
     if (updatedAtVal !== undefined && updatedAtVal !== null && updatedAtVal !== '') {
       doc.updatedAt = Number(updatedAtVal);
@@ -135,14 +171,14 @@ export const baseIngredientsSerializer: CollectionSerializer = {
       updatedAt: doc.updatedAt,
       _deleted: doc._deleted,
       values: [
-        doc.id,
-        doc.name,
+        escapeFormulaInjection(doc.id),
+        escapeFormulaInjection(doc.name),
         doc.source,
         doc.lang,
-        doc.calories_100g,
-        doc.protein_100g,
-        doc.carbs_100g,
-        doc.fats_100g,
+        parseNumber(doc.calories_100g, 0),
+        parseNumber(doc.protein_100g, 0),
+        parseNumber(doc.carbs_100g, 0),
+        parseNumber(doc.fats_100g, 0),
         doc.updatedAt ?? Date.now(),
         Boolean(doc._deleted)
       ]
@@ -162,14 +198,14 @@ export const baseIngredientsSerializer: CollectionSerializer = {
     const deletedVal = getField('_deleted', 9);
 
     return {
-      id: String(idVal || row.id),
-      name: String(nameVal || ''),
+      id: sanitizeString(idVal || row.id),
+      name: sanitizeString(nameVal || ''),
       source: String(sourceVal || 'custom'),
       lang: String(langVal || 'en'),
-      calories_100g: Number(caloriesVal || 0),
-      protein_100g: Number(proteinVal || 0),
-      carbs_100g: Number(carbsVal || 0),
-      fats_100g: Number(fatsVal || 0),
+      calories_100g: parseNumber(caloriesVal, 0),
+      protein_100g: parseNumber(proteinVal, 0),
+      carbs_100g: parseNumber(carbsVal, 0),
+      fats_100g: parseNumber(fatsVal, 0),
       updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
       _deleted: parseBool(deletedVal ?? row._deleted)
     };
@@ -184,10 +220,10 @@ export const recipesSerializer: CollectionSerializer = {
       updatedAt: doc.updatedAt,
       _deleted: doc._deleted,
       values: [
-        doc.id,
-        doc.name,
+        escapeFormulaInjection(doc.id),
+        escapeFormulaInjection(doc.name),
         typeof doc.ingredients === 'string' ? doc.ingredients : JSON.stringify(doc.ingredients || []),
-        doc.yield_factor ?? 1.0,
+        parseNumber(doc.yield_factor, 1.0),
         doc.updatedAt ?? Date.now(),
         Boolean(doc._deleted)
       ]
@@ -209,10 +245,10 @@ export const recipesSerializer: CollectionSerializer = {
       ingredients = [];
     }
     return {
-      id: String(idVal || row.id),
-      name: String(nameVal || ''),
+      id: sanitizeString(idVal || row.id),
+      name: sanitizeString(nameVal || ''),
       ingredients,
-      yield_factor: Number(yieldFactorVal || 1.0),
+      yield_factor: parseNumber(yieldFactorVal, 1.0),
       updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
       _deleted: parseBool(deletedVal ?? row._deleted)
     };
@@ -227,10 +263,10 @@ export const portionsSerializer: CollectionSerializer = {
       updatedAt: doc.updatedAt,
       _deleted: doc._deleted,
       values: [
-        doc.id,
-        doc.base_food_id,
-        doc.name,
-        doc.equivalent_weight_g,
+        escapeFormulaInjection(doc.id),
+        escapeFormulaInjection(doc.base_food_id),
+        escapeFormulaInjection(doc.name),
+        parseNumber(doc.equivalent_weight_g, 0),
         doc.updatedAt ?? Date.now(),
         Boolean(doc._deleted)
       ]
@@ -246,10 +282,10 @@ export const portionsSerializer: CollectionSerializer = {
     const deletedVal = getField('_deleted', 5);
 
     return {
-      id: String(idVal || row.id),
-      base_food_id: String(baseFoodIdVal || ''),
-      name: String(nameVal || ''),
-      equivalent_weight_g: Number(weightVal || 0),
+      id: sanitizeString(idVal || row.id),
+      base_food_id: sanitizeString(baseFoodIdVal || ''),
+      name: sanitizeString(nameVal || ''),
+      equivalent_weight_g: parseNumber(weightVal, 0),
       updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
       _deleted: parseBool(deletedVal ?? row._deleted)
     };

@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import './config/env.js';
 import type { BaseIngredient, Portion } from '@quomida/domain-core';
 import type { RawIngredientItem } from './types.js';
-import { exportSQLiteCatalog } from './exporters/SQLiteExporter.js';
 import { fetchPrebuiltSystemCatalog } from './utils/fetchPrebuiltSystem.js';
 import { parseSara2CSV } from './sources/sara2.js';
 import { parseTbcaCSV } from './sources/tbca.js';
@@ -101,6 +100,41 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
 
   // 1. SYSTEM
   const systemOut = addIntermediate('system');
+  const webappSystemSqlite = path.resolve(currentDir, '../../webapp/public/system.sqlite');
+
+  if (process.argv.includes('--system-only')) {
+    console.log('[ETL Pipeline] --system-only flag detected. Running fast-path for webapp build...');
+    if (process.env.PREBUILT_SYSTEM_CATALOG_URL) {
+      await fetchPrebuiltSystemCatalog(process.env.PREBUILT_SYSTEM_CATALOG_URL, webappSystemSqlite, currentDir);
+    } else {
+      const scriptDir = path.resolve(currentDir, '../scripts');
+      if (process.env.SYSTEM_INGREDIENTS_URL && !process.env.SYSTEM_INGREDIENTS_URL.startsWith('YOUR_')) {
+        const { execSync } = await import('child_process');
+        try {
+          execSync(`bash "${path.join(scriptDir, 'download_system.sh')}"`, { stdio: 'inherit' });
+        } catch (err: any) {
+          console.warn(`[ETL Pipeline] download_system.sh notice: ${err.message}`);
+        }
+      }
+
+      const systemIngredientsCsv = path.join(dataRawDir, 'system/system_ingredients.csv');
+      const systemPortionsCsv = path.join(dataRawDir, 'system/system_portions.csv');
+      const { exportSystemSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
+
+      if (fs.existsSync(systemIngredientsCsv)) {
+        const { ingredientsCount, portionsCount } = await parseSystemCSV(systemIngredientsCsv, systemPortionsCsv, systemOut);
+        console.log(`[ETL Pipeline] Loaded ${ingredientsCount} ingredients and ${portionsCount} portions from SYSTEM CSV`);
+        await exportSystemSQLiteCatalog(systemOut, webappSystemSqlite);
+      } else {
+        console.warn(`[ETL Pipeline] ⚠️ WARNING: Neither PREBUILT_SYSTEM_CATALOG_URL nor system CSV templates are configured/found!`);
+        console.warn(`[ETL Pipeline] ⚠️ Falling back to an empty system.sqlite database.`);
+        await exportSystemSQLiteCatalog(null, webappSystemSqlite);
+      }
+    }
+    console.log('[ETL Pipeline] --system-only fast path complete. Exiting.');
+    return;
+  }
+
   if (!hasCompleted(state.stage, 'SYSTEM')) {
     console.log('[ETL Pipeline] --- Processing SYSTEM seed ---');
     
@@ -122,12 +156,6 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
     state = tracker.getState();
   } else {
     console.log('[ETL Pipeline] Skipped SYSTEM (already processed)');
-  }
-
-  if (process.argv.includes('--system-only')) {
-    console.log('[ETL Pipeline] --system-only flag detected. Skipping remaining sources.');
-    tracker.updateStage('RESOLVER');
-    state = tracker.getState();
   }
 
   if (process.argv.includes('--generate-system-catalog')) {
@@ -220,9 +248,12 @@ export async function runETL(options?: RunETLOptions): Promise<void> {
       fs.mkdirSync(publicDir, { recursive: true });
     }
     const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const systemDbPath = path.resolve(currentDir, '../../webapp/public/system.sqlite');
     const metaPath = path.join(publicDir, 'catalog_meta.json');
     
-    await exportSQLiteCatalog(intermediateFiles, catalogPath, metaPath);
+    // Dynamic import to prevent Vercel CI from crashing due to better-sqlite3 native bindings
+    const { exportSQLiteCatalog } = await import('./exporters/SQLiteExporter.js');
+    await exportSQLiteCatalog(intermediateFiles, catalogPath, systemDbPath, metaPath);
 
     // Generate _headers file for Cloudflare Pages
     const headersContent = `/*\n  Access-Control-Allow-Origin: *\n  Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n`;

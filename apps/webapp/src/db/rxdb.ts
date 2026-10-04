@@ -30,11 +30,14 @@ export interface QuomidaDBError extends Error {
   backupData?: string;
 }
 
-async function exportRawDexieBackup(dbName: string): Promise<string> {
-  if (typeof window === 'undefined' || !('indexedDB' in window)) return '';
+export async function exportRawDexieBackup(dbName: string): Promise<string> {
+  const idb = typeof window !== 'undefined' && 'indexedDB' in window
+    ? window.indexedDB
+    : (typeof indexedDB !== 'undefined' ? indexedDB : null);
+  if (!idb) return '';
   try {
     return await new Promise((resolve, reject) => {
-      const request = indexedDB.open(dbName);
+      const request = idb.open(dbName);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
         const db = request.result;
@@ -45,23 +48,40 @@ async function exportRawDexieBackup(dbName: string): Promise<string> {
            resolve('{}');
            return;
         }
-        
+
+        // Target stores, excluding internal catalog system dumps
+        const targetStores = objectStoreNames.filter(name => {
+          const lower = name.toLowerCase();
+          return !lower.includes('catalog_system');
+        });
+
+        const storesToExport = targetStores.length > 0 ? targetStores : objectStoreNames;
         let completed = 0;
-        const transaction = db.transaction(objectStoreNames, 'readonly');
+        const transaction = db.transaction(storesToExport, 'readonly');
         
-        objectStoreNames.forEach(storeName => {
+        storesToExport.forEach(storeName => {
           const store = transaction.objectStore(storeName);
           const getAllRequest = store.getAll();
           getAllRequest.onsuccess = () => {
-            backup[storeName] = getAllRequest.result;
+            let records = getAllRequest.result || [];
+            // Filter out system catalog items to prevent memory explosion
+            if (storeName.includes('base_ingredients') || storeName.includes('portions')) {
+              records = records.filter((r: any) => r?.source !== 'system');
+            }
+            backup[storeName] = records;
             completed++;
-            if (completed === objectStoreNames.length) {
+            if (completed === storesToExport.length) {
               db.close();
-              resolve(JSON.stringify(backup, null, 2));
+              // Compact JSON stringify to avoid OOM memory expansion
+              resolve(JSON.stringify(backup));
             }
           };
           getAllRequest.onerror = () => {
-            // Error handling for getAll
+            completed++;
+            if (completed === storesToExport.length) {
+              db.close();
+              resolve(JSON.stringify(backup));
+            }
           };
         });
       };
@@ -192,9 +212,12 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       errorType = 'CORRUPTION';
     }
     
+    // Always attempt emergency raw backup export so user data can be recovered
     let backupData = '';
-    if (errorType === 'MIGRATION_FAILED' || errorType === 'CORRUPTION') {
+    try {
       backupData = await exportRawDexieBackup(options?.name || 'quomidadb_v1');
+    } catch (e) {
+      console.warn('[RxDB] Emergency backup export notice:', e);
     }
 
     const customError = new Error(err?.message || 'Database initialization failed') as QuomidaDBError;
@@ -210,6 +233,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     }
     throw customError;
   }
+
 
   // Hydrate global user settings if empty
   const now = Date.now();

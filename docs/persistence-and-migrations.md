@@ -95,9 +95,9 @@ export const dailyLogsSchema = {
 1. **Build-Time Validation (`validate-schemas.js`)**:
    Runs during `npm run build`. Inspects all exported schemas. Fails the build immediately if any schema with `version > 0` lacks a corresponding function in `migrationStrategies`.
 2. **Schema Hash Guard (`APP-DB6-GUARD`)**:
-   In `apps/webapp/src/db/rxdb.ts`, hashes of all schemas are compared with `localStorage['rxdb_schema_hashes']`. If an unversioned schema mutation occurs (which causes RxDB `DB6` initialization crashes):
-   - It prevents application crash / white-screen-of-death.
-   - Executes an emergency raw IndexedDB export to JSON.
+   In `apps/webapp/src/db/rxdb.ts`, when an unversioned schema mutation occurs (which causes RxDB `DB6` initialization errors) or a migration fails:
+   - It intercepts the error to prevent application crash / white-screen-of-death.
+   - Executes an emergency memory-safe raw IndexedDB export to compact JSON (excluding system catalog items to prevent mobile OOM crashes).
    - Renders the `DatabaseRecoveryScreen` allowing the user to download their unmigrated data before performing `clearLocalDatabase()`.
 
 ---
@@ -108,12 +108,12 @@ export const dailyLogsSchema = {
 Manages schema health, column structure, safety backups, and version migrations for user-owned spreadsheets and cloud documents (Google Drive/Sheets, and future Box/OneDrive connectors).
 
 ### Key Components
-* **Package**: `@qozara/gdocs-schema` (integrated exclusively in `@quomida/sync-adapters`)
-* **Schemas Location**: `packages/sync-adapters/src/google/schemas.ts`
+* **Package**: `@qozara/gdocs-schema` (integrated exclusively in `@quomida/cloud-providers`)
+* **Schemas Location**: `packages/cloud-providers/src/google/schemas.ts`
   - `QuomidaDailyLogsSpreadsheetSchema` (tab: `daily_logs`)
   - `QuomidaFoodCatalogSpreadsheetSchema` (tabs: `base_ingredients`, `recipes`, `portions`)
-* **Service**: `packages/sync-adapters/src/google/ValidationService.ts`
-* **Driver**: `packages/sync-adapters/src/google/GoogleSheetsTabularDriver.ts`
+* **Service**: `packages/cloud-providers/src/google/ValidationService.ts`
+* **Driver**: `packages/cloud-providers/src/google/GoogleSheetsTabularDriver.ts`
 * **UI Trigger**: `apps/webapp/src/components/sync/SchemaRemediationModal.tsx`
 
 ### How Versioning & State are Stored in Google Drive
@@ -127,7 +127,7 @@ Manages schema health, column structure, safety backups, and version migrations 
 
 ### Key Architectural Invariants for Remote Storage
 1. **Dynamic Header Mapping (Resilience to User Edits)**:
-   Users can manually edit their personal Google Sheets. If a user reorders columns (e.g. moves `calories` to column A), Quomida **does not rely on fixed array indices** (`values[6]`). Deserializers in `packages/sync-adapters/src/strategy/serializers.ts` dynamically look up column positions using `row.headers` (fetched from row 1 of the sheet).
+   Users can manually edit their personal Google Sheets. If a user reorders columns (e.g. moves `calories` to column A), Quomida **does not rely on fixed array indices** (`values[6]`). Deserializers in `packages/cloud-providers/src/strategy/serializers.ts` dynamically look up column positions using normalized header matching (`row.headers`), with whitespace and case trimming, formula injection escaping, and finite number bounds.
 2. **Automated Safety Backups**:
    Before modifying any spreadsheet during a repair or migration, `ValidationService.repairFile()` and `migrateFile()` call `client.createBackup()`, producing an automated Google Drive duplicate copy named `Backup of <spreadsheetId> - <ISO timestamp>`.
 3. **Non-Destructive Repairs**:
@@ -210,21 +210,22 @@ To provide a seamless, multi-device experience (e.g. switching between phone and
 5. Run `npm run build` to verify `validate-schemas.js` passes.
 
 ### Scenario B: Adding a Field to Google Sheets Remote Only
-1. Edit `packages/sync-adapters/src/google/schemas.ts`.
+1. Edit `packages/cloud-providers/src/google/schemas.ts`.
 2. Add the column definition to `QuomidaDailyLogsSpreadsheetSchema` or `QuomidaFoodCatalogSpreadsheetSchema`.
 3. Update `serializers.ts` to map the new column in `docToRow` and `rowToDoc`.
-4. Run unit tests: `npx vitest run packages/sync-adapters/tests/schema-validation-remediation.test.ts`.
+4. Run unit tests: `npx vitest run packages/cloud-providers/tests/schema-validation-remediation.test.ts`.
 
 ### Scenario C: Adding a Synced Field (Both Local RxDB and Cloud Sheets)
 1. **Local Layer**:
    - Update RxDB schema in `packages/domain-core/src/schemas/index.ts`.
    - Bump version and add `migrationStrategies` function.
 2. **Cloud Layer**:
-   - Update remote schema in `packages/sync-adapters/src/google/schemas.ts`.
-   - Update `packages/sync-adapters/src/strategy/serializers.ts` (`headers`, `docToRow`, `rowToDoc`).
+   - Update remote schema in `packages/cloud-providers/src/google/schemas.ts`.
+   - Update `packages/cloud-providers/src/strategy/serializers.ts` (`headers`, `docToRow`, `rowToDoc`).
 3. **i18n Translations**:
    - Ensure keys exist in both `packages/i18n-locales/locales/en.json` and `es.json`.
 4. **Verification Registry**:
+
    ```bash
    # 1. Run unit & domain tests
    npm run test

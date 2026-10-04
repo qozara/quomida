@@ -135,6 +135,10 @@ npm run etl:show-catalog-setup
 # Generate CSV templates from the OpenFoodFacts database
 npm run etl:generate-system
 
+# Upload compiled catalog artifacts to Cloudflare R2 (Preview or Prod)
+npm run etl:upload:preview
+npm run etl:upload:prod
+
 # Clean all downloaded datasets and generated ETL files
 npm run clean
 ```
@@ -159,3 +163,9 @@ npm run logout --workspace=@quomida/cli
 ## 📄 License
 
 MIT License - free and open-source software built by Qozara.
+
+## Local & Remote Catalog Architecture
+Quomida uses the Unified Single-SQLite Local-First Architecture (ADR 0018):
+- **System Data (Built-in & Full Offline Catalog):** On first run, Quomida seeds `catalog.sqlite` in the browser's Origin Private File System (OPFS) from the built-in compact `/system.sqlite` (240 KB, 965 items). When expanding to the complete 1.1M+ food database, `downloadWorker.ts` streams `catalog.sqlite.gz` directly into OPFS using atomic staging and SQLite header validation, querying locally with sub-millisecond FTS5 trigram fuzzy matching.
+- **User Data (Custom Ingredients & Logs):** Stored in IndexedDB via RxDB for instant local reactivity and transparent BYOS synchronization with user-owned Google Drive & Sheets.
+

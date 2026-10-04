@@ -36,7 +36,10 @@
     "tabSearch": "Búsqueda en Catálogo",
     "tabAi": "Registro IA",
     "parseButton": "Analizar Comida",
-    "noResults": "No se encontraron alimentos en el catálogo."
+    "noResults": "No se encontraron alimentos en el catálogo.",
+    "noResultsBasic": "No se encontraron alimentos en el catálogo básico. Descarga la base completa de 1.1M en Configuración para una búsqueda integral.",
+    "downloadFullCatalog": "Descargar Catálogo Completo",
+    "searchingLocal": "Buscando en catálogo..."
   },
   "portionModal": {
     "title": "Porción y Cantidad",

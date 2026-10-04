@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppProvider, useApp } from '../src/context/AppContext.js';
 import { CatalogHydrationService } from '../src/services/CatalogHydrationService.js';
@@ -14,6 +14,8 @@ describe('Application Boot Hydration [APP-207]', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

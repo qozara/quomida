@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db/rxdb.js';
 import { syncDatabaseWithRemote } from '../db/replication.js';
 import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
+import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
 import {
   type BaseIngredient,
   type Portion,
@@ -80,6 +81,28 @@ const defaultSettings: UserSettings = {
   daily_calorie_target: 2000,
   custom_macros: { protein: 150, carbs: 200, fats: 65 }
 };
+
+export async function runWithSyncLock<T>(
+  action: () => Promise<T>,
+  fallbackLock: React.MutableRefObject<boolean>
+): Promise<T | null> {
+  if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+    return navigator.locks.request('quomida_sync_lock', { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        return null;
+      }
+      return await action();
+    });
+  }
+
+  if (fallbackLock.current) return null;
+  fallbackLock.current = true;
+  try {
+    return await action();
+  } finally {
+    fallbackLock.current = false;
+  }
+}
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -269,7 +292,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
         if (v) setCatalogFileSizeBytes(Number(v));
       });
-      refreshCatalog().catch((err) => {
+      DatabaseBootstrapper.ensureSystemCatalogOPFS().then(() => {
+        return refreshCatalog();
+      }).catch((err) => {
         console.warn('[CatalogHydration] Background boot hydration notice:', err);
       });
     }).catch((err: any) => {
@@ -334,19 +359,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forceSync = useCallback(async () => {
-    if (!activeProvider || !isOnline || syncLock.current) return;
-    syncLock.current = true;
-    setSyncStatus('syncing');
-    try {
-      if (db) {
-        await syncDatabaseWithRemote(db, activeProvider);
+    if (!activeProvider || !isOnline) return;
+
+    await runWithSyncLock(async () => {
+      setSyncStatus('syncing');
+      try {
+        if (db) {
+          await syncDatabaseWithRemote(db, activeProvider);
+        }
+      } finally {
+        setSyncStatus(activeProvider.getStatus());
+        setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
       }
-    } finally {
-      setSyncStatus(activeProvider.getStatus());
-      setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
-      syncLock.current = false;
-    }
+    }, syncLock);
   }, [activeProvider, isOnline, db]);
+
 
   // Transparent Background Sync: Polling and Visibility focus
   useEffect(() => {
@@ -436,31 +463,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (dbService) {
       const rxdb = dbService.getDatabaseInstance();
       if (rxdb) {
-        // --- LAZY CACHING LOGIC ---
-        // Only cache to local catalog if it doesn't already exist
-        const existingIng = await rxdb.base_ingredients.findOne(ingredient.id).exec();
-        if (!existingIng && ingredient.source !== 'custom') {
-           try {
-              await rxdb.base_ingredients.insert(ingredient);
-              console.log(`[Cache] Lazy-cached remote result to built-in local catalog: ${ingredient.name}`);
-           } catch(e) {}
-        }
-
-        if (passedPortions && passedPortions.length > 0) {
-           for (const p of passedPortions) {
-              // Only cache true valid portion objects, ignore UI-tagged versions
-              if (p.id) {
-                 try {
-                    const existingP = await rxdb.portions.findOne(p.id).exec();
-                    if (!existingP) {
-                       const { tag, ...cleanPortion } = p as any;
-                       await rxdb.portions.insert(cleanPortion);
-                    }
-                 } catch(e) {}
-              }
-           }
-        }
-        // --- END LAZY CACHING LOGIC ---
+        // --- LAZY CACHING LOGIC REMOVED ---
+        // RxDB strictly stores 'custom' items and daily logs.
+        // The SQLite OPFS catalog is the sole source of truth for read-only catalog items.
 
         if (!passedPortions || passedPortions.length === 0) {
           const pdocs = await rxdb.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
