@@ -56,7 +56,11 @@ export function calculateRecipeMacros(
     fatsSum += itemMacros.fats;
   }
 
-  const yieldFactor = recipe.yield_factor || 1.0;
+  const rawYield = recipe.yield_factor;
+  if (rawYield !== undefined && (rawYield <= 0 || !Number.isFinite(rawYield))) {
+    throw new Error('ERR_INVALID_YIELD_FACTOR: Yield factor must be a positive finite number');
+  }
+  const yieldFactor = rawYield ?? 1.0;
   const cookedWeight = Math.round(rawWeightTotal * yieldFactor * 10) / 10;
 
   return {
