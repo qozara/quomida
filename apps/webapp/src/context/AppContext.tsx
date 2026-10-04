@@ -82,6 +82,28 @@ const defaultSettings: UserSettings = {
   custom_macros: { protein: 150, carbs: 200, fats: 65 }
 };
 
+export async function runWithSyncLock<T>(
+  action: () => Promise<T>,
+  fallbackLock: React.MutableRefObject<boolean>
+): Promise<T | null> {
+  if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+    return navigator.locks.request('quomida_sync_lock', { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        return null;
+      }
+      return await action();
+    });
+  }
+
+  if (fallbackLock.current) return null;
+  fallbackLock.current = true;
+  try {
+    return await action();
+  } finally {
+    fallbackLock.current = false;
+  }
+}
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -337,19 +359,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forceSync = useCallback(async () => {
-    if (!activeProvider || !isOnline || syncLock.current) return;
-    syncLock.current = true;
-    setSyncStatus('syncing');
-    try {
-      if (db) {
-        await syncDatabaseWithRemote(db, activeProvider);
+    if (!activeProvider || !isOnline) return;
+
+    await runWithSyncLock(async () => {
+      setSyncStatus('syncing');
+      try {
+        if (db) {
+          await syncDatabaseWithRemote(db, activeProvider);
+        }
+      } finally {
+        setSyncStatus(activeProvider.getStatus());
+        setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
       }
-    } finally {
-      setSyncStatus(activeProvider.getStatus());
-      setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
-      syncLock.current = false;
-    }
+    }, syncLock);
   }, [activeProvider, isOnline, db]);
+
 
   // Transparent Background Sync: Polling and Visibility focus
   useEffect(() => {

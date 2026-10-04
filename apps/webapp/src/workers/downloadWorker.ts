@@ -49,16 +49,16 @@ self.onmessage = async (e: MessageEvent) => {
         .pipeThrough(progressTracker)
         .pipeThrough(new DecompressionStream('gzip'));
 
-      // 5. Write to OPFS directly (Zero RAM buffering)
+      // 5. Write to temporary staging file in OPFS (Zero RAM buffering)
       self.postMessage({ type: 'STATUS', payload: 'decompressing_and_writing' });
       const opfsRoot = await navigator.storage.getDirectory();
       
-      const fileHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
-      if (typeof fileHandle.createWritable === 'function') {
-        const writable = await fileHandle.createWritable();
+      const tmpHandle = await opfsRoot.getFileHandle('catalog.sqlite.tmp', { create: true });
+      if (typeof tmpHandle.createWritable === 'function') {
+        const writable = await tmpHandle.createWritable();
         await decompressedStream.pipeTo(writable);
-      } else if (typeof (fileHandle as any).createSyncAccessHandle === 'function') {
-        const accessHandle = await (fileHandle as any).createSyncAccessHandle();
+      } else if (typeof (tmpHandle as any).createSyncAccessHandle === 'function') {
+        const accessHandle = await (tmpHandle as any).createSyncAccessHandle();
         const reader = decompressedStream.getReader();
         while (true) {
           const { done, value } = await reader.read();
@@ -69,9 +69,53 @@ self.onmessage = async (e: MessageEvent) => {
         accessHandle.close();
       }
 
+      // 6. Verify SQLite database integrity before swap
+      const tmpFile = await tmpHandle.getFile();
+      if (tmpFile.size < 100) {
+        throw new Error('Downloaded catalog file is too small to be a valid SQLite database');
+      }
+      const headerBuffer = await tmpFile.slice(0, 16).arrayBuffer();
+      const headerText = new TextDecoder('utf-8').decode(headerBuffer);
+      if (headerText !== 'SQLite format 3\x00') {
+        throw new Error('Downloaded catalog does not have a valid SQLite format 3 header');
+      }
+
+
+      // 7. Atomic Swap: move or copy tmp to target
+      if (typeof (tmpHandle as any).move === 'function') {
+        try {
+          await opfsRoot.removeEntry('catalog.sqlite');
+        } catch (err: any) {
+          if (err.name !== 'NotFoundError') throw err;
+        }
+        await (tmpHandle as any).move('catalog.sqlite');
+      } else {
+        const targetHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
+        if (typeof targetHandle.createWritable === 'function') {
+          const writable = await targetHandle.createWritable();
+          await tmpFile.stream().pipeTo(writable);
+        } else if (typeof (targetHandle as any).createSyncAccessHandle === 'function') {
+          const accessHandle = await (targetHandle as any).createSyncAccessHandle();
+          const reader = tmpFile.stream().getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            accessHandle.write(value);
+          }
+          accessHandle.flush();
+          accessHandle.close();
+        }
+        await opfsRoot.removeEntry('catalog.sqlite.tmp').catch(() => {});
+      }
+
       self.postMessage({ type: 'COMPLETE' });
     } catch (err: any) {
+      try {
+        const opfsRoot = await navigator.storage.getDirectory();
+        await opfsRoot.removeEntry('catalog.sqlite.tmp').catch(() => {});
+      } catch {}
       self.postMessage({ type: 'ERROR', payload: err.message || 'Download failed' });
     }
   }
 };
+

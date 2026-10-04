@@ -17,25 +17,34 @@ export interface UnifiedSearchResult {
   catalogCount: number;
 }
 
+export function normalizeFoodName(name: string): string {
+  return (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 export class CatalogSearchManager {
   /**
    * Unifies and deduplicates searches across custom in-memory ingredients and the catalog provider.
-   * Custom user ingredients are always prioritized first.
+   * Custom user ingredients are always prioritized first and override system items on name collisions.
    */
   async search(
     options: FoodSearchOptions,
     catalogProvider?: ICatalogProvider
   ): Promise<UnifiedSearchResult> {
-    const rawQuery = options.query.trim().toLowerCase();
+    const rawQuery = options.query.trim();
     if (!rawQuery) {
       return { items: [], customCount: 0, catalogCount: 0 };
     }
+    const normQuery = normalizeFoodName(rawQuery);
 
     const limit = options.limit || 30;
 
-    // 1. Filter local custom in-memory ingredients
+    // 1. Filter local custom in-memory ingredients (accent & case-insensitive)
     const customMatches = (options.customIngredients || []).filter(item =>
-      item.name.toLowerCase().includes(rawQuery)
+      normalizeFoodName(item.name).includes(normQuery)
     );
 
     // 2. Query catalog provider if provided
@@ -48,7 +57,7 @@ export class CatalogSearchManager {
       }
     }
 
-    // 3. Merge, prioritize custom, and deduplicate by ID
+    // 3. Merge, prioritize custom, and deduplicate by ID and normalized name
     const merged = this.mergeAndDeduplicate(customMatches, catalogMatches, limit);
 
     return {
@@ -67,19 +76,19 @@ export class CatalogSearchManager {
     customIngredients: BaseIngredient[],
     catalogProvider?: ICatalogProvider
   ): Promise<BaseIngredient | null> {
-    const normalized = foodQuery.trim().toLowerCase();
-    if (!normalized) return null;
+    const normQuery = normalizeFoodName(foodQuery);
+    if (!normQuery) return null;
 
     // 1. Check custom ingredients
     const customMatch = customIngredients.find(item =>
-      item.name.toLowerCase().includes(normalized)
+      normalizeFoodName(item.name).includes(normQuery)
     );
     if (customMatch) return customMatch;
 
     // 2. Query catalog provider
     if (catalogProvider) {
       try {
-        const catalogResults = await catalogProvider.searchIngredients(normalized, 1);
+        const catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 1);
         if (catalogResults.length > 0) {
           return catalogResults[0];
         }
@@ -93,6 +102,7 @@ export class CatalogSearchManager {
 
   /**
    * Deduplicates ingredients while preserving order (custom first).
+   * User-created custom ingredients override system ingredients on naming collision.
    */
   mergeAndDeduplicate(
     customItems: BaseIngredient[],
@@ -100,16 +110,26 @@ export class CatalogSearchManager {
     limit: number = 30
   ): BaseIngredient[] {
     const seenIds = new Set<string>();
+    const seenCustomNames = new Set<string>();
     const result: BaseIngredient[] = [];
 
     for (const item of customItems) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
+        const normName = normalizeFoodName(item.name);
+        if (normName) {
+          seenCustomNames.add(normName);
+        }
         result.push(item);
       }
     }
 
     for (const item of catalogItems) {
+      const normName = normalizeFoodName(item.name);
+      // Custom ingredients natively override system ingredients on naming collision (PRODUCT_SPEC §2.B)
+      if (normName && seenCustomNames.has(normName)) {
+        continue;
+      }
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         result.push(item);
@@ -119,3 +139,4 @@ export class CatalogSearchManager {
     return result.slice(0, limit);
   }
 }
+

@@ -95,8 +95,30 @@ export class ValidationService {
       // Ignore error reading app properties
     }
 
+    // Two-way reconciliation: inspect _migrations tab in the spreadsheet
+    try {
+      const migrationsRes = await client.batchGet(spreadsheetId, ['_migrations!A2:B']);
+      const rows = migrationsRes?.valueRanges?.[0]?.values || [];
+      let maxMigratedVersion = 0;
+      for (const row of rows) {
+        const v = parseInt(row[0], 10);
+        if (!isNaN(v) && v > maxMigratedVersion) {
+          maxMigratedVersion = v;
+        }
+      }
+      if (maxMigratedVersion > currentVersion) {
+        currentVersion = maxMigratedVersion;
+        await client.updateFileAppProperties(spreadsheetId, {
+          quomida_schema_version: currentVersion.toString()
+        }).catch(() => {});
+      }
+    } catch {
+      // Ignore if _migrations tab is missing or unreadable
+    }
+
     const validator = new SchemaValidator(client);
     const result = await validator.validateStructure(spreadsheetId, schema);
+
 
     const missingTabs: string[] = [];
     const missingColumns: Record<string, string[]> = {};

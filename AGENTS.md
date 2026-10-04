@@ -20,8 +20,8 @@ This document contains operational guidelines, architectural constraints, and st
    - Modifying a custom ingredient, recipe, or portion MUST NEVER retroactively recalculate or alter past `daily_logs` documents.
 
 4. **BYOS Sync Adapter Isolation**:
-   - Presentation logic in `apps/webapp` strictly communicates with the storage layer via the `SyncAdapter` interface (`packages/sync-adapters`).
-   - Out-of-the-box local development MUST default to `MockSyncAdapter` so `npm run dev` works with zero initial cloud credential configuration.
+   - Presentation logic in `apps/webapp` strictly communicates with the storage layer via the `CloudSyncProvider` interface (`packages/cloud-providers`).
+   - Out-of-the-box local development MUST default to `MockCloudSyncProvider` so `npm run dev` works with zero initial cloud credential configuration.
 
 5. **Test-Driven Development (TDD)**:
    - NEVER claim a task or bug fix is complete without running `npm run test` or `npx vitest run` to verify green test execution.
@@ -122,14 +122,15 @@ npm run build
 | System Component | File Path |
 | :--- | :--- |
 | RxDB Schemas (Local Tier 2) | `packages/domain-core/src/schemas/index.ts` |
-| Cloud Spreadsheet Schemas (Remote Tier 3) | `packages/sync-adapters/src/google/schemas.ts` |
-| Google Validation & Remediation Service | `packages/sync-adapters/src/google/ValidationService.ts` |
-| Serializers & Dynamic Header Mapping | `packages/sync-adapters/src/strategy/serializers.ts` |
-| Composite Sync Adapter Orchestrator | `packages/sync-adapters/src/strategy/CompositeSyncAdapter.ts` |
-| Sync Adapter Interface & Types | `packages/sync-adapters/src/types.ts` |
-| Mock Sync Adapter | `packages/sync-adapters/src/MockSyncAdapter.ts` |
-| Google Drive Sheets Sync Adapter | `packages/sync-adapters/src/GoogleDriveSheetsSyncAdapter.ts` |
+| Cloud Spreadsheet Schemas (Remote Tier 3) | `packages/cloud-providers/src/google/schemas.ts` |
+| Google Validation & Remediation Service | `packages/cloud-providers/src/google/ValidationService.ts` |
+| Serializers & Dynamic Header Mapping | `packages/cloud-providers/src/strategy/serializers.ts` |
+| Composite Sync Adapter Orchestrator | `packages/cloud-providers/src/strategy/CompositeCloudSyncProvider.ts` |
+| Sync Adapter Interface & Types | `packages/cloud-providers/src/types.ts` |
+| Mock Sync Adapter | `packages/cloud-providers/src/mock/MockCloudSyncProvider.ts` |
+| Google Drive Sheets Sync Adapter | `packages/cloud-providers/src/google/GoogleDriveSheetsCloudSyncProvider.ts` |
 | Macro Calculations & Formulas | `packages/domain-core/src/calculations/index.ts` |
+
 | LLM Natural Log Parser | `packages/llm-engine/src/LLMParser.ts` |
 | React App Context & DB Provider | `apps/webapp/src/context/AppContext.tsx` |
 | RxDB Database Hydration & DB6 Guard | `apps/webapp/src/db/rxdb.ts` |

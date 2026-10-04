@@ -237,9 +237,11 @@ export class RemoteCatalogService implements ICatalogProvider {
 
   async searchIngredients(query: string, limit: number = 20): Promise<BaseIngredient[]> {
     const sanitizedQuery = query.replace(/[^\w\s\u00C0-\u017F]/g, '');
-    const matchQuery = sanitizedQuery.split(/\s+/).filter(Boolean).map(term => term + '*').join(' ');
-    
-    if (!matchQuery) return [];
+    const tokens = sanitizedQuery.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+
+    // Safely escape and quote each token to prevent FTS5 keyword collisions (AND, OR, NOT, col:)
+    const matchQuery = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
 
     const worker = await this.getWorker();
 
@@ -297,6 +299,9 @@ export class RemoteCatalogService implements ICatalogProvider {
   }
 
   async getPortionsForIngredient(baseFoodId: string): Promise<Portion[]> {
+    const safeFoodId = baseFoodId.replace(/[^a-zA-Z0-9_\-]/g, '');
+    if (!safeFoodId) return [];
+
     const worker = await this.getWorker();
     const sql = `
       SELECT 
@@ -306,8 +311,9 @@ export class RemoteCatalogService implements ICatalogProvider {
         equivalent_weight_g as equivalent_weight_g,
         contentHash as contentHash
       FROM portions 
-      WHERE base_food_id = '${baseFoodId.replace(/'/g, "''")}'
+      WHERE base_food_id = '${safeFoodId}'
     `;
+
 
     try {
       const res = await worker('exec', { sql, rowMode: 'array' } as any);

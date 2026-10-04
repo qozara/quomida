@@ -1,6 +1,6 @@
 # 17. Resumable Streaming & Memory-Safe Catalog Architecture
 
-* Status: accepted
+* Status: Superseded by ADR 0018 (Hybrid OPFS Catalog Strategy)
 * Date: 2026-09-22
 
 ## Context and Problem Statement
