@@ -536,14 +536,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeCustomIngredient = async (id: string) => {
-    const rxdb = dbService.getDatabaseInstance();
-    if (rxdb) {
-      const doc = await rxdb.base_ingredients.findOne(id).exec();
-      if (doc && doc.source === 'custom') {
-        await doc.remove();
-        forceSync().catch(console.error);
-      }
-    }
+    await dbService.deleteCustomFood(id);
+    forceSync().catch(console.error);
   };
 
   const hasActiveAdapter = Boolean(
