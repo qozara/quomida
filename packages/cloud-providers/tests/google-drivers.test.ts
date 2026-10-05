@@ -246,4 +246,121 @@ describe('GoogleSheetsTabularDriver', () => {
 
     await expect(driver.readTable('sheet_123', 'daily_logs')).rejects.toThrow(/quota|rate limit|429/i);
   });
+
+  it('finds existing spreadsheet by title fallback when appProperties query returns empty and patches appProperties', async () => {
+    const mockCalls: { url: string; method?: string; body?: any }[] = [];
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method, body: init?.body });
+
+        // 1. AppProperties query returns empty (e.g. file existed from before or created manually)
+        if (url.includes('/drive/v3/files?') && url.includes('appProperties')) {
+          return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+
+        // 2. Name query returns the existing file
+        if (url.includes('/drive/v3/files?') && url.includes('name%20%3D')) {
+          return new Response(
+            JSON.stringify({ files: [{ id: 'sheet_existing_title_match', name: 'Quomida Food Catalog' }] }),
+            { status: 200 }
+          );
+        }
+
+        // 3. Inspect existing sheet tabs
+        if (url.includes('/v4/spreadsheets/sheet_existing_title_match?fields=sheets(properties(title))')) {
+          return new Response(
+            JSON.stringify({
+              sheets: [
+                { properties: { title: 'base_ingredients' } }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+
+        // 4. Batch update to add missing tabs (recipes, portions, _quomida_meta)
+        if (url.includes(':batchUpdate')) {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // 5. PATCH Drive metadata
+        if (url.includes('/drive/v3/files/') && init?.method === 'PATCH') {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    const docId = await driver.ensureDocument('Quomida Food Catalog', ['base_ingredients', 'recipes', 'portions']);
+    expect(docId).toBe('sheet_existing_title_match');
+
+    // Verify it patched appProperties onto the existing document
+    const patchCall = mockCalls.find(c => c.method === 'PATCH' && c.url.includes('sheet_existing_title_match'));
+    expect(patchCall).toBeDefined();
+
+    // Verify it called batchUpdate to add missing tabs ('recipes', 'portions', '_quomida_meta')
+    const batchUpdateCall = mockCalls.find(c => c.url.includes(':batchUpdate') && c.method === 'POST');
+    expect(batchUpdateCall).toBeDefined();
+    const batchBody = JSON.parse(batchUpdateCall!.body);
+    const addedTabs = batchBody.requests.map((r: any) => r.addSheet?.properties?.title);
+    expect(addedTabs).toContain('recipes');
+    expect(addedTabs).toContain('portions');
+    expect(addedTabs).toContain('_quomida_meta');
+  });
+
+  it('self-heals and creates missing tab dynamically when writeTable encounters Unable to parse range', async () => {
+    const mockCalls: { url: string; method?: string; body?: any }[] = [];
+    let writeAttempts = 0;
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method, body: init?.body });
+
+        // First attempt to write to 'portions' tab fails because tab does not exist in Google Sheets
+        if (url.includes('/values:batchUpdate')) {
+          writeAttempts++;
+          if (writeAttempts === 1) {
+            return new Response(
+              JSON.stringify({ error: { message: 'Unable to parse range: portions!A1:Z' } }),
+              { status: 400 }
+            );
+          }
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // Auto-creation batchUpdate succeeds
+        if (url.includes(':batchUpdate') && init?.method === 'POST') {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // Trailing rows clear
+        if (url.includes(':clear')) {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    await driver.writeTable('doc_123', 'portions', ['id', 'name'], [{ id: 'p1', values: ['p1', '1 unidad'] }]);
+
+    expect(writeAttempts).toBe(2);
+    const addSheetCall = mockCalls.find(c => c.url.includes(':batchUpdate') && !c.url.includes('/values:batchUpdate'));
+    expect(addSheetCall).toBeDefined();
+    const parsedBody = JSON.parse(addSheetCall!.body);
+    expect(parsedBody.requests[0].addSheet.properties.title).toBe('portions');
+  });
 });
+

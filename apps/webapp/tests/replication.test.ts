@@ -31,6 +31,33 @@ describe('syncDatabaseWithRemote', () => {
           },
           required: ['id', 'name']
         }
+      },
+      base_ingredients: {
+        schema: {
+          version: 0,
+          primaryKey: 'id',
+          type: 'object',
+          properties: {
+            id: { type: 'string', maxLength: 100 },
+            name: { type: 'string' },
+            source: { type: 'string' },
+            updatedAt: { type: 'number', minimum: 0 }
+          },
+          required: ['id', 'name']
+        }
+      },
+      system_metadata: {
+        schema: {
+          version: 0,
+          primaryKey: 'key',
+          type: 'object',
+          properties: {
+            key: { type: 'string', maxLength: 100 },
+            value: { type: 'string' },
+            updatedAt: { type: 'number', minimum: 0 }
+          },
+          required: ['key', 'value']
+        }
       }
     });
     return db;
@@ -129,4 +156,45 @@ describe('syncDatabaseWithRemote', () => {
 
     await db.remove();
   });
+
+  it('should strictly skip non-syncable collections like system_metadata', async () => {
+    const db = await createTestDb();
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([]);
+
+    await db.system_metadata.insert({ key: 'catalog_version', value: '1.0.0', updatedAt: 100 });
+
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
+
+    // Verify push was NEVER called with system_metadata
+    const pushCalls = (mockCloudSyncProvider.push as any).mock.calls;
+    const systemMetadataPush = pushCalls.find((c: any[]) => c[0].collection === 'system_metadata');
+    expect(systemMetadataPush).toBeUndefined();
+
+    await db.remove();
+  });
+
+  it('should only push custom ingredients and ignore bundled system ingredients', async () => {
+    const db = await createTestDb();
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
+      { collection: 'base_ingredients', documents: [] }
+    ]);
+
+    // Insert 1 system ingredient and 1 custom ingredient
+    await db.base_ingredients.insert({ id: 'sys_1', name: 'System Milk', source: 'system', updatedAt: 100 });
+    await db.base_ingredients.insert({ id: 'cust_1', name: 'My Homemade Jam', source: 'custom', updatedAt: 200 });
+
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
+
+    const pushCalls = (mockCloudSyncProvider.push as any).mock.calls;
+    const ingPush = pushCalls.find((c: any[]) => c[0].collection === 'base_ingredients');
+    expect(ingPush).toBeDefined();
+    expect(ingPush[0].documents.length).toBe(1);
+    expect(ingPush[0].documents[0].id).toBe('cust_1');
+    expect(ingPush[0].documents.some((d: any) => d.id === 'sys_1')).toBe(false);
+
+    await db.remove();
+  });
 });
+

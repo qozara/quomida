@@ -347,19 +347,36 @@ export class LocalDBService {
       source: 'custom',
       updatedAt: Date.now()
     };
-    await this.db!.base_ingredients.insert(newFood);
+    await this.db!.base_ingredients.upsert(newFood);
 
     if (portions && portions.length > 0) {
+      const now = Date.now();
       const portionsToUpsert = portions.map((p, i) => ({
         id: `port-${id}-${i}`,
         base_food_id: id,
         name: p.name,
-        equivalent_weight_g: p.equivalent_weight_g
+        equivalent_weight_g: p.equivalent_weight_g,
+        source: 'custom' as const,
+        updatedAt: now
       }));
       await this.db!.portions.bulkUpsert(portionsToUpsert);
     }
     
     return id;
+  }
+
+  async deleteCustomFood(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    const doc = await this.db!.base_ingredients.findOne(id).exec();
+    if (doc && doc.source === 'custom') {
+      const patchedDoc = await doc.patch({ updatedAt: Date.now() });
+      await patchedDoc.remove();
+    }
+    const portions = await this.db!.portions.find({ selector: { base_food_id: id } }).exec();
+    for (const p of portions) {
+      const patchedPortion = await p.patch({ updatedAt: Date.now() });
+      await patchedPortion.remove();
+    }
   }
 
   async logFood(logInput: Omit<DailyLog, 'id' | 'timestamp'> & { id?: string; timestamp?: string }): Promise<string> {
@@ -372,8 +389,19 @@ export class LocalDBService {
       timestamp,
       updatedAt: Date.now()
     };
-    await this.db!.daily_logs.insert(logEntry);
+    await this.db!.daily_logs.upsert(logEntry);
     return id;
+  }
+
+  async updateLogItem(id: string, updates: Partial<Omit<DailyLog, 'id'>>): Promise<void> {
+    if (!this.db) await this.init();
+    const doc = await this.db!.daily_logs.findOne(id).exec();
+    if (doc) {
+      await doc.patch({
+        ...updates,
+        updatedAt: Date.now()
+      });
+    }
   }
 
   async deleteLogItem(id: string): Promise<void> {
