@@ -286,6 +286,7 @@ export const portionsSerializer: CollectionSerializer = {
       base_food_id: sanitizeString(baseFoodIdVal || ''),
       name: sanitizeString(nameVal || ''),
       equivalent_weight_g: parseNumber(weightVal, 0),
+      source: 'custom' as const,
       updatedAt: updatedAtVal !== undefined && updatedAtVal !== '' ? Number(updatedAtVal) : row.updatedAt,
       _deleted: parseBool(deletedVal ?? row._deleted)
     };

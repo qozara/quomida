@@ -85,6 +85,14 @@ export const CatalogManager: React.FC = () => {
       return;
     }
 
+    const finalPortions = [...portions];
+    if (portionName.trim() && portionWeight.trim() && !isNaN(parseFloat(portionWeight))) {
+      finalPortions.push({
+        name: portionName.trim(),
+        equivalent_weight_g: parseFloat(portionWeight)
+      });
+    }
+
     await addCustomIngredient({
       name,
       lang: 'es',
@@ -92,13 +100,15 @@ export const CatalogManager: React.FC = () => {
       protein_100g: pNum,
       carbs_100g: cNum,
       fats_100g: fNum
-    }, portions);
+    }, finalPortions);
 
     setName('');
     setCalories('');
     setProtein('');
     setCarbs('');
     setFats('');
+    setPortionName('');
+    setPortionWeight('');
     setPortions([]);
     setIsAdding(false);
   };

@@ -182,7 +182,7 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
 
       // Verify that all required tabs exist in the existing spreadsheet
       try {
-        const getMetaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${docId}?fields=sheets.properties.title`;
+        const getMetaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${docId}?fields=sheets(properties(title))`;
         const metaRes = await this.client.fetch(getMetaUrl, { method: 'GET', headers });
         if (metaRes.ok) {
           const metaJson = await metaRes.json();
@@ -194,11 +194,42 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
             const addSheetRequests = missingTabs.map(tabName => ({
               addSheet: { properties: { title: tabName } }
             }));
-            await this.client.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${docId}:batchUpdate`, {
+            const addRes = await this.client.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${docId}:batchUpdate`, {
               method: 'POST',
               headers,
               body: JSON.stringify({ requests: addSheetRequests })
             });
+
+            if (addRes.ok) {
+              const currentSchema = this.documentSchemas.get(docId);
+              if (currentSchema) {
+                const headerData = missingTabs
+                  .filter(t => t !== '_quomida_meta')
+                  .map(tabName => {
+                    const tabDef = currentSchema.tabs.find(t => t.name === tabName);
+                    if (!tabDef) return null;
+                    return {
+                      range: `${tabName}!A1:Z1`,
+                      majorDimension: 'ROWS',
+                      values: [tabDef.columns.map(c => c.name)]
+                    };
+                  })
+                  .filter(Boolean);
+
+                if (headerData.length > 0) {
+                  try {
+                    await this.client.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${docId}/values:batchUpdate`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        valueInputOption: 'USER_ENTERED',
+                        data: headerData
+                      })
+                    });
+                  } catch {}
+                }
+              }
+            }
           }
         }
       } catch (err) {
@@ -290,6 +321,35 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
       await this.handleResponseErrors(protectRes, `protecting _quomida_meta in spreadsheet "${title}"`);
     }
 
+    // Pre-populate column headers for data tabs
+    const currentSchema = this.documentSchemas.get(createdDocId);
+    if (currentSchema) {
+      const headerData = tabs
+        .map(tabName => {
+          const tabDef = currentSchema.tabs.find(t => t.name === tabName);
+          if (!tabDef) return null;
+          return {
+            range: `${tabName}!A1:Z1`,
+            majorDimension: 'ROWS',
+            values: [tabDef.columns.map(c => c.name)]
+          };
+        })
+        .filter(Boolean);
+
+      if (headerData.length > 0) {
+        try {
+          await this.client.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${createdDocId}/values:batchUpdate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              valueInputOption: 'USER_ENTERED',
+              data: headerData
+            })
+          });
+        } catch {}
+      }
+    }
+
     return createdDocId;
   }
 
@@ -357,11 +417,38 @@ export class GoogleSheetsTabularDriver implements TabularStorageDriver {
       ]
     };
 
-    const res = await this.client.fetch(url, {
+    let res = await this.client.fetch(url, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify(body)
     });
+
+    // Self-healing: if write fails because tab is missing in remote spreadsheet ("Unable to parse range"), create the tab and retry
+    if (!res.ok) {
+      const errText = await res.clone().text().catch(() => '');
+      if (errText.includes('Unable to parse range') || errText.includes('range')) {
+        try {
+          const addSheetRequests = [{
+            addSheet: { properties: { title: tabName } }
+          }];
+          const addRes = await this.client.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${documentId}:batchUpdate`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ requests: addSheetRequests })
+          });
+          if (addRes.ok) {
+            res = await this.client.fetch(url, {
+              method: 'POST',
+              headers: authHeaders,
+              body: JSON.stringify(body)
+            });
+          }
+        } catch {
+          // Fall through to standard error handling
+        }
+      }
+    }
+
     await this.handleResponseErrors(res, `writing table "${tabName}" in document ${documentId}`);
 
     // 2. Clear any leftover trailing rows beyond the new data to keep table clean if row count shrank

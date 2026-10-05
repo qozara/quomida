@@ -28,6 +28,8 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
     const fetchAllPortions = async () => {
       if (!ingredient || !db) {
         setAvailablePortions([]);
+        setSelectedPortionName('g');
+        setQuantity(100);
         return;
       }
       
@@ -37,9 +39,16 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
           selector: { base_food_id: { $in: [ingredient.id, 'generic'] } }
         }).exec();
         customPortions = localDocs.map((d: any) => d.toJSON ? d.toJSON() : d);
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[PortionBottomSheet] Failed to query local portions:', e);
+      }
 
-      const remoteService = (await import('../services/RemoteCatalogService.js')).RemoteCatalogService.getInstance();
+      let remoteService: any = undefined;
+      try {
+        remoteService = (await import('../services/RemoteCatalogService.js')).RemoteCatalogService.getInstance();
+      } catch (e) {
+        console.warn('[PortionBottomSheet] RemoteCatalogService load notice:', e);
+      }
 
       const resolved = await portionManager.resolvePortions({
         ingredient,
@@ -49,6 +58,13 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
       
       if (!isCancelled) {
         setAvailablePortions(resolved);
+        if (resolved.length > 0) {
+          setSelectedPortionName(resolved[0].name);
+          setQuantity(1);
+        } else {
+          setSelectedPortionName('g');
+          setQuantity(100);
+        }
       }
     };
     
@@ -57,15 +73,8 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   }, [ingredient, db, portionManager]);
 
   useEffect(() => {
-    if (availablePortions.length > 0) {
-      setSelectedPortionName(availablePortions[0].name);
-      setQuantity(1);
-    } else {
-      setSelectedPortionName('g');
-      setQuantity(100); // default 100g if grams chosen
-    }
     setMealType(defaultMealType);
-  }, [ingredient, defaultMealType]);
+  }, [defaultMealType]);
 
   if (!ingredient) return null;
 

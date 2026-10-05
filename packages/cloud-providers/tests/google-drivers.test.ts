@@ -268,7 +268,7 @@ describe('GoogleSheetsTabularDriver', () => {
         }
 
         // 3. Inspect existing sheet tabs
-        if (url.includes('/v4/spreadsheets/sheet_existing_title_match?fields=sheets.properties.title')) {
+        if (url.includes('/v4/spreadsheets/sheet_existing_title_match?fields=sheets(properties(title))')) {
           return new Response(
             JSON.stringify({
               sheets: [
@@ -313,6 +313,54 @@ describe('GoogleSheetsTabularDriver', () => {
     expect(addedTabs).toContain('recipes');
     expect(addedTabs).toContain('portions');
     expect(addedTabs).toContain('_quomida_meta');
+  });
+
+  it('self-heals and creates missing tab dynamically when writeTable encounters Unable to parse range', async () => {
+    const mockCalls: { url: string; method?: string; body?: any }[] = [];
+    let writeAttempts = 0;
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method, body: init?.body });
+
+        // First attempt to write to 'portions' tab fails because tab does not exist in Google Sheets
+        if (url.includes('/values:batchUpdate')) {
+          writeAttempts++;
+          if (writeAttempts === 1) {
+            return new Response(
+              JSON.stringify({ error: { message: 'Unable to parse range: portions!A1:Z' } }),
+              { status: 400 }
+            );
+          }
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // Auto-creation batchUpdate succeeds
+        if (url.includes(':batchUpdate') && init?.method === 'POST') {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        // Trailing rows clear
+        if (url.includes(':clear')) {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    await driver.writeTable('doc_123', 'portions', ['id', 'name'], [{ id: 'p1', values: ['p1', '1 unidad'] }]);
+
+    expect(writeAttempts).toBe(2);
+    const addSheetCall = mockCalls.find(c => c.url.includes(':batchUpdate') && !c.url.includes('/values:batchUpdate'));
+    expect(addSheetCall).toBeDefined();
+    const parsedBody = JSON.parse(addSheetCall!.body);
+    expect(parsedBody.requests[0].addSheet.properties.title).toBe('portions');
   });
 });
 
