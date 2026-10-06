@@ -67,7 +67,19 @@
     "checkingCatalog": "Checking for updates...",
     "catalogUpToDate": "Catalog is up to date",
     "catalogUpdated": "Catalog updated to {{version}} ({{count}} items)",
-    "catalogCheckError": "Failed to check for updates"
+    "catalogCheckError": "Failed to check for updates",
+    "supportTitle": "Support & Assistance",
+    "supportHelp": "Get Help & Support",
+    "supportHelpSubtitle": "Assistance with your account or sync issues",
+    "supportLegal": "Legal & Privacy Inquiries",
+    "supportLegalSubtitle": "Terms, data handling, and regulatory inquiries",
+    "legalTitle": "Legal & Licensing",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "googleComplianceBadge": "Google Limited Use Compliant",
+    "license": "Open Source License (Apache 2.0)",
+    "aboutNotice": "Quomida is a research project by Qozara Lab",
+    "aboutCommunity": "Built for the Open Source Community"
   },
   "appStatus": {
     "offline": "Application status: Offline. Changes are saved locally.",
@@ -141,7 +153,8 @@
       "emptyDatabase": "Empty Local Database (v0)",
       "emptyDatabaseConfirmTitle": "Empty local database?",
       "emptyDatabaseConfirmMessage": "All local daily logs and custom ingredients will be permanently removed, and initial foods will be re-seeded fresh for version 0.",
-      "emptyDatabaseAction": "Empty Database"
+      "emptyDatabaseAction": "Empty Database",
+      "googleLimitedUseNote": "Quomida operates under a Bring Your Own Storage (BYOS) model. Your data is stored directly in your personal Google Drive and never transferred to central servers. Quomida adheres to the Google API Services User Data Policy, including Limited Use requirements."
     },
     "a11y": {
       "syncing": "Syncing data to remote storage.",

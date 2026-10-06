@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { CloudProviderList } from './CloudProviderList.js';
-import { ChevronLeft, X, Database, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { ChevronLeft, X, Database, ShieldCheck, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
 
 export interface StorageSettingsPanelProps {
   isOpen: boolean;
@@ -102,6 +102,40 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
             {t.sync?.panel?.localFirstGuarantee ||
               'Local-first guarantee: Disconnecting a cloud provider will never delete records from this device.'}
           </p>
+        </div>
+
+        {/* Google API Limited Use & Compliance Disclosure */}
+        <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1.5 leading-relaxed">
+          <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-xs">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Google API Limited Use Disclosure</span>
+          </div>
+          <p>
+            {t.sync?.panel?.googleLimitedUseNote ||
+              'Quomida operates under a Bring Your Own Storage (BYOS) model. Your data is stored directly in your personal Google Drive and never transferred to central servers. Quomida adheres to the Google API Services User Data Policy, including Limited Use requirements.'}
+          </p>
+          <div className="flex gap-4 pt-1 text-[11px]">
+            <a
+              href={`${(import.meta.env.VITE_LEGAL_BASE_URL || 'https://qozara.org').replace(/\/+$/, '')}/legal/quomida/privacy.html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              id="link-storage-privacy"
+              className="text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+            >
+              <span>{t.settings?.privacyPolicy || 'Privacy Policy'}</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href={`${(import.meta.env.VITE_LEGAL_BASE_URL || 'https://qozara.org').replace(/\/+$/, '')}/legal/quomida/tos.html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              id="link-storage-tos"
+              className="text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+            >
+              <span>{t.settings?.termsOfService || 'Terms of Service'}</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
 
         {/* Disconnect Confirmation Sheet / Dialog */}

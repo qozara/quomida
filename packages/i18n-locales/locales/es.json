@@ -67,7 +67,19 @@
     "checkingCatalog": "Buscando actualizaciones...",
     "catalogUpToDate": "El catálogo está actualizado",
     "catalogUpdated": "Catálogo actualizado a {{version}} ({{count}} alimentos)",
-    "catalogCheckError": "Error al buscar actualizaciones"
+    "catalogCheckError": "Error al buscar actualizaciones",
+    "supportTitle": "Soporte y Asistencia",
+    "supportHelp": "Obtener Ayuda y Soporte",
+    "supportHelpSubtitle": "Asistencia con tu cuenta o sincronización",
+    "supportLegal": "Consultas Legales y de Privacidad",
+    "supportLegalSubtitle": "Términos, tratamiento de datos y regulaciones",
+    "legalTitle": "Legal y Licencias",
+    "termsOfService": "Términos del Servicio",
+    "privacyPolicy": "Política de Privacidad",
+    "googleComplianceBadge": "Cumple con Uso Limitado de Google",
+    "license": "Licencia de Código Abierto (Apache 2.0)",
+    "aboutNotice": "Quomida es un proyecto de investigación de Qozara Lab",
+    "aboutCommunity": "Desarrollado para la comunidad de código abierto"
   },
   "appStatus": {
     "offline": "Estado de la aplicación: Sin conexión. Los cambios se guardan localmente.",
@@ -141,7 +153,8 @@
       "emptyDatabase": "Vaciar Base de Datos Local (v0)",
       "emptyDatabaseConfirmTitle": "¿Vaciar base de datos local?",
       "emptyDatabaseConfirmMessage": "Se eliminarán permanentemente todos los registros locales y alimentos personalizados, resembrando los datos iniciales para la versión 0.",
-      "emptyDatabaseAction": "Vaciar Base de Datos"
+      "emptyDatabaseAction": "Vaciar Base de Datos",
+      "googleLimitedUseNote": "Quomida opera bajo el modelo Bring Your Own Storage (BYOS). Tus datos se guardan directamente en tu Google Drive personal y nunca se transfieren a servidores centrales. Quomida cumple con la Política de Datos de Usuario de los Servicios de la API de Google, incluidos los requisitos de Uso Limitado."
     },
     "a11y": {
       "syncing": "Sincronizando datos con el almacenamiento remoto.",
