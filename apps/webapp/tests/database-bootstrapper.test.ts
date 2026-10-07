@@ -116,4 +116,40 @@ describe('DatabaseBootstrapper', () => {
     expect(mockFlushSync).toHaveBeenCalled();
     expect(mockCloseSync).toHaveBeenCalled();
   });
+
+  it('removes catalog.sqlite from OPFS and reseeds system.sqlite', async () => {
+    const mockRemoveEntry = vi.fn().mockResolvedValue(undefined);
+    const mockWrite = vi.fn().mockResolvedValue(undefined);
+    const mockClose = vi.fn().mockResolvedValue(undefined);
+    const mockWritable = { write: mockWrite, close: mockClose };
+
+    const mockGetFileHandle = vi.fn().mockImplementation((name, options) => {
+      if (options?.create) {
+        return Promise.resolve({ createWritable: vi.fn().mockResolvedValue(mockWritable) });
+      }
+      const err = new Error('Not found');
+      err.name = 'NotFoundError';
+      return Promise.reject(err);
+    });
+
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue({
+          removeEntry: mockRemoveEntry,
+          getFileHandle: mockGetFileHandle
+        })
+      }
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10))
+    });
+
+    await DatabaseBootstrapper.removeDownloadedCatalogAndReseed();
+
+    expect(mockRemoveEntry).toHaveBeenCalledWith('catalog.sqlite');
+    expect(mockRemoveEntry).toHaveBeenCalledWith('catalog.sqlite.tmp');
+    expect(global.fetch).toHaveBeenCalledWith('/system.sqlite');
+  });
 });

@@ -121,7 +121,26 @@ describe('Google OAuth Certification Compliance & Legal Verification', () => {
         'googleComplianceBadge',
         'license',
         'aboutNotice',
-        'aboutCommunity'
+        'aboutCommunity',
+        'offlineDbTitle',
+        'offlineDbDescription',
+        'offlineDbStatus',
+        'offlineDbNotDownloaded',
+        'offlineDbDownloading',
+        'offlineDbInstalling',
+        'offlineDbInstalled',
+        'offlineDbFailed',
+        'offlineDbDownloadBtn',
+        'offlineDbDownloadOfflineTooltip',
+        'offlineDbDeleteBtn',
+        'offlineDbDeleting',
+        'offlineDbConfirmDownloadTitle',
+        'offlineDbConfirmDownloadDesc',
+        'offlineDbConfirmDownloadAction',
+        'offlineDbConfirmDeleteTitle',
+        'offlineDbConfirmDeleteDesc',
+        'offlineDbConfirmDeleteAction',
+        'offlineDbCancel'
       ];
 
       for (const key of requiredSettingsKeys) {
