@@ -178,18 +178,27 @@ export const SyncInspectorPopover: React.FC<SyncInspectorPopoverProps> = ({
             return t.sync?.diagnostics?.connected || 'Connected';
           };
 
+          const account = hasActiveAdapter ? activeProvider?.getConnectedAccount?.() : null;
+
           return (
-            <DiagnosticRow
-              icon={<Cloud className="w-4 h-4" />}
-              label={hasActiveAdapter ? activeProvider!.name : (t.sync?.diagnostics?.cloudProvider || 'Cloud Provider')}
-              value={getDiagnosticText()}
-              statusBadge={
-                <StatusDot
-                  variant={providerDiag.variant}
-                  hasAlertBadge={providerDiag.hasAlertBadge}
-                />
-              }
-            />
+            <div>
+              <DiagnosticRow
+                icon={<Cloud className="w-4 h-4" />}
+                label={hasActiveAdapter ? activeProvider!.name : (t.sync?.diagnostics?.cloudProvider || 'Cloud Provider')}
+                value={getDiagnosticText()}
+                statusBadge={
+                  <StatusDot
+                    variant={providerDiag.variant}
+                    hasAlertBadge={providerDiag.hasAlertBadge}
+                  />
+                }
+              />
+              {account && (
+                <div className="pl-6 pb-1 text-[11px] text-slate-400 font-mono truncate">
+                  {account}
+                </div>
+              )}
+            </div>
           );
         })()}
 

@@ -14,6 +14,7 @@ export interface GoogleDriveSheetsCloudSyncProviderOptions {
 export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvider {
   private accessToken: string | null = null;
   private userEmail: string | null = null;
+  private userName: string | null = null;
   private httpClient?: GoogleHttpClient;
   private onTokenRefresh?: () => Promise<string>;
 
@@ -80,19 +81,29 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
 
   override getConnectedAccount(): string | null {
     if (!this.isInitialized()) return null;
-    return this.userEmail || 'google-user@drive.google.com';
+    if (this.userName && this.userEmail) {
+      return `${this.userName} (${this.userEmail})`;
+    }
+    if (this.userEmail) {
+      return this.userEmail;
+    }
+    if (this.userName) {
+      return this.userName;
+    }
+    return 'google-user@drive.google.com';
   }
 
   override async initialize(credentials?: string | Record<string, any>): Promise<void> {
     if (typeof credentials === 'string') {
       this.accessToken = credentials;
+      this.userEmail = null;
+      this.userName = null;
     } else if (credentials && typeof credentials === 'object') {
       if (credentials.accessToken) {
         this.accessToken = credentials.accessToken;
       }
-      if (credentials.userEmail) {
-        this.userEmail = credentials.userEmail;
-      }
+      this.userEmail = credentials.userEmail || null;
+      this.userName = credentials.userName || null;
       if (credentials.httpClient) {
         this.httpClient = credentials.httpClient;
       }
@@ -121,6 +132,7 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
   override async disconnect(): Promise<void> {
     this.accessToken = null;
     this.userEmail = null;
+    this.userName = null;
     await super.disconnect();
   }
 
@@ -131,7 +143,12 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
         this.accessToken = newToken;
         this.setStatus('idle');
         this.lastSyncedTime = new Date().toISOString();
-        this.notifyCredentialsChange({ accessToken: newToken, expiresAt: Date.now() + 3500000 });
+        this.notifyCredentialsChange({
+          accessToken: newToken,
+          userEmail: this.userEmail,
+          userName: this.userName,
+          expiresAt: Date.now() + 3500000
+        });
         return;
       } catch (e) {
         this.setStatus('auth_failed');

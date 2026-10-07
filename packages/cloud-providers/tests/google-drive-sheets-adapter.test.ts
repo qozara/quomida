@@ -14,9 +14,22 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
     expect(adapter.getStatus()).toBe('idle');
     expect(adapter.getConnectedAccount()).toBe('user@example.com');
 
+    // Test with both userName and userEmail
+    await adapter.initialize({ accessToken: 'test-oauth-token', userEmail: 'user@example.com', userName: 'John Doe' });
+    expect(adapter.getConnectedAccount()).toBe('John Doe (user@example.com)');
+
+    // Test with only userName
+    await adapter.initialize({ accessToken: 'test-oauth-token', userName: 'Jane Smith', userEmail: undefined });
+    expect(adapter.getConnectedAccount()).toBe('Jane Smith');
+
+    // Test fallback when neither is provided
+    await adapter.initialize('test-oauth-token');
+    expect(adapter.getConnectedAccount()).toBe('google-user@drive.google.com');
+
     await adapter.disconnect();
     expect(adapter.isInitialized()).toBe(false);
     expect(adapter.getStatus()).toBe('disconnected');
+    expect(adapter.getConnectedAccount()).toBeNull();
   });
 
   it('orchestrates multi-format sync: JSON settings to appData and separate spreadsheets for Catalog vs Logs', async () => {

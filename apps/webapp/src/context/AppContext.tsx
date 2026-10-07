@@ -466,6 +466,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       active_cloud_provider: { id: adapterId, credentials }
     });
 
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('quomida_onboarding_dismissed', 'true');
+    }
+
     dbService.setCloudSyncProvider(adapter);
     setActiveAdapter(adapter);
     setSyncStatus(adapter.getStatus());

@@ -8,7 +8,7 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
   const loginRejecter = useRef<((err: any) => void) | null>(null);
 
   const login = useGoogleLogin({
-    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
+    scope: 'openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
     onSuccess: (res) => {
       if (loginResolver.current) loginResolver.current(res.access_token);
     },
@@ -31,18 +31,38 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
     
     connect: async () => {
       const token = await triggerLogin();
+      let userEmail: string | undefined;
+      let userName: string | undefined;
+
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (userInfoRes.ok) {
+          const userInfo = await userInfoRes.json();
+          userEmail = userInfo.email;
+          userName = userInfo.name;
+        }
+      } catch (err) {
+        console.warn('[useGoogleDriveProvider] Failed to fetch Google userinfo:', err);
+      }
+
       const adapter = new GoogleDriveSheetsCloudSyncProvider({ onTokenRefresh: triggerLogin });
-      await adapter.initialize(token);
+      await adapter.initialize({ accessToken: token, userEmail, userName });
       return { 
         adapter, 
-        credentials: { accessToken: token, expiresAt: Date.now() + 3500000 } 
+        credentials: { 
+          accessToken: token, 
+          userEmail, 
+          userName, 
+          expiresAt: Date.now() + 3500000 
+        } 
       };
     },
     
     restore: async (credentials: any) => {
       const adapter = new GoogleDriveSheetsCloudSyncProvider({ onTokenRefresh: triggerLogin });
-      const token = credentials?.accessToken;
-      await adapter.initialize(token);
+      await adapter.initialize(credentials);
       return adapter;
     }
   }), [triggerLogin]);
