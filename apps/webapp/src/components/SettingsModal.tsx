@@ -1,7 +1,36 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { X, Globe, Moon, Sun, Monitor, Target, Cloud, Save, Database, RefreshCw, Download, CheckCircle } from 'lucide-react';
+import {
+  X,
+  Globe,
+  Moon,
+  Sun,
+  Monitor,
+  Target,
+  Cloud,
+  Save,
+  Database,
+  RefreshCw,
+  Download,
+  CheckCircle,
+  HelpCircle,
+  Mail,
+  Shield,
+  FileText,
+  Scale,
+  ExternalLink,
+  LifeBuoy
+} from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+
+const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || 'support@qozara.org';
+const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@qozara.org';
+const legalBaseUrl = (import.meta.env.VITE_LEGAL_BASE_URL || 'https://qozara.org').replace(/\/+$/, '');
+const appWebsiteUrl = (import.meta.env.VITE_APP_WEBSITE_URL || 'https://quomida.qozara.org').replace(/\/+$/, '');
+
+const tosUrl = `${legalBaseUrl}/legal/quomida/tos.html`;
+const privacyUrl = `${legalBaseUrl}/legal/quomida/privacy.html`;
+const licenseUrl = `${appWebsiteUrl}/LICENSE`;
 
 
 
@@ -318,11 +347,140 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5: App Version Info */}
-        <div className="pt-2 text-center flex flex-col gap-1">
-          <span className="text-xs text-slate-500 font-mono">
+        {/* Section 5: Support & Assistance */}
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <HelpCircle className="w-4 h-4 text-emerald-400" />
+            <span>{(t.settings as any).supportTitle || 'Support & Assistance'}</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            <a
+              href={`mailto:${supportEmail}`}
+              id="link-support-help"
+              className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all group min-h-[44px]"
+              aria-label={(t.settings as any).supportHelp || 'Get Help & Support'}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-slate-900 group-hover:bg-emerald-950/60 text-emerald-400 border border-slate-800 transition-colors">
+                  <LifeBuoy className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    {(t.settings as any).supportHelp || 'Get Help & Support'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    {supportEmail}
+                  </div>
+                </div>
+              </div>
+              <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            </a>
+
+            <a
+              href={`mailto:${legalEmail}`}
+              id="link-support-legal"
+              className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all group min-h-[44px]"
+              aria-label={(t.settings as any).supportLegal || 'Legal & Privacy Inquiries'}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-slate-900 group-hover:bg-emerald-950/60 text-emerald-400 border border-slate-800 transition-colors">
+                  <Shield className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    {(t.settings as any).supportLegal || 'Legal & Privacy Inquiries'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    {legalEmail}
+                  </div>
+                </div>
+              </div>
+              <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            </a>
+          </div>
+        </div>
+
+        {/* Section 6: Legal & Licensing */}
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <Scale className="w-4 h-4 text-emerald-400" />
+            <span>{(t.settings as any).legalTitle || 'Legal & Licensing'}</span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="grid grid-cols-1 gap-2.5">
+              <a
+                href={tosUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="link-tos"
+                className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                  {(t.settings as any).termsOfService || 'Terms of Service'}
+                </span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+              </a>
+
+              <div className="border-t border-slate-900" />
+
+              <a
+                href={privacyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="link-privacy"
+                className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                  <span>{(t.settings as any).privacyPolicy || 'Privacy Policy'}</span>
+                  <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono">
+                    {(t.settings as any).googleComplianceBadge || 'Google Limited Use Compliant'}
+                  </span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+              </a>
+
+              <div className="border-t border-slate-900" />
+
+              <a
+                href={licenseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="link-license"
+                className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <Scale className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                  {(t.settings as any).license || 'Open Source License (Apache 2.0)'}
+                </span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 7: About, Attribution & Version Info */}
+        <div className="pt-2 border-t border-slate-800 text-center flex flex-col gap-1 text-slate-400">
+          <div className="text-xs font-medium text-slate-300">
+            <a
+              href="https://qozara.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-emerald-400 transition-colors inline-flex items-center gap-1 min-h-[44px] px-2 py-1 justify-center"
+            >
+              <span>{(t.settings as any).aboutNotice || 'Quomida is a research project by Qozara Lab'}</span>
+              <ExternalLink className="w-3 h-3 text-slate-500" />
+            </a>
+          </div>
+          <div className="text-[11px] text-slate-500">
+            © {new Date().getFullYear()} · {(t.settings as any).aboutCommunity || 'Built for the Open Source Community'}
+          </div>
+          <div className="text-[11px] text-slate-600 font-mono mt-1">
             Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
-          </span>
+          </div>
         </div>
 
       </div>
