@@ -118,8 +118,11 @@ async function uploadFile(file: typeof filesToUpload[0]) {
   }
 
   console.log(`\n[R2 Upload] Uploading ${file.description}...`);
-  const fileStream = fs.createReadStream(file.path);
   const fileSize = fs.statSync(file.path).size;
+  if (fileSize === 0) {
+    throw new Error(`[R2 Upload] Refusing to upload 0-byte file: ${file.path}`);
+  }
+  const fileStream = fs.createReadStream(file.path);
 
   try {
     const upload = new Upload({

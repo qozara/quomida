@@ -17,6 +17,9 @@ export async function fetchPrebuiltSystemCatalog(
       const res = await fetch(urlToFetch);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buffer = await res.arrayBuffer();
+      if (buffer.byteLength === 0) {
+        throw new Error(`Downloaded system catalog is empty (0 bytes). Expected non-empty SQLite database.`);
+      }
       fs.writeFileSync(systemOutPath, Buffer.from(buffer));
     } else {
       const localPath = urlToFetch.startsWith('file://') ? urlToFetch.replace('file://', '') : urlToFetch;
