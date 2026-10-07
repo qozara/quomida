@@ -28,20 +28,20 @@ export class DatabaseBootstrapper {
         return;
       }
 
+      const buffer = await res.arrayBuffer();
+      if (buffer.byteLength === 0) {
+        console.warn('[DatabaseBootstrapper] /system.sqlite is empty (0 bytes). Aborting OPFS seed.');
+        return;
+      }
+
       // Stage in catalog.sqlite.tmp to avoid corrupting target on network or power drop
       const tmpHandle = await opfsRoot.getFileHandle('catalog.sqlite.tmp', { create: true });
       if (typeof tmpHandle.createWritable === 'function') {
         const writable = await tmpHandle.createWritable();
-        if (res.body) {
-          await res.body.pipeTo(writable);
-        } else {
-          const buffer = await res.arrayBuffer();
-          await writable.write(buffer);
-          await writable.close();
-        }
+        await writable.write(buffer);
+        await writable.close();
       } else if (typeof (tmpHandle as any).createSyncAccessHandle === 'function') {
         const accessHandle = await (tmpHandle as any).createSyncAccessHandle();
-        const buffer = await res.arrayBuffer();
         accessHandle.write(new Uint8Array(buffer));
         accessHandle.flush();
         accessHandle.close();

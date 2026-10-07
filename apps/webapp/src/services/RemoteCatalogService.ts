@@ -184,7 +184,9 @@ export class RemoteCatalogService implements ICatalogProvider {
             const file = await handle.getFile();
             if (file.size > 0) {
               const buffer = await file.arrayBuffer();
-              catalogBytes = new Uint8Array(buffer);
+              if (buffer.byteLength > 0) {
+                catalogBytes = new Uint8Array(buffer);
+              }
             }
           } catch {
             // Not in OPFS yet
@@ -197,7 +199,11 @@ export class RemoteCatalogService implements ICatalogProvider {
             const res = await fetch('/system.sqlite');
             if (res.ok) {
               const buffer = await res.arrayBuffer();
-              catalogBytes = new Uint8Array(buffer);
+              if (buffer.byteLength > 0) {
+                catalogBytes = new Uint8Array(buffer);
+              } else {
+                console.warn('[RemoteCatalogService] /system.sqlite is empty (0 bytes).');
+              }
             }
           } catch (fetchErr) {
             console.warn('[RemoteCatalogService] Failed to fetch /system.sqlite:', fetchErr);
