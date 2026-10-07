@@ -22,7 +22,9 @@ const DashboardContent: React.FC = () => {
     dbVersion,
     clearLocalDatabase,
     uxSyncState,
-    itemCounts
+    itemCounts,
+    activeProvider,
+    userSettings
   } = useApp();
   const [selectedIngredient, setSelectedIngredient] = useState<BaseIngredient | null>(null);
 
@@ -32,6 +34,13 @@ const DashboardContent: React.FC = () => {
     return localStorage.getItem('quomida_onboarding_dismissed') === 'true';
   });
 
+  React.useEffect(() => {
+    if (activeProvider || uxSyncState !== 'local' || userSettings?.active_cloud_provider) {
+      setIsBannerDismissed(true);
+      localStorage.setItem('quomida_onboarding_dismissed', 'true');
+    }
+  }, [activeProvider, uxSyncState, userSettings?.active_cloud_provider]);
+
   if (dbInitError) {
     return <DatabaseRecoveryScreen error={dbInitError} dbVersion={dbVersion} />;
   }
@@ -39,6 +48,12 @@ const DashboardContent: React.FC = () => {
   const handleDismissBanner = () => {
     setIsBannerDismissed(true);
     localStorage.setItem('quomida_onboarding_dismissed', 'true');
+  };
+
+  const handleConnectFromBanner = () => {
+    setIsBannerDismissed(true);
+    localStorage.setItem('quomida_onboarding_dismissed', 'true');
+    setIsStorageSettingsOpen(true);
   };
 
   const handleOpenPortionModal = (ingredient: BaseIngredient, mealType: MealType) => {
@@ -63,7 +78,7 @@ const DashboardContent: React.FC = () => {
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">
         
         {/* Onboarding Banner for Fresh Devices */}
-        {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && (
+        {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && !activeProvider && !userSettings?.active_cloud_provider && (
           <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">
             <button 
               onClick={handleDismissBanner}
@@ -84,7 +99,7 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
             <button 
-              onClick={() => setIsStorageSettingsOpen(true)}
+              onClick={handleConnectFromBanner}
               className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
               {t.dashboard.onboarding?.connect || 'Connect Cloud Storage'}

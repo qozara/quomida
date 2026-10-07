@@ -42,4 +42,33 @@ describe('AppContext auto-connect logic (Issue 1)', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('rehydrates userEmail and userName on Google provider restore', async () => {
+    vi.spyOn(LocalDBService.prototype, 'getSettings').mockResolvedValue({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: {
+          accessToken: 'fake-token',
+          userEmail: 'alice@qozara.org',
+          userName: 'Alice Smith'
+        }
+      }
+    } as any);
+
+    const TestAccountComponent = () => {
+      const { activeProvider } = useApp();
+      return React.createElement('div', { 'data-testid': 'account-info' }, activeProvider?.getConnectedAccount?.() || 'none');
+    };
+
+    const { container } = render(
+      React.createElement(GoogleOAuthProvider as any, { clientId: 'test-client-id' },
+        React.createElement(AppProvider, null, React.createElement(TestAccountComponent))
+      )
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(container.querySelector('[data-testid="account-info"]')?.textContent).toBe('Alice Smith (alice@qozara.org)');
+
+    vi.restoreAllMocks();
+  });
 });
