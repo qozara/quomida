@@ -86,5 +86,31 @@ export class DatabaseBootstrapper {
       console.warn('[DatabaseBootstrapper] OPFS seed notice:', err);
     }
   }
+
+  static async removeDownloadedCatalogAndReseed(): Promise<void> {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.storage) {
+        return;
+      }
+      const opfsRoot = await navigator.storage.getDirectory();
+      if (typeof opfsRoot.removeEntry === 'function') {
+        try {
+          await opfsRoot.removeEntry('catalog.sqlite');
+        } catch (err: any) {
+          if (err.name !== 'NotFoundError') {
+            console.warn('[DatabaseBootstrapper] Error removing catalog.sqlite:', err);
+          }
+        }
+        try {
+          await opfsRoot.removeEntry('catalog.sqlite.tmp');
+        } catch {}
+      }
+      // Re-seed OPFS with the built-in system.sqlite
+      await DatabaseBootstrapper.ensureSystemCatalogOPFS();
+    } catch (err) {
+      console.warn('[DatabaseBootstrapper] Error removing downloaded catalog and reseeding:', err);
+      throw err;
+    }
+  }
 }
 

@@ -19,7 +19,9 @@ import {
   FileText,
   Scale,
   ExternalLink,
-  LifeBuoy
+  LifeBuoy,
+  Wifi,
+  Trash2
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 
@@ -52,6 +54,7 @@ export const SettingsModal: React.FC = () => {
     catalogGeneratedAt,
     catalogFileSizeBytes,
     refreshCatalog,
+    isOnline,
     t
   } = useApp();
 
@@ -59,8 +62,17 @@ export const SettingsModal: React.FC = () => {
     status: downloadStatus,
     progress: downloadProgress,
     error: downloadError,
-    downloadCatalog
+    isDeleting,
+    downloadCatalog,
+    deleteCatalog
   } = useCatalogDownload();
+
+  const [showConfirmDownload, setShowConfirmDownload] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  const approximateSizeMb = catalogFileSizeBytes && catalogFileSizeBytes > 0
+    ? String(Math.round(catalogFileSizeBytes / (1024 * 1024)))
+    : '55';
 
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
 
@@ -290,7 +302,7 @@ export const SettingsModal: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
               <Database className="w-4 h-4 text-emerald-400" />
-              <span>Offline Database</span>
+              <span>{(t.settings as any).offlineDbTitle || 'Offline Food Database'}</span>
             </div>
             {catalogVersion && (
               <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-950 px-1.5 py-0.5 rounded">
@@ -301,18 +313,20 @@ export const SettingsModal: React.FC = () => {
 
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Quomida supports downloading the massive 1.1 million item database directly to your device for instant sub-millisecond offline searches without using your cellular data.
+              {(t.settings as any).offlineDbDescription || 'Quomida supports downloading the massive 1.1 million item database directly to your device for instant sub-millisecond offline searches without using your cellular data.'}
             </p>
             
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/50">
               <div className="flex flex-col">
-                <span className="text-xs font-semibold text-slate-300">Status</span>
+                <span className="text-xs font-semibold text-slate-300">
+                  {(t.settings as any).offlineDbStatus || 'Status'}
+                </span>
                 <span className="text-[11px] font-mono mt-0.5 text-emerald-400">
-                  {downloadStatus === 'idle' && 'Not Downloaded'}
-                  {downloadStatus === 'fetching' && `Downloading ${downloadProgress}%`}
-                  {downloadStatus === 'decompressing_and_writing' && 'Installing...'}
-                  {downloadStatus === 'complete' && 'Available Offline'}
-                  {downloadStatus === 'error' && 'Download Failed'}
+                  {downloadStatus === 'idle' && ((t.settings as any).offlineDbNotDownloaded || 'Not Downloaded')}
+                  {downloadStatus === 'fetching' && (((t.settings as any).offlineDbDownloading || 'Downloading {{progress}}%').replace('{{progress}}', String(downloadProgress)))}
+                  {downloadStatus === 'decompressing_and_writing' && ((t.settings as any).offlineDbInstalling || 'Installing...')}
+                  {downloadStatus === 'complete' && ((t.settings as any).offlineDbInstalled || 'Available Offline')}
+                  {downloadStatus === 'error' && ((t.settings as any).offlineDbFailed || 'Download Failed')}
                 </span>
                 {downloadError && <span className="text-[10px] text-rose-400 mt-1 max-w-[150px] truncate" title={downloadError}>{downloadError}</span>}
               </div>
@@ -320,21 +334,35 @@ export const SettingsModal: React.FC = () => {
               {downloadStatus === 'idle' || downloadStatus === 'error' ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
-                    const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
-                    downloadCatalog(targetUrl);
-                  }}
-                  className="px-3 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow active:scale-95 transition-all flex items-center gap-1.5"
+                  disabled={!isOnline}
+                  title={!isOnline ? ((t.settings as any).offlineDbDownloadOfflineTooltip || 'Connect to the internet to download the offline database') : undefined}
+                  onClick={() => setShowConfirmDownload(true)}
+                  className={`px-3 py-1.5 min-h-[44px] text-xs font-bold rounded-lg shadow transition-all flex items-center gap-1.5 ${
+                    !isOnline
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                      : 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95'
+                  }`}
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Download (~55MB)
+                  {((t.settings as any).offlineDbDownloadBtn || 'Download (~{{size}}MB)').replace('{{size}}', approximateSizeMb)}
                 </button>
               ) : downloadStatus === 'complete' ? (
-                <span className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-900/50">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Installed
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1.5 min-h-[44px] text-xs font-bold bg-slate-800 text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-900/50">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {(t.settings as any).offlineDbInstalled || 'Installed'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmDelete(true)}
+                    disabled={isDeleting}
+                    aria-label={(t.settings as any).offlineDbDeleteBtn || 'Delete Database'}
+                    className="px-2.5 py-1.5 min-h-[44px] text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 border border-rose-900/40 rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {isDeleting ? ((t.settings as any).offlineDbDeleting || 'Removing...') : ((t.settings as any).offlineDbDeleteBtn || 'Delete')}
+                  </button>
+                </div>
               ) : (
                 <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div 
@@ -484,6 +512,90 @@ export const SettingsModal: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Confirmation Dialog: Download Offline Database */}
+      {showConfirmDownload && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-download-title"
+            className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
+          >
+            <div className="p-3 bg-emerald-950/60 text-emerald-400 rounded-full mb-3 border border-emerald-800/50">
+              <Wifi className="w-6 h-6" />
+            </div>
+            <h3 id="confirm-download-title" className="text-base font-bold text-white mb-2">
+              {(t.settings as any).offlineDbConfirmDownloadTitle || 'Download Offline Database?'}
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xs mb-6 leading-relaxed">
+              {((t.settings as any).offlineDbConfirmDownloadDesc || 'You are about to download the complete offline food database (~{{size}}MB). We strongly recommend connecting to Wi-Fi to preserve mobile cellular data.').replace('{{size}}', approximateSizeMb)}
+            </p>
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDownload(false)}
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                {(t.settings as any).offlineDbCancel || 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmDownload(false);
+                  const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
+                  const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+                  downloadCatalog(targetUrl);
+                }}
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-sm"
+              >
+                {(t.settings as any).offlineDbConfirmDownloadAction || 'Download Now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog: Delete Offline Database */}
+      {showConfirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-title"
+            className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
+          >
+            <div className="p-3 bg-rose-950/60 text-rose-400 rounded-full mb-3 border border-rose-800/50">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 id="confirm-delete-title" className="text-base font-bold text-white mb-2">
+              {(t.settings as any).offlineDbConfirmDeleteTitle || 'Delete Offline Database?'}
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xs mb-6 leading-relaxed">
+              {((t.settings as any).offlineDbConfirmDeleteDesc || 'This will remove the downloaded database (~{{size}}MB) from local storage to free up disk space and revert to the lightweight built-in database.').replace('{{size}}', approximateSizeMb)}
+            </p>
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDelete(false)}
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                {(t.settings as any).offlineDbCancel || 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowConfirmDelete(false);
+                  await deleteCatalog();
+                }}
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
+              >
+                {(t.settings as any).offlineDbConfirmDeleteAction || 'Delete and Free Space'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

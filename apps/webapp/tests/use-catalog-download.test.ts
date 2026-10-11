@@ -100,4 +100,32 @@ describe('useCatalogDownload', () => {
     expect(result.current.error).toBe('Network error');
     expect(mockWorker.terminate).toHaveBeenCalled();
   });
+
+  it('deletes downloaded catalog and resets status to idle', async () => {
+    const { DatabaseBootstrapper } = await import('../src/services/DatabaseBootstrapper.js');
+    const { RemoteCatalogService } = await import('../src/services/RemoteCatalogService.js');
+    const reseedSpy = vi.spyOn(DatabaseBootstrapper, 'removeDownloadedCatalogAndReseed').mockResolvedValue(undefined as any);
+    const resetSpy = vi.spyOn(RemoteCatalogService.getInstance(), 'reset').mockResolvedValue(undefined as any);
+    const notifySpy = vi.spyOn(RemoteCatalogService, 'notifyCatalogDownloaded');
+
+    const { result } = renderHook(() => useCatalogDownload());
+
+    act(() => {
+      result.current.downloadCatalog('url');
+    });
+    act(() => {
+      mockWorker.onmessage({ data: { type: 'COMPLETE' } });
+    });
+    expect(result.current.status).toBe('complete');
+
+    await act(async () => {
+      await result.current.deleteCatalog();
+    });
+
+    expect(reseedSpy).toHaveBeenCalled();
+    expect(resetSpy).toHaveBeenCalled();
+    expect(notifySpy).toHaveBeenCalled();
+    expect(result.current.status).toBe('idle');
+    expect(result.current.progress).toBe(0);
+  });
 });

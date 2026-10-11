@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
+import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
 
 export type DownloadStatus = 'idle' | 'fetching' | 'decompressing_and_writing' | 'complete' | 'error';
 
@@ -7,6 +8,7 @@ export function useCatalogDownload() {
   const [status, setStatus] = useState<DownloadStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     // Check if OPFS catalog.sqlite exists and is larger than 10MB (suggesting it's the full catalog)
@@ -62,5 +64,22 @@ export function useCatalogDownload() {
     worker.postMessage({ type: 'START_DOWNLOAD', payload: { url } });
   }, [status]);
 
-  return { status, progress, error, downloadCatalog };
+  const deleteCatalog = useCallback(async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setError(null);
+    try {
+      await RemoteCatalogService.getInstance().reset();
+      await DatabaseBootstrapper.removeDownloadedCatalogAndReseed();
+      RemoteCatalogService.notifyCatalogDownloaded();
+      setStatus('idle');
+      setProgress(0);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete catalog');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [isDeleting]);
+
+  return { status, progress, error, isDeleting, downloadCatalog, deleteCatalog };
 }
