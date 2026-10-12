@@ -5,10 +5,14 @@ import { CatalogHydrationService, type HydrationResult } from '../services/Catal
 import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
 import {
   type BaseIngredient,
+  type Recipe,
+  type RecipeFoodItem,
+  type FoodItem,
   type Portion,
   type DailyLog,
   type UserSettings,
   type MealType,
+  RecipeManager,
   calculateItemMacros,
   convertPortionToGrams,
   createMacroSnapshot,
@@ -36,6 +40,8 @@ interface AppContextType {
   userSettings: UserSettings;
   updateUserSettings: (newSettings: Partial<UserSettings>) => Promise<void>;
   ingredients: BaseIngredient[];
+  recipes: Recipe[];
+  recipeFoods: RecipeFoodItem[];
   dailyLogs: DailyLog[];
   syncStatus: SyncStatus;
   uxSyncState: UXSyncState;
@@ -48,7 +54,7 @@ interface AppContextType {
   disconnectProvider: () => Promise<void>;
   connectProvider: (adapterId: string, token?: string) => Promise<void>;
   logFoodItem: (
-    ingredient: BaseIngredient,
+    food: FoodItem | BaseIngredient,
     mealType: MealType,
     quantity: number,
     portionName: string,
@@ -57,6 +63,8 @@ interface AppContextType {
   deleteLogItem: (id: string) => Promise<void>;
   addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
   removeCustomIngredient: (id: string) => Promise<void>;
+  addRecipe: (recipe: Recipe, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<string>;
+  removeRecipe: (id: string) => Promise<void>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
   isCatalogOpen: boolean;
@@ -121,6 +129,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('dark');
   const [userSettings, setUserSettings] = useState<UserSettings>(defaultSettings);
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipeManager] = useState(() => new RecipeManager());
+  const recipeFoods = React.useMemo(() => {
+    return recipes.map(r => recipeManager.toFoodItem(r));
+  }, [recipes, recipeManager]);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(new Date().toLocaleTimeString());
@@ -236,6 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let subLogs: any = null;
     let subIngs: any = null;
+    let subRecipes: any = null;
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
@@ -286,6 +300,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIngredients(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
       });
 
+      // Subscribe to Recipes
+      subRecipes = dbService.observeRecipes().subscribe((docs: any[]) => {
+        setRecipes(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
+      });
+
       // Subscribe to Daily Logs for selected date
       subLogs = dbService.observeLogsByDate(selectedDate).subscribe((docs: any[]) => {
         setDailyLogs(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
@@ -319,6 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       subLogs?.unsubscribe();
       subIngs?.unsubscribe();
+      subRecipes?.unsubscribe();
     };
   }, [selectedDate, dbService]);
 
@@ -336,7 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (db) {
       updateItemCounts();
     }
-  }, [db, dailyLogs.length, ingredients.length, updateItemCounts]);
+  }, [db, dailyLogs.length, ingredients.length, recipes.length, updateItemCounts]);
 
   // Update HTML tag lang & dark mode
   useEffect(() => {
@@ -490,7 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logFoodItem = async (
-    ingredient: BaseIngredient,
+    food: FoodItem | BaseIngredient,
     mealType: MealType,
     quantity: number,
     portionName: string,
@@ -506,20 +526,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // The SQLite OPFS catalog is the sole source of truth for read-only catalog items.
 
         if (!passedPortions || passedPortions.length === 0) {
-          const pdocs = await rxdb.portions.find({ selector: { base_food_id: ingredient.id } }).exec();
+          const pdocs = await rxdb.portions.find({ selector: { base_food_id: food.id } }).exec();
           relevantPortions = pdocs.map((d: any) => d.toJSON ? d.toJSON() : d);
         }
       }
     }
-    const weightGrams = convertPortionToGrams(quantity, portionName, relevantPortions);
-    const rawMacros = calculateItemMacros(ingredient, weightGrams);
+
+    const isRecipe = 'kind' in food && food.kind === 'recipe';
+    let portionsToUse = relevantPortions;
+    if (isRecipe) {
+      const recipeItem = food as RecipeFoodItem;
+      const hasWhole = portionsToUse.some(p => p.name === 'Whole recipe');
+      if (!hasWhole) {
+        const wholePortion = recipeManager.getWholeRecipePortion(recipeItem);
+        portionsToUse = [wholePortion, ...portionsToUse];
+      }
+    }
+
+    const weightGrams = convertPortionToGrams(quantity, portionName, portionsToUse);
+    const rawMacros = calculateItemMacros(food, weightGrams);
     const macrosSnapshot = createMacroSnapshot(rawMacros);
 
     await dbService.logFood({
       date: selectedDate,
       meal_type: mealType,
-      food_reference_id: ingredient.id,
-      food_name: ingredient.name,
+      food_reference_id: food.id,
+      food_name: food.name,
       quantity,
       portion_name: portionName,
       macros: macrosSnapshot
@@ -541,6 +573,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeCustomIngredient = async (id: string) => {
     await dbService.deleteCustomFood(id);
+    forceSync().catch(console.error);
+  };
+
+  const addRecipe = async (recipeData: Recipe, portions?: { name: string, equivalent_weight_g: number }[]) => {
+    const id = await dbService.saveRecipe(recipeData, portions);
+    forceSync().catch(console.error);
+    return id;
+  };
+
+  const removeRecipe = async (id: string) => {
+    await dbService.deleteRecipe(id);
     forceSync().catch(console.error);
   };
 
@@ -573,6 +616,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userSettings,
         updateUserSettings,
         ingredients,
+        recipes,
+        recipeFoods,
         dailyLogs,
         syncStatus,
         uxSyncState,
@@ -590,6 +635,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteLogItem,
         addCustomIngredient,
         removeCustomIngredient,
+        addRecipe,
+        removeRecipe,
         isSettingsOpen,
         setIsSettingsOpen,
         isCatalogOpen,

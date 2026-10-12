@@ -30,8 +30,8 @@ export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
 
 export const recipesSchema: RxJsonSchema<Recipe> = {
   title: 'recipes',
-  version: 0,
-  description: 'Compound recipes with cooking yield factors',
+  version: 1,
+  description: 'Compound recipes with cooking yield factors and copied nutrient density',
   primaryKey: 'id',
   type: 'object',
   properties: {
@@ -42,10 +42,18 @@ export const recipesSchema: RxJsonSchema<Recipe> = {
       items: {
         type: 'object',
         properties: {
-          ingredient_id: { type: 'string' },
-          raw_weight_g: { type: 'number', minimum: 0 }
+          food_id: { type: 'string' },
+          name: { type: 'string' },
+          weight_g: { type: 'number', minimum: 0.1 },
+          quantity: { type: 'number' },
+          portion_name: { type: 'string' },
+          calories_100g: { type: 'number', minimum: 0 },
+          protein_100g: { type: 'number', minimum: 0 },
+          carbs_100g: { type: 'number', minimum: 0 },
+          fats_100g: { type: 'number', minimum: 0 },
+          from_recipe: { type: 'boolean' }
         },
-        required: ['ingredient_id', 'raw_weight_g']
+        required: ['food_id', 'name', 'weight_g', 'calories_100g', 'protein_100g', 'carbs_100g', 'fats_100g']
       }
     },
     yield_factor: { type: 'number', minimum: 0.1, default: 1.0 },

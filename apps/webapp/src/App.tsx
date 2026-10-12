@@ -10,7 +10,7 @@ import { SettingsModal } from './components/SettingsModal.js';
 import { CatalogManager } from './components/CatalogManager.js';
 import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
-import type { BaseIngredient, MealType } from '@quomida/domain-core';
+import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
 import { Plus, Cloud, X } from 'lucide-react';
 
 const DashboardContent: React.FC = () => {
@@ -26,7 +26,7 @@ const DashboardContent: React.FC = () => {
     activeProvider,
     userSettings
   } = useApp();
-  const [selectedIngredient, setSelectedIngredient] = useState<BaseIngredient | null>(null);
+  const [selectedIngredient, setSelectedIngredient] = useState<FoodItem | BaseIngredient | null>(null);
 
   const [targetMealType, setTargetMealType] = useState<MealType>('meal_lunch');
 
@@ -56,7 +56,7 @@ const DashboardContent: React.FC = () => {
     setIsStorageSettingsOpen(true);
   };
 
-  const handleOpenPortionModal = (ingredient: BaseIngredient, mealType: MealType) => {
+  const handleOpenPortionModal = (ingredient: FoodItem | BaseIngredient, mealType: MealType) => {
     setSelectedIngredient(ingredient);
     setTargetMealType(mealType);
   };

@@ -85,4 +85,56 @@ describe('DailyLogManager', () => {
     expect(remaining.length).toBe(1);
     expect(remaining[0].id).toBe('2');
   });
+
+  it('creates a DailyLog with exact same structure and keys when logging a recipe (polymorphic invariant)', () => {
+    const mockRecipeFood: any = {
+      kind: 'recipe',
+      id: 'rec-pancake',
+      name: 'Fluffy Pancake',
+      source: 'custom',
+      cooked_weight_g: 270,
+      calories_100g: 322.6,
+      protein_100g: 12.1,
+      carbs_100g: 56.6,
+      fats_100g: 4.3
+    };
+
+    const recipePortion: Portion = {
+      id: 'port-rec-serving',
+      base_food_id: 'rec-pancake',
+      name: '1 serving (90g)',
+      equivalent_weight_g: 90
+    };
+
+    const ingredientLog = manager.createLogEntry({
+      id: 'log-ing',
+      food: mockIngredient,
+      portion: mockPortion,
+      quantity: 1,
+      mealType: 'meal_breakfast',
+      date: '2026-10-11'
+    });
+
+    const recipeLog = manager.createLogEntry({
+      id: 'log-rec',
+      food: mockRecipeFood,
+      portion: recipePortion,
+      quantity: 1,
+      mealType: 'meal_breakfast',
+      date: '2026-10-11'
+    });
+
+    // Keys must be 100% identical
+    const ingredientKeys = Object.keys(ingredientLog).sort();
+    const recipeKeys = Object.keys(recipeLog).sort();
+    expect(recipeKeys).toEqual(ingredientKeys);
+
+    // Food reference ID links to recipe
+    expect(recipeLog.food_reference_id).toBe('rec-pancake');
+    expect(recipeLog.food_name).toBe('Fluffy Pancake');
+    expect(recipeLog.portion_name).toBe('1 serving (90g)');
+    
+    // 90g @ 322.6 kcal/100g = 290.3 kcal
+    expect(recipeLog.macros.calories).toBeCloseTo(290.3, 1);
+  });
 });

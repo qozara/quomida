@@ -1,4 +1,4 @@
-import type { BaseIngredient, Portion } from '../types.js';
+import type { BaseIngredient, Portion, FoodItem } from '../types.js';
 import type { ICatalogProvider } from './CatalogSearchManager.js';
 
 export interface TaggedPortion extends Portion {
@@ -6,18 +6,19 @@ export interface TaggedPortion extends Portion {
 }
 
 export interface PortionResolutionOptions {
-  ingredient: BaseIngredient;
+  ingredient: FoodItem | BaseIngredient;
   customPortions?: Portion[];
   catalogProvider?: ICatalogProvider;
 }
 
 export class PortionManager {
   /**
-   * Resolves, aggregates, and tags portions for a given ingredient.
+   * Resolves, aggregates, and tags portions for a given food item (ingredient or recipe).
    * Handles:
-   * 1. Ingredient-specific custom portions.
-   * 2. Catalog standard portions (if ingredient.source === 'system').
-   * 3. Generic fallback portions (from custom store or catalog).
+   * 1. Food-specific custom portions (servings).
+   * 2. Virtual "Whole recipe" portion if item is a recipe.
+   * 3. Catalog standard portions (if ingredient.source === 'system').
+   * 4. Generic fallback portions (from custom store or catalog).
    */
   async resolvePortions(options: PortionResolutionOptions): Promise<TaggedPortion[]> {
     const { ingredient, customPortions = [], catalogProvider } = options;
@@ -30,6 +31,26 @@ export class PortionManager {
       if (!seenIds.has(p.id)) {
         seenIds.add(p.id);
         result.push({ ...p, tag: 'Custom' });
+      }
+    }
+
+    // 2. If item is a recipe, inject virtual "Whole recipe" portion based on cooked weight
+    const isRecipe = (ingredient as any).kind === 'recipe';
+    if (isRecipe) {
+      const cookedWeight = (ingredient as any).cooked_weight_g;
+      if (cookedWeight && cookedWeight > 0) {
+        const wholeId = `port-whole-${ingredient.id}`;
+        if (!seenIds.has(wholeId)) {
+          seenIds.add(wholeId);
+          result.push({
+            id: wholeId,
+            base_food_id: ingredient.id,
+            name: 'Whole recipe',
+            equivalent_weight_g: cookedWeight,
+            source: 'custom',
+            tag: 'Custom'
+          });
+        }
       }
     }
 

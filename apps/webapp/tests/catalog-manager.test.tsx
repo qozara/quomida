@@ -118,3 +118,118 @@ describe('CatalogManager - Custom Portions UI', () => {
     ]);
   });
 });
+
+describe('CatalogManager - Recipes Integration', () => {
+  let removeRecipeMock: any;
+  let addRecipeMock: any;
+
+  const sampleRecipeFood: any = {
+    id: 'recipe_lentil_stew',
+    name: 'Lentil Stew',
+    kind: 'recipe',
+    source: 'custom',
+    calories_100g: 120,
+    protein_100g: 8,
+    carbs_100g: 16,
+    fats_100g: 2,
+    raw_weight_g: 450,
+    cooked_weight_g: 500,
+    yield_factor: 1.11,
+    total_macros: {
+      calories: 600,
+      protein: 40,
+      carbs: 80,
+      fats: 10
+    },
+    recipe: {
+      id: 'recipe_lentil_stew',
+      name: 'Lentil Stew',
+      yield_factor: 1.11,
+      ingredients: [
+        {
+          food_id: 'ing_lentils',
+          name: 'Dry Lentils',
+          weight_g: 200,
+          calories_100g: 116,
+          protein_100g: 9,
+          carbs_100g: 20,
+          fats_100g: 0.8
+        },
+        {
+          food_id: 'ing_carrots',
+          name: 'Carrots',
+          weight_g: 250,
+          calories_100g: 41,
+          protein_100g: 0.9,
+          carbs_100g: 9.6,
+          fats_100g: 0.2
+        }
+      ]
+    }
+  };
+
+  beforeEach(() => {
+    removeRecipeMock = vi.fn().mockResolvedValue(undefined);
+    addRecipeMock = vi.fn().mockResolvedValue('new_recipe_id');
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      isCatalogOpen: true,
+      ingredients: [],
+      recipes: [],
+      recipeFoods: [sampleRecipeFood],
+      addCustomIngredient: vi.fn(),
+      removeCustomIngredient: vi.fn(),
+      addRecipe: addRecipeMock,
+      removeRecipe: removeRecipeMock,
+      setIsCatalogOpen: vi.fn(),
+      db: {}
+    } as any);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('renders custom recipes with badge and expands ingredients breakdown on chevron click', () => {
+    render(<CatalogManager />);
+
+    expect(screen.getByText('Lentil Stew')).toBeDefined();
+    expect(screen.getAllByText('Recipe').length).toBeGreaterThan(0);
+    expect(screen.getByText(/500g cooked/)).toBeDefined();
+
+    // Initially breakdown is collapsed
+    expect(screen.queryByText('Dry Lentils')).toBeNull();
+
+    // Click expand chevron
+    const expandBtn = screen.getByLabelText('Expand recipe ingredients');
+    fireEvent.click(expandBtn);
+
+    // Breakdown is now visible
+    expect(screen.getByText('Dry Lentils')).toBeDefined();
+    expect(screen.getByText('Carrots')).toBeDefined();
+  });
+
+  it('calls removeRecipe when delete recipe button is clicked and confirmed', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<CatalogManager />);
+
+    const deleteBtn = screen.getByLabelText('Delete recipe');
+    fireEvent.click(deleteBtn);
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(removeRecipeMock).toHaveBeenCalledWith('recipe_lentil_stew');
+  });
+
+  it('opens RecipeBuilder when Recipe button is clicked', () => {
+    render(<CatalogManager />);
+
+    const recipeBtn = screen.getAllByText('Recipe').find(el => el.tagName === 'SPAN' && el.parentElement?.tagName === 'BUTTON');
+    if (recipeBtn) {
+      fireEvent.click(recipeBtn);
+    }
+
+    // RecipeBuilder header should now appear
+    expect(screen.getByText('Combine Foods (Recipe)')).toBeDefined();
+  });
+});
+

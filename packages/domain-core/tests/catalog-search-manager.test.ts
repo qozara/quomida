@@ -223,5 +223,140 @@ describe('CatalogSearchManager', () => {
     expect(result.items.length).toBe(1);
     expect(result.items[0].id).toBe('custom-cafe-1');
   });
+
+  it('unifies recipes, custom ingredients, and catalog in search results, prioritizing recipes first', async () => {
+    const mockRecipes: any[] = [
+      {
+        kind: 'recipe',
+        id: 'rec-apple-pie',
+        name: 'Grandma Apple Pie',
+        source: 'custom',
+        cooked_weight_g: 800,
+        calories_100g: 280,
+        protein_100g: 4,
+        carbs_100g: 45,
+        fats_100g: 10
+      }
+    ];
+
+    const result = await manager.search({
+      query: 'apple',
+      customIngredients: mockCustomIngredients, // Has 'Homemade Apple Pie'
+      customRecipes: mockRecipes,
+      limit: 10
+    }, mockProvider); // Has 'Apple Red Delicious'
+
+    // Order: 1. Recipe, 2. Custom Ingredient, 3. System Catalog Ingredient
+    expect(result.items.length).toBe(3);
+    expect(result.items[0].id).toBe('rec-apple-pie');
+    expect(result.items[0].kind).toBe('recipe');
+    expect(result.items[1].id).toBe('custom-1');
+    expect(result.items[1].kind).toBe('ingredient');
+    expect(result.items[2].id).toBe('sys-apple');
+    expect(result.items[2].kind).toBe('ingredient');
+
+    expect(result.recipeCount).toBe(1);
+    expect(result.customCount).toBe(1);
+    expect(result.catalogCount).toBe(1);
+  });
+
+  it('filters search results strictly by kinds option (e.g. ingredient-only builder search)', async () => {
+    const mockRecipes: any[] = [
+      {
+        kind: 'recipe',
+        id: 'rec-mora-dessert',
+        name: 'Mora Dessert',
+        source: 'custom',
+        cooked_weight_g: 300,
+        calories_100g: 150,
+        protein_100g: 2,
+        carbs_100g: 30,
+        fats_100g: 2
+      }
+    ];
+
+    // Only search ingredients (e.g. when building a recipe from pure ingredients)
+    const result = await manager.search({
+      query: 'mora',
+      customIngredients: mockCustomIngredients, // Has 'Fresh Mora Jam'
+      customRecipes: mockRecipes,
+      kinds: ['ingredient'],
+      limit: 10
+    }, mockProvider);
+
+    expect(result.items.every(i => i.kind === 'ingredient')).toBe(true);
+    expect(result.items.some(i => i.id === 'rec-mora-dessert')).toBe(false);
+  });
+
+  it('allows same-name recipe and system ingredient to both appear with distinct kinds', async () => {
+    const pizzaRecipe: any = {
+      kind: 'recipe',
+      id: 'rec-pizza',
+      name: 'Pizza Napoletana',
+      source: 'custom',
+      cooked_weight_g: 400,
+      calories_100g: 240,
+      protein_100g: 10,
+      carbs_100g: 30,
+      fats_100g: 8
+    };
+
+    const pizzaCatalogProvider: ICatalogProvider = {
+      searchIngredients: vi.fn().mockResolvedValue([
+        {
+          id: 'sys-pizza-off',
+          name: 'pizza napoletana',
+          source: 'system',
+          lang: 'it',
+          calories_100g: 220,
+          protein_100g: 9,
+          carbs_100g: 28,
+          fats_100g: 7
+        }
+      ]),
+      getPortionsForIngredient: vi.fn().mockResolvedValue([])
+    };
+
+    const result = await manager.search({
+      query: 'pizza',
+      customIngredients: [],
+      customRecipes: [pizzaRecipe],
+      limit: 10
+    }, pizzaCatalogProvider);
+
+    // Both should appear: the custom recipe and the system catalog item
+    expect(result.items.length).toBe(2);
+    expect(result.items[0].kind).toBe('recipe');
+    expect(result.items[0].id).toBe('rec-pizza');
+    expect(result.items[1].kind).toBe('ingredient');
+    expect(result.items[1].id).toBe('sys-pizza-off');
+  });
+
+  it('resolves AI natural match prioritizing custom recipes before ingredients', async () => {
+    const mockRecipes: any[] = [
+      {
+        kind: 'recipe',
+        id: 'rec-special-mora',
+        name: 'Fresh Mora Tart',
+        source: 'custom',
+        cooked_weight_g: 500,
+        calories_100g: 200,
+        protein_100g: 3,
+        carbs_100g: 35,
+        fats_100g: 5
+      }
+    ];
+
+    const match = await manager.resolveAiMatch(
+      'fresh mora',
+      mockCustomIngredients, // Has 'Fresh Mora Jam'
+      mockProvider,
+      mockRecipes // Has 'Fresh Mora Tart'
+    );
+
+    expect(match).not.toBeNull();
+    expect(match?.id).toBe('rec-special-mora');
+    expect(match?.kind).toBe('recipe');
+  });
 });
 

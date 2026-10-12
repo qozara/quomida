@@ -1,9 +1,9 @@
-import type { BaseIngredient, Portion, DailyLog, MealType } from '../types.js';
+import type { BaseIngredient, Portion, DailyLog, MealType, FoodItem } from '../types.js';
 import { calculatePortionMacros, createMacroSnapshot } from '../calculations/index.js';
 
 export interface CreateLogEntryParams {
   id?: string;
-  food: BaseIngredient;
+  food: FoodItem | BaseIngredient;
   portion: Portion;
   quantity: number;
   mealType: MealType;
@@ -44,7 +44,7 @@ export class DailyLogManager {
   updateLogQuantity(
     log: DailyLog,
     newQuantity: number,
-    food: BaseIngredient,
+    food: FoodItem | BaseIngredient,
     portion: Portion
   ): DailyLog {
     const calculatedMacros = calculatePortionMacros(food, portion, newQuantity);

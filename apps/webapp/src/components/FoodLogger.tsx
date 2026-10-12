@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { BaseIngredient, MealType } from '@quomida/domain-core';
+import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
 import { CatalogSearchManager } from '@quomida/domain-core';
 import { parseNaturalLanguageLog, MockLLMProvider } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
@@ -8,16 +8,16 @@ import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 interface FoodLoggerProps {
-  onSelectIngredient: (ingredient: BaseIngredient, mealType: MealType) => void;
+  onSelectIngredient: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, t, setIsSettingsOpen } = useApp();
+  const { ingredients, recipeFoods = [], t, setIsSettingsOpen } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
-  const [filteredIngredients, setFilteredIngredients] = useState<BaseIngredient[]>([]);
+  const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [isSearching, setIsSearching] = useState(false);
@@ -47,6 +47,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         const result = await searchManager.search({
           query,
           customIngredients: ingredients,
+          customRecipes: recipeFoods,
           limit: 30
         }, remoteService);
 
@@ -181,12 +182,15 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                           <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
                             {ing.name}
                           </div>
-                          {ing.source === 'custom' && (
+                          {'kind' in ing && ing.kind === 'recipe' ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                              {t.recipes?.recipeBadge || 'Recipe'}
+                            </span>
+                          ) : ing.source === 'custom' ? (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Custom</span>
-                          )}
-                          {ing.source === 'system' && (
+                          ) : ing.source === 'system' ? (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">System</span>
-                          )}
+                          ) : null}
                         </div>
                         <div className="text-xs text-slate-400 mt-0.5">
                           {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g

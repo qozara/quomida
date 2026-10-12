@@ -5,6 +5,7 @@ import {
   calculateRecipeMacros,
   createMacroSnapshot,
   type BaseIngredient,
+  type FoodItem,
   type DailyLog,
   type MacroSnapshot,
   type Recipe
@@ -108,7 +109,7 @@ export class QuomidaSystemHarness {
   }
 
   // Local-first catalog search adhering to ADR 0018 single-SQLite architecture
-  public async searchCatalog(query: string): Promise<{ items: BaseIngredient[]; guidedToDownloadFullCatalog: boolean }> {
+  public async searchCatalog(query: string): Promise<{ items: FoodItem[]; guidedToDownloadFullCatalog: boolean }> {
     this.networkCalls.localCatalogSearches++;
     
     // Per ADR 0018: Zero network calls are made during search operations
@@ -586,7 +587,15 @@ describe('Destructive Breaker & Security Invariants Suite (ADR 0012, 0013, 0018)
     const validRecipe: Recipe = {
       id: 'r1',
       name: 'Pollo asado',
-      ingredients: [{ ingredient_id: 'i1', raw_weight_g: 200 }],
+      ingredients: [{
+        food_id: 'i1',
+        name: 'Pechuga de pollo',
+        weight_g: 200,
+        calories_100g: 165,
+        protein_100g: 30,
+        carbs_100g: 0,
+        fats_100g: 8
+      }],
       yield_factor: 0.8
     };
     expect(calculateRecipeMacros(validRecipe, ingMap).cooked_weight_g).toBe(160);

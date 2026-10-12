@@ -1,16 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { validateMacroAlignment, type BaseIngredient } from '@quomida/domain-core';
-import { X, Plus, Utensils, AlertCircle, Search, Trash2, PlusCircle } from 'lucide-react';
+import {
+  validateMacroAlignment,
+  type BaseIngredient,
+  type FoodItem,
+  type RecipeFoodItem,
+  type Recipe
+} from '@quomida/domain-core';
+import {
+  X,
+  Plus,
+  Utensils,
+  AlertCircle,
+  Search,
+  Trash2,
+  PlusCircle,
+  ChefHat,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { dictionaries } from '@quomida/i18n-locales';
+import { RecipeBuilder } from './recipes/RecipeBuilder.js';
+import { RecipeComponentList } from './recipes/RecipeComponentList.js';
+
+const EMPTY_ARRAY: any[] = [];
 
 export const CatalogManager: React.FC = () => {
-  const { ingredients, db, addCustomIngredient, removeCustomIngredient, isCatalogOpen, setIsCatalogOpen } = useApp();
+  const {
+    ingredients = EMPTY_ARRAY,
+    recipes = EMPTY_ARRAY,
+    recipeFoods = EMPTY_ARRAY,
+    db,
+    addCustomIngredient,
+    removeCustomIngredient,
+    addRecipe,
+    removeRecipe,
+    isCatalogOpen,
+    setIsCatalogOpen,
+    t
+  } = useApp();
+
+  const dict = t || dictionaries.en;
+
   const [isAdding, setIsAdding] = useState(false);
+  const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'ingredients' | 'recipes'>('all');
+  const [expandedRecipeIds, setExpandedRecipeIds] = useState<Record<string, boolean>>({});
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<BaseIngredient[]>([]);
+  const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // New Ingredient Form State
@@ -19,7 +59,7 @@ export const CatalogManager: React.FC = () => {
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fats, setFats] = useState('');
-  const [portions, setPortions] = useState<{name: string, equivalent_weight_g: number}[]>([]);
+  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>([]);
   const [portionName, setPortionName] = useState('');
   const [portionWeight, setPortionWeight] = useState('');
 
@@ -35,37 +75,81 @@ export const CatalogManager: React.FC = () => {
     setPortions(portions.filter((_, i) => i !== index));
   };
 
+  const toggleRecipeExpand = (id: string) => {
+    setExpandedRecipeIds(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Build stable items list
+  const customItems: FoodItem[] = useMemo(() => [
+    ...(recipeFoods || []),
+    ...(ingredients || []).map(ing => ({
+      ...ing,
+      kind: 'ingredient' as const
+    }))
+  ], [ingredients, recipeFoods]);
+
+  const displayedItems = useMemo(() => {
+    let items = searchQuery.trim() ? searchResults : customItems;
+    if (filterType === 'ingredients') {
+      return items.filter(item => item.kind === 'ingredient');
+    }
+    if (filterType === 'recipes') {
+      return items.filter(item => item.kind === 'recipe');
+    }
+    return items;
+  }, [searchQuery, searchResults, customItems, filterType]);
+
+  // Search effect (runs only when searchQuery or db changes)
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults(ingredients); // Custom ones
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults(prev => prev.length > 0 ? [] : prev);
       return;
     }
-    
+
     let active = true;
-    const fetchSearch = async () => {
-      if (!db) return;
-      setIsSearching(true);
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
       try {
-        const docs = await db.base_ingredients.find({
-          selector: { name: { $regex: new RegExp(searchQuery, 'i') } },
-          limit: 50
-        }).exec();
+        const queryLower = trimmed.toLowerCase();
+        const matchedCustom = customItems.filter(item =>
+          item.name.toLowerCase().includes(queryLower)
+        );
+
+        let systemDocs: FoodItem[] = [];
+        if (db && db.base_ingredients) {
+          try {
+            const docs = await db.base_ingredients.find({
+              selector: { name: { $regex: new RegExp(trimmed, 'i') } },
+              limit: 50
+            }).exec();
+            systemDocs = docs
+              .map((d: any) => d.toJSON ? d.toJSON() : d)
+              .filter((d: BaseIngredient) => d.source !== 'custom')
+              .map((d: BaseIngredient) => ({ ...d, kind: 'ingredient' as const }));
+          } catch (e) {
+            console.warn('DB search notice:', e);
+          }
+        }
+
         if (active) {
-          setSearchResults(docs.map((d: any) => d.toJSON ? d.toJSON() : d));
+          setSearchResults([...matchedCustom, ...systemDocs]);
         }
       } catch (err) {
         console.error(err);
       } finally {
         if (active) setIsSearching(false);
       }
-    };
+    }, 250);
 
-    const timer = setTimeout(fetchSearch, 300);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [searchQuery, ingredients, db]);
+  }, [searchQuery, customItems, db]);
 
   if (!isCatalogOpen) return null;
 
@@ -113,22 +197,32 @@ export const CatalogManager: React.FC = () => {
     setIsAdding(false);
   };
 
-  const handleRemove = async (id: string) => {
-    if (confirm('Are you sure you want to delete this custom ingredient?')) {
+  const handleRemoveIngredient = async (id: string) => {
+    if (confirm(dict.catalog.deleteCustomConfirm)) {
       await removeCustomIngredient(id);
     }
+  };
+
+  const handleRemoveRecipe = async (id: string) => {
+    if (confirm(dict.recipes.deleteConfirm)) {
+      await removeRecipe(id);
+    }
+  };
+
+  const handleSaveRecipe = async (recipe: Recipe, recipePortions?: { name: string; equivalent_weight_g: number }[]) => {
+    await addRecipe(recipe, recipePortions);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
       
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Utensils className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-extrabold text-white">Food Catalog Manager</h2>
+            <h2 className="text-xl font-extrabold text-white">{dict.catalog.title}</h2>
           </div>
           <button
             onClick={() => setIsCatalogOpen(false)}
@@ -138,36 +232,91 @@ export const CatalogManager: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Bar & Add Button */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search catalog..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-            />
+        {/* Action Buttons & Search */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder={dict.catalog.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                setIsAdding(!isAdding);
+                setIsBuildingRecipe(false);
+              }}
+              className="p-2 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{dict.catalog.newFood}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsBuildingRecipe(true);
+                setIsAdding(false);
+              }}
+              className="p-2 px-3 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
+            >
+              <ChefHat className="w-4 h-4" />
+              <span>{dict.recipes.recipeBadge}</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => setIsAdding(!isAdding)}
-            className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New</span>
-          </button>
+          {/* Filter Pills */}
+          <div className="flex gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+                filterType === 'all'
+                  ? 'bg-slate-700 text-white'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {dict.catalog.filterAll} ({recipeFoods.length + ingredients.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('recipes')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+                filterType === 'recipes'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {dict.catalog.filterRecipes} ({recipeFoods.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('ingredients')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+                filterType === 'ingredients'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {dict.catalog.filterIngredients} ({ingredients.length})
+            </button>
+          </div>
         </div>
 
         <div aria-live="polite" className="sr-only">
-          {isSearching ? 'Searching...' : `Found ${searchResults.length} ingredients`}
+          {isSearching ? 'Searching...' : `Found ${searchResults.length} foods`}
         </div>
 
         {/* Create Custom Ingredient Form */}
         {isAdding && (
           <form onSubmit={handleCreateIngredient} className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">New Custom Ingredient (100g base)</h3>
+            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              {dict.catalog.newCustomIngredient}
+            </h3>
             
             {errorMsg && (
               <div className="p-2.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
@@ -294,44 +443,98 @@ export const CatalogManager: React.FC = () => {
 
         {/* Content List */}
         <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-          {searchResults.length === 0 && !isSearching && (
+          {displayedItems.length === 0 && !isSearching && (
             <div className="text-center py-6 text-slate-500 text-sm">
-              {searchQuery ? 'No ingredients found' : 'No custom ingredients added yet'}
+              {searchQuery ? dict.catalog.noFoodsFound : dict.catalog.noCustomFoodsYet}
             </div>
           )}
-          {searchResults.map((ing) => (
-            <div
-              key={ing.id}
-              className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors group"
-            >
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-white">{ing.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    ing.source === 'custom' ? 'bg-amber-950 text-amber-400 border border-amber-800/50' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {ing.source}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 mt-0.5">
-                  {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
-                </div>
-              </div>
+          {displayedItems.map((item) => {
+            const isRecipe = item.kind === 'recipe';
+            const recipeFood = isRecipe ? (item as RecipeFoodItem) : null;
+            const isExpanded = isRecipe && Boolean(expandedRecipeIds[item.id]);
 
-              {ing.source === 'custom' && (
-                <button
-                  onClick={() => handleRemove(ing.id)}
-                  aria-label="Delete custom ingredient"
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors group overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-3">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-semibold text-white truncate">{item.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                        isRecipe
+                          ? 'bg-purple-950 text-purple-400 border border-purple-800/50'
+                          : item.source === 'custom'
+                          ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {isRecipe ? dict.recipes.recipeBadge : item.source}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
+                      {isRecipe && recipeFood && (
+                        <span className="text-slate-500"> • {recipeFood.cooked_weight_g}g cooked</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isRecipe && (
+                      <button
+                        type="button"
+                        onClick={() => toggleRecipeExpand(item.id)}
+                        aria-label={isExpanded ? 'Collapse recipe ingredients' : 'Expand recipe ingredients'}
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+
+                    {isRecipe ? (
+                      <button
+                        onClick={() => handleRemoveRecipe(item.id)}
+                        aria-label="Delete recipe"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : item.source === 'custom' ? (
+                      <button
+                        onClick={() => handleRemoveIngredient(item.id)}
+                        aria-label="Delete custom ingredient"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Expanded Recipe Breakdown */}
+                {isRecipe && isExpanded && recipeFood && (
+                  <div className="p-3 bg-slate-900/80 border-t border-slate-800/80 space-y-2">
+                    <span className="text-[11px] font-bold text-purple-400 block">
+                      {dict.recipes.breakdownTitle}
+                    </span>
+                    <RecipeComponentList components={recipeFood.recipe?.ingredients || (recipeFood as any).ingredients || []} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
       </div>
+
+      {/* Recipe Builder Modal */}
+      {isBuildingRecipe && (
+        <RecipeBuilder
+          onClose={() => setIsBuildingRecipe(false)}
+          onSave={handleSaveRecipe}
+        />
+      )}
     </div>
   );
 };
