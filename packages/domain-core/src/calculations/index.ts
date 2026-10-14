@@ -1,4 +1,5 @@
 import type {
+  NutrientDensity,
   BaseIngredient,
   Recipe,
   Portion,
@@ -6,9 +7,9 @@ import type {
 } from '../types.js';
 
 /**
- * Calculates nutritional macros for a specific ingredient amount in grams based on 100g base values.
+ * Calculates nutritional macros for a specific food amount in grams based on 100g base values.
  */
-export function calculateItemMacros(ingredient: BaseIngredient, weightGrams: number): MacroSnapshot {
+export function calculateItemMacros(ingredient: NutrientDensity, weightGrams: number): MacroSnapshot {
   const factor = weightGrams / 100;
   return {
     calories: Math.round(ingredient.calories_100g * factor * 10) / 10,
@@ -19,10 +20,10 @@ export function calculateItemMacros(ingredient: BaseIngredient, weightGrams: num
 }
 
 /**
- * Calculates nutritional macros for a portion and quantity of a base ingredient.
+ * Calculates nutritional macros for a portion and quantity of a base ingredient or food.
  */
 export function calculatePortionMacros(
-  food: BaseIngredient,
+  food: NutrientDensity,
   portion: Partial<Portion>,
   quantity: number
 ): MacroSnapshot {
@@ -34,10 +35,11 @@ export function calculatePortionMacros(
 /**
  * Calculates total yield cooked weight and cumulative nutritional macros for a compound recipe
  * considering cooking yield factor (FAO/INFOODS standard).
+ * Supports both copied component snapshots (RecipeComponent) and legacy external ingredient lookups.
  */
 export function calculateRecipeMacros(
   recipe: Recipe,
-  ingredientsMap: Map<string, BaseIngredient>
+  ingredientsMap?: Map<string, BaseIngredient>
 ): { cooked_weight_g: number; total_macros: MacroSnapshot } {
   let rawWeightTotal = 0;
   let caloriesSum = 0;
@@ -45,15 +47,30 @@ export function calculateRecipeMacros(
   let carbsSum = 0;
   let fatsSum = 0;
 
-  for (const item of recipe.ingredients) {
-    const ing = ingredientsMap.get(item.ingredient_id);
-    if (!ing) continue;
-    rawWeightTotal += item.raw_weight_g;
-    const itemMacros = calculateItemMacros(ing, item.raw_weight_g);
-    caloriesSum += itemMacros.calories;
-    proteinSum += itemMacros.protein;
-    carbsSum += itemMacros.carbs;
-    fatsSum += itemMacros.fats;
+  for (const item of (recipe.ingredients || [])) {
+    const rawWeight = item.weight_g ?? (item as any).raw_weight_g ?? 0;
+    if (rawWeight <= 0) continue;
+
+    if (item.calories_100g !== undefined) {
+      // Modern copied component with embedded nutrient density
+      rawWeightTotal += rawWeight;
+      const itemMacros = calculateItemMacros(item, rawWeight);
+      caloriesSum += itemMacros.calories;
+      proteinSum += itemMacros.protein;
+      carbsSum += itemMacros.carbs;
+      fatsSum += itemMacros.fats;
+    } else if (ingredientsMap) {
+      // Legacy item referencing ingredient_id
+      const refId = (item as any).food_id || (item as any).ingredient_id;
+      const ing = ingredientsMap.get(refId);
+      if (!ing) continue;
+      rawWeightTotal += rawWeight;
+      const itemMacros = calculateItemMacros(ing, rawWeight);
+      caloriesSum += itemMacros.calories;
+      proteinSum += itemMacros.protein;
+      carbsSum += itemMacros.carbs;
+      fatsSum += itemMacros.fats;
+    }
   }
 
   const rawYield = recipe.yield_factor;

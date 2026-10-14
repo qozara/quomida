@@ -22,8 +22,9 @@ describe('RxDB Schema Specs', () => {
     expect(sourceProp.enum).toContain('ai');
   });
 
-  it('defines recipes schema with embedded ingredients array', () => {
+  it('defines recipes schema with embedded ingredients array and version 1', () => {
     expect(recipesSchema.title).toBe('recipes');
+    expect(recipesSchema.version).toBe(1);
     expect(recipesSchema.primaryKey).toBe('id');
     expect(recipesSchema.properties.ingredients.type).toBe('array');
   });

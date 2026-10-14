@@ -20,7 +20,7 @@ import {
   type SystemMetadata
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
 
@@ -178,7 +178,27 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   try {
     await db.addCollections({
       base_ingredients: { schema: baseIngredientsSchema },
-      recipes: { schema: recipesSchema },
+      recipes: { 
+        schema: recipesSchema,
+        migrationStrategies: {
+          1: (oldDoc: any) => {
+            // Migration to v1: Ensure ingredients have modern RecipeComponent structure
+            const oldIngredients = Array.isArray(oldDoc.ingredients) ? oldDoc.ingredients : [];
+            oldDoc.ingredients = oldIngredients.map((item: any) => ({
+              food_id: item.food_id || item.ingredient_id || 'unknown',
+              name: item.name || item.ingredient_id || 'Ingredient',
+              weight_g: Number(item.weight_g ?? item.raw_weight_g ?? 100),
+              calories_100g: Number(item.calories_100g) || 0,
+              protein_100g: Number(item.protein_100g) || 0,
+              carbs_100g: Number(item.carbs_100g) || 0,
+              fats_100g: Number(item.fats_100g) || 0,
+              from_recipe: Boolean(item.from_recipe)
+            }));
+            oldDoc.yield_factor = Number(oldDoc.yield_factor) || 1.0;
+            return oldDoc;
+          }
+        }
+      },
       portions: { 
         schema: portionsSchema,
         migrationStrategies: {
@@ -303,9 +323,10 @@ export class LocalDBService {
     if (!this.db) await this.init();
     const logs = await this.db!.daily_logs.find().exec();
     const customFoods = await this.db!.base_ingredients.find({ selector: { source: 'custom' } }).exec();
+    const recipes = await this.db!.recipes.find().exec();
     return {
       logs: logs.length,
-      customFoods: customFoods.length
+      customFoods: customFoods.length + recipes.length
     };
   }
 
@@ -377,6 +398,54 @@ export class LocalDBService {
       const patchedPortion = await p.patch({ updatedAt: Date.now() });
       await patchedPortion.remove();
     }
+  }
+
+  async saveRecipe(recipeInput: Recipe, portions?: { name: string, equivalent_weight_g: number }[]): Promise<string> {
+    if (!this.db) await this.init();
+    const id = recipeInput.id || `recipe-custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRecipe: Recipe = {
+      ...recipeInput,
+      id,
+      updatedAt: Date.now()
+    };
+    await this.db!.recipes.upsert(newRecipe);
+
+    if (portions && portions.length > 0) {
+      const now = Date.now();
+      const portionsToUpsert = portions.map((p, i) => ({
+        id: `port-${id}-${i}`,
+        base_food_id: id,
+        name: p.name,
+        equivalent_weight_g: p.equivalent_weight_g,
+        source: 'custom' as const,
+        updatedAt: now
+      }));
+      await this.db!.portions.bulkUpsert(portionsToUpsert);
+    }
+
+    return id;
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    const doc = await this.db!.recipes.findOne(id).exec();
+    if (doc) {
+      const patchedDoc = await doc.patch({ updatedAt: Date.now() });
+      await patchedDoc.remove();
+    }
+    const portions = await this.db!.portions.find({ selector: { base_food_id: id } }).exec();
+    for (const p of portions) {
+      const patchedPortion = await p.patch({ updatedAt: Date.now() });
+      await patchedPortion.remove();
+    }
+  }
+
+  observeRecipes(): Observable<Recipe[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.recipes) {
+      return of([]);
+    }
+    return db.recipes.find().$;
   }
 
   async logFood(logInput: Omit<DailyLog, 'id' | 'timestamp'> & { id?: string; timestamp?: string }): Promise<string> {

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { MealType, BaseIngredient } from '@quomida/domain-core';
+import type { MealType, BaseIngredient, FoodItem } from '@quomida/domain-core';
 import { ChevronDown, ChevronUp, Trash2, Coffee, Utensils, Moon, Apple } from 'lucide-react';
 
 interface MealSectionProps {
   mealType: MealType;
   title: string;
-  onOpenPortionModal: (ingredient: BaseIngredient, mealType: MealType) => void;
+  onOpenPortionModal: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
 }
 
 const mealIcons: Record<MealType, React.ReactNode> = {

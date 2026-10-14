@@ -111,4 +111,50 @@ describe('PortionManager', () => {
     expect(portions[1].name).toBe('1 cucharada (15 g)');
     expect(portions[1].tag).toBe('Generic');
   });
+
+  it('resolves custom servings, virtual whole recipe portion, and skips SQLite catalog calls for recipes', async () => {
+    const mockRecipeFood: any = {
+      kind: 'recipe',
+      id: 'rec-quiche',
+      name: 'Spinach Quiche',
+      source: 'custom',
+      cooked_weight_g: 800,
+      calories_100g: 210,
+      protein_100g: 8,
+      carbs_100g: 15,
+      fats_100g: 12
+    };
+
+    const recipeCustomPortions: Portion[] = [
+      {
+        id: 'p-quiche-slice',
+        base_food_id: 'rec-quiche',
+        name: '1 slice (1/8)',
+        equivalent_weight_g: 100
+      },
+      ...mockCustomPortions
+    ];
+
+    const portions = await manager.resolvePortions({
+      ingredient: mockRecipeFood,
+      customPortions: recipeCustomPortions,
+      catalogProvider: mockProvider
+    });
+
+    // 1. Custom serving: 1 slice (1/8)
+    expect(portions[0].name).toBe('1 slice (1/8)');
+    expect(portions[0].tag).toBe('Custom');
+
+    // 2. Virtual whole recipe: Whole recipe (800g)
+    expect(portions[1].name).toBe('Whole recipe');
+    expect(portions[1].equivalent_weight_g).toBe(800);
+    expect(portions[1].tag).toBe('Custom');
+
+    // 3. Generic fallback
+    expect(portions[2].name).toBe('1 cup');
+    expect(portions[2].tag).toBe('Generic');
+
+    // Catalog provider should not have been called for recipe id
+    expect(mockProvider.getPortionsForIngredient).not.toHaveBeenCalledWith('rec-quiche');
+  });
 });

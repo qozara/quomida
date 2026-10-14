@@ -1,4 +1,10 @@
-import type { BaseIngredient, Portion } from '../types.js';
+import type {
+  BaseIngredient,
+  Portion,
+  FoodItem,
+  RecipeFoodItem,
+  FoodKind
+} from '../types.js';
 
 export interface ICatalogProvider {
   searchIngredients(query: string, limit?: number): Promise<BaseIngredient[]>;
@@ -8,11 +14,14 @@ export interface ICatalogProvider {
 export interface FoodSearchOptions {
   query: string;
   customIngredients?: BaseIngredient[];
+  customRecipes?: RecipeFoodItem[];
+  kinds?: FoodKind[];
   limit?: number;
 }
 
 export interface UnifiedSearchResult {
-  items: BaseIngredient[];
+  items: FoodItem[];
+  recipeCount: number;
   customCount: number;
   catalogCount: number;
 }
@@ -27,8 +36,8 @@ export function normalizeFoodName(name: string): string {
 
 export class CatalogSearchManager {
   /**
-   * Unifies and deduplicates searches across custom in-memory ingredients and the catalog provider.
-   * Custom user ingredients are always prioritized first and override system items on name collisions.
+   * Unifies and deduplicates searches across recipes, custom ingredients, and the system catalog provider.
+   * Order of precedence: Recipes -> Custom Ingredients -> System Catalog.
    */
   async search(
     options: FoodSearchOptions,
@@ -36,20 +45,31 @@ export class CatalogSearchManager {
   ): Promise<UnifiedSearchResult> {
     const rawQuery = options.query.trim();
     if (!rawQuery) {
-      return { items: [], customCount: 0, catalogCount: 0 };
+      return { items: [], recipeCount: 0, customCount: 0, catalogCount: 0 };
     }
     const normQuery = normalizeFoodName(rawQuery);
-
     const limit = options.limit || 30;
+    const allowedKinds = new Set<FoodKind>(options.kinds || ['ingredient', 'recipe']);
 
-    // 1. Filter local custom in-memory ingredients (accent & case-insensitive)
-    const customMatches = (options.customIngredients || []).filter(item =>
-      normalizeFoodName(item.name).includes(normQuery)
-    );
+    // 1. Filter local custom recipes
+    let recipeMatches: RecipeFoodItem[] = [];
+    if (allowedKinds.has('recipe') && options.customRecipes) {
+      recipeMatches = options.customRecipes.filter(r =>
+        normalizeFoodName(r.name).includes(normQuery)
+      );
+    }
 
-    // 2. Query catalog provider if provided
+    // 2. Filter local custom in-memory ingredients
+    let customMatches: BaseIngredient[] = [];
+    if (allowedKinds.has('ingredient') && options.customIngredients) {
+      customMatches = options.customIngredients.filter(item =>
+        normalizeFoodName(item.name).includes(normQuery)
+      );
+    }
+
+    // 3. Query catalog provider if allowed and provided
     let catalogMatches: BaseIngredient[] = [];
-    if (catalogProvider) {
+    if (allowedKinds.has('ingredient') && catalogProvider) {
       try {
         catalogMatches = await catalogProvider.searchIngredients(rawQuery, limit);
       } catch (err) {
@@ -57,40 +77,52 @@ export class CatalogSearchManager {
       }
     }
 
-    // 3. Merge, prioritize custom, and deduplicate by ID and normalized name
-    const merged = this.mergeAndDeduplicate(customMatches, catalogMatches, limit);
+    // 4. Merge, prioritize, and deduplicate
+    const merged = this.mergeAndDeduplicate(recipeMatches, customMatches, catalogMatches, limit);
 
     return {
       items: merged,
+      recipeCount: recipeMatches.length,
       customCount: customMatches.length,
       catalogCount: catalogMatches.length
     };
   }
 
   /**
-   * Resolves a natural-language AI food query by checking custom foods first,
-   * then querying the catalog provider.
+   * Resolves a natural-language AI food query by checking custom recipes first,
+   * then custom ingredients, then querying the catalog provider.
    */
   async resolveAiMatch(
     foodQuery: string,
     customIngredients: BaseIngredient[],
-    catalogProvider?: ICatalogProvider
-  ): Promise<BaseIngredient | null> {
+    catalogProvider?: ICatalogProvider,
+    customRecipes?: RecipeFoodItem[]
+  ): Promise<FoodItem | null> {
     const normQuery = normalizeFoodName(foodQuery);
     if (!normQuery) return null;
 
-    // 1. Check custom ingredients
+    // 1. Check custom recipes
+    if (customRecipes && customRecipes.length > 0) {
+      const recipeMatch = customRecipes.find(r =>
+        normalizeFoodName(r.name).includes(normQuery)
+      );
+      if (recipeMatch) return recipeMatch;
+    }
+
+    // 2. Check custom ingredients
     const customMatch = customIngredients.find(item =>
       normalizeFoodName(item.name).includes(normQuery)
     );
-    if (customMatch) return customMatch;
+    if (customMatch) {
+      return { ...customMatch, kind: 'ingredient' };
+    }
 
-    // 2. Query catalog provider
+    // 3. Query catalog provider
     if (catalogProvider) {
       try {
         const catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 1);
         if (catalogResults.length > 0) {
-          return catalogResults[0];
+          return { ...catalogResults[0], kind: 'ingredient' };
         }
       } catch (err) {
         console.error('[CatalogSearchManager] AI catalog fallback failed:', err);
@@ -101,38 +133,50 @@ export class CatalogSearchManager {
   }
 
   /**
-   * Deduplicates ingredients while preserving order (custom first).
-   * User-created custom ingredients override system ingredients on naming collision.
+   * Deduplicates food items while preserving order:
+   * 1. Custom Recipes
+   * 2. Custom Ingredients
+   * 3. System Catalog Ingredients (suppressed on name collision with Custom Ingredients)
    */
   mergeAndDeduplicate(
+    recipes: RecipeFoodItem[],
     customItems: BaseIngredient[],
     catalogItems: BaseIngredient[],
     limit: number = 30
-  ): BaseIngredient[] {
+  ): FoodItem[] {
     const seenIds = new Set<string>();
-    const seenCustomNames = new Set<string>();
-    const result: BaseIngredient[] = [];
+    const seenCustomIngredientNames = new Set<string>();
+    const result: FoodItem[] = [];
 
+    // 1. Recipes first
+    for (const r of recipes) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id);
+        result.push(r);
+      }
+    }
+
+    // 2. Custom ingredients second
     for (const item of customItems) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         const normName = normalizeFoodName(item.name);
         if (normName) {
-          seenCustomNames.add(normName);
+          seenCustomIngredientNames.add(normName);
         }
-        result.push(item);
+        result.push({ ...item, kind: 'ingredient' });
       }
     }
 
+    // 3. Catalog ingredients third (filtered by custom ingredient name collisions)
     for (const item of catalogItems) {
       const normName = normalizeFoodName(item.name);
-      // Custom ingredients natively override system ingredients on naming collision (PRODUCT_SPEC §2.B)
-      if (normName && seenCustomNames.has(normName)) {
+      if (normName && seenCustomIngredientNames.has(normName)) {
         continue;
       }
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
-        result.push(item);
+        result.push({ ...item, kind: 'ingredient' });
       }
     }
 

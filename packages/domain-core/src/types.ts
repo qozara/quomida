@@ -2,7 +2,14 @@ export type IngredientSource = 'system' | 'custom' | 'ai';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type MealType = 'meal_breakfast' | 'meal_lunch' | 'meal_dinner' | 'meal_snack';
 
-export interface BaseIngredient {
+export interface NutrientDensity {
+  calories_100g: number;
+  protein_100g: number;
+  carbs_100g: number;
+  fats_100g: number;
+}
+
+export interface BaseIngredient extends NutrientDensity {
   id: string;
   name: string;
   source: IngredientSource;
@@ -14,6 +21,19 @@ export interface BaseIngredient {
   updatedAt?: number;
 }
 
+export interface RecipeComponent extends NutrientDensity {
+  food_id: string;
+  name: string;
+  weight_g: number;
+  quantity?: number;
+  portion_name?: string;
+  calories_100g: number;
+  protein_100g: number;
+  carbs_100g: number;
+  fats_100g: number;
+  from_recipe?: boolean;
+}
+
 export interface RecipeIngredientItem {
   ingredient_id: string;
   raw_weight_g: number;
@@ -22,10 +42,32 @@ export interface RecipeIngredientItem {
 export interface Recipe {
   id: string;
   name: string;
-  ingredients: RecipeIngredientItem[];
+  ingredients: RecipeComponent[];
   yield_factor: number;
   updatedAt?: number;
 }
+
+export type FoodKind = 'ingredient' | 'recipe';
+
+export interface IngredientFoodItem extends BaseIngredient {
+  kind: 'ingredient';
+}
+
+export interface RecipeFoodItem extends NutrientDensity {
+  kind: 'recipe';
+  id: string;
+  name: string;
+  source: 'custom';
+  lang?: string;
+  raw_weight_g: number;
+  cooked_weight_g: number;
+  yield_factor: number;
+  total_macros: MacroSnapshot;
+  recipe: Recipe;
+  updatedAt?: number;
+}
+
+export type FoodItem = IngredientFoodItem | RecipeFoodItem;
 
 export interface Portion {
   id: string;
