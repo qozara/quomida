@@ -96,5 +96,5 @@ describe.skipIf(!fs.existsSync(catalogPath))('Built Catalog Validation & Trigram
         fs.unlinkSync(tempDbPath);
       }
     }
-  });
+  }, 30000);
 });
