@@ -226,7 +226,10 @@
     "recipeBadge": "Receta",
     "customBadge": "Personalizado",
     "wholeRecipe": "Receta entera",
-    "breakdownTitle": "Desglose de Ingredientes de la Receta"
+    "breakdownTitle": "Desglose de Ingredientes de la Receta",
+    "cooked": "cocido",
+    "raw": "crudo",
+    "totalDish": "Total Receta"
   },
   "catalog": {
     "title": "Administrador de Catálogo de Alimentos",

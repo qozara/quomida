@@ -226,7 +226,10 @@
     "recipeBadge": "Recipe",
     "customBadge": "Custom",
     "wholeRecipe": "Whole recipe",
-    "breakdownTitle": "Recipe Ingredients Breakdown"
+    "breakdownTitle": "Recipe Ingredients Breakdown",
+    "cooked": "cooked",
+    "raw": "raw",
+    "totalDish": "Total Recipe"
   },
   "catalog": {
     "title": "Food Catalog Manager",

@@ -405,19 +405,19 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
               <div className="grid grid-cols-4 gap-1 text-center">
                 <div className="bg-slate-900 p-1.5 rounded-lg">
                   <div className="text-[10px] text-slate-400">kcal</div>
-                  <div className="text-xs font-bold text-white">{nutritionPreview.density.calories_100g}</div>
+                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.calories_100g * 10) / 10}</div>
                 </div>
                 <div className="bg-slate-900 p-1.5 rounded-lg">
                   <div className="text-[10px] text-rose-400">P</div>
-                  <div className="text-xs font-bold text-white">{nutritionPreview.density.protein_100g}g</div>
+                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.protein_100g * 10) / 10}g</div>
                 </div>
                 <div className="bg-slate-900 p-1.5 rounded-lg">
                   <div className="text-[10px] text-amber-400">C</div>
-                  <div className="text-xs font-bold text-white">{nutritionPreview.density.carbs_100g}g</div>
+                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.carbs_100g * 10) / 10}g</div>
                 </div>
                 <div className="bg-slate-900 p-1.5 rounded-lg">
                   <div className="text-[10px] text-cyan-400">F</div>
-                  <div className="text-xs font-bold text-white">{nutritionPreview.density.fats_100g}g</div>
+                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.fats_100g * 10) / 10}g</div>
                 </div>
               </div>
             </div>

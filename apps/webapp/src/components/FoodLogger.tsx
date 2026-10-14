@@ -192,9 +192,20 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">System</span>
                           ) : null}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
-                        </div>
+                        {'kind' in ing && ing.kind === 'recipe' ? (
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            <span className="font-semibold text-slate-200">
+                              {t.recipes?.totalDish || 'Total'}: {Math.round(ing.total_macros.calories)} kcal
+                            </span>
+                            <span className="text-slate-400"> ({ing.cooked_weight_g}g {t.recipes?.cooked || 'cooked'})</span>
+                            <span className="text-slate-600"> • </span>
+                            <span>{Math.round(ing.calories_100g * 10) / 10} kcal/100g</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
+                          </div>
+                        )}
                       </div>
                       <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
                     </button>

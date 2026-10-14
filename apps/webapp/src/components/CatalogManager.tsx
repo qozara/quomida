@@ -472,12 +472,29 @@ export const CatalogManager: React.FC = () => {
                         {isRecipe ? dict.recipes.recipeBadge : item.source}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
-                      {isRecipe && recipeFood && (
-                        <span className="text-slate-500"> • {recipeFood.cooked_weight_g}g cooked</span>
-                      )}
-                    </div>
+                    {isRecipe && recipeFood ? (
+                      <div className="text-xs text-slate-400 mt-0.5 space-y-0.5">
+                        <div>
+                          <span className="font-semibold text-white">
+                            {dict.recipes.totalDish || 'Total'}: {Math.round(recipeFood.total_macros.calories)} kcal
+                          </span>
+                          <span className="text-slate-400"> ({recipeFood.cooked_weight_g}g {dict.recipes.cooked})</span>
+                          <span className="text-slate-600"> • </span>
+                          <span className="text-rose-400">P: {Math.round(recipeFood.total_macros.protein * 10) / 10}g</span>
+                          <span className="text-slate-600"> | </span>
+                          <span className="text-amber-400">C: {Math.round(recipeFood.total_macros.carbs * 10) / 10}g</span>
+                          <span className="text-slate-600"> | </span>
+                          <span className="text-cyan-400">F: {Math.round(recipeFood.total_macros.fats * 10) / 10}g</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {Math.round(recipeFood.calories_100g * 10) / 10} kcal/100g • P: {Math.round(recipeFood.protein_100g * 10) / 10}g | C: {Math.round(recipeFood.carbs_100g * 10) / 10}g | F: {Math.round(recipeFood.fats_100g * 10) / 10}g
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
@@ -518,7 +535,11 @@ export const CatalogManager: React.FC = () => {
                     <span className="text-[11px] font-bold text-purple-400 block">
                       {dict.recipes.breakdownTitle}
                     </span>
-                    <RecipeComponentList components={recipeFood.recipe?.ingredients || (recipeFood as any).ingredients || []} />
+                    <RecipeComponentList
+                      components={recipeFood.recipe?.ingredients || (recipeFood as any).ingredients || []}
+                      cookedWeightGrams={recipeFood.cooked_weight_g}
+                      totalMacros={recipeFood.total_macros}
+                    />
                   </div>
                 )}
               </div>

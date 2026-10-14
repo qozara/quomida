@@ -114,9 +114,19 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              100g base: {ingredient.calories_100g} kcal | P: {ingredient.protein_100g}g | C: {ingredient.carbs_100g}g | F: {ingredient.fats_100g}g
-            </p>
+            {'kind' in ingredient && ingredient.kind === 'recipe' ? (
+              <p className="text-xs text-slate-400 mt-0.5">
+                <span className="font-semibold text-slate-200">
+                  {dict.recipes?.totalDish || 'Total'}: {Math.round((ingredient as RecipeFoodItem).total_macros.calories)} kcal ({(ingredient as RecipeFoodItem).cooked_weight_g}g {dict.recipes?.cooked || 'cooked'})
+                </span>
+                <span className="text-slate-600"> • </span>
+                <span>{Math.round(ingredient.calories_100g * 10) / 10} kcal/100g</span>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-0.5">
+                100g base: {ingredient.calories_100g} kcal | P: {ingredient.protein_100g}g | C: {ingredient.carbs_100g}g | F: {ingredient.fats_100g}g
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -139,7 +149,11 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
             </button>
             {isBreakdownOpen && (
               <div className="p-3 pt-0 border-t border-slate-800/80">
-                <RecipeComponentList components={(ingredient as RecipeFoodItem).recipe?.ingredients || (ingredient as any).ingredients || []} />
+                <RecipeComponentList
+                  components={(ingredient as RecipeFoodItem).recipe?.ingredients || (ingredient as any).ingredients || []}
+                  cookedWeightGrams={(ingredient as RecipeFoodItem).cooked_weight_g}
+                  totalMacros={(ingredient as RecipeFoodItem).total_macros}
+                />
               </div>
             )}
           </div>

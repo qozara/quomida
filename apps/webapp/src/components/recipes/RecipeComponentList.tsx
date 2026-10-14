@@ -6,12 +6,18 @@ import { Trash2 } from 'lucide-react';
 
 interface RecipeComponentListProps {
   components: RecipeComponent[];
+  cookedWeightGrams?: number;
+  totalMacros?: { calories: number; protein: number; carbs: number; fats: number };
+  showSummary?: boolean;
   onRemove?: (index: number) => void;
   className?: string;
 }
 
 export const RecipeComponentList: React.FC<RecipeComponentListProps> = ({
   components,
+  cookedWeightGrams,
+  totalMacros,
+  showSummary = true,
   onRemove,
   className = ''
 }) => {
@@ -25,6 +31,18 @@ export const RecipeComponentList: React.FC<RecipeComponentListProps> = ({
       </div>
     );
   }
+
+  const totalRawWeight = components.reduce((sum, c) => sum + (c.weight_g || 0), 0);
+  const totalCals = totalMacros ? totalMacros.calories : components.reduce((sum, c) => sum + ((c.calories_100g * c.weight_g) / 100), 0);
+  const totalProtein = totalMacros ? totalMacros.protein : components.reduce((sum, c) => sum + ((c.protein_100g * c.weight_g) / 100), 0);
+  const totalCarbs = totalMacros ? totalMacros.carbs : components.reduce((sum, c) => sum + ((c.carbs_100g * c.weight_g) / 100), 0);
+  const totalFats = totalMacros ? totalMacros.fats : components.reduce((sum, c) => sum + ((c.fats_100g * c.weight_g) / 100), 0);
+
+  const effectiveCookedWeight = cookedWeightGrams || totalRawWeight;
+  const densityCals = effectiveCookedWeight > 0 ? (totalCals / effectiveCookedWeight) * 100 : 0;
+  const densityProtein = effectiveCookedWeight > 0 ? (totalProtein / effectiveCookedWeight) * 100 : 0;
+  const densityCarbs = effectiveCookedWeight > 0 ? (totalCarbs / effectiveCookedWeight) * 100 : 0;
+  const densityFats = effectiveCookedWeight > 0 ? (totalFats / effectiveCookedWeight) * 100 : 0;
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -80,6 +98,32 @@ export const RecipeComponentList: React.FC<RecipeComponentListProps> = ({
           </div>
         );
       })}
+
+      {showSummary && !onRemove && components.length > 0 && (
+        <div className="mt-3 p-3 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-white">
+            <span>
+              {dict.recipes.totalDish || dict.recipes.totalNutrition} ({effectiveCookedWeight}g {cookedWeightGrams ? dict.recipes.cooked : dict.recipes.raw}):
+            </span>
+            <span className="text-purple-300">
+              {Math.round(totalCals)} kcal
+            </span>
+          </div>
+          <div className="text-xs text-slate-300 flex flex-wrap gap-x-2">
+            <span className="text-rose-400">P: {Math.round(totalProtein * 10) / 10}g</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-amber-400">C: {Math.round(totalCarbs * 10) / 10}g</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-cyan-400">F: {Math.round(totalFats * 10) / 10}g</span>
+          </div>
+          <div className="text-[11px] text-slate-400 pt-1 border-t border-purple-800/30 flex items-center justify-between">
+            <span>{dict.recipes.nutritionPer100g}:</span>
+            <span className="font-semibold text-slate-300">
+              {Math.round(densityCals * 10) / 10} kcal • P: {Math.round(densityProtein * 10) / 10}g | C: {Math.round(densityCarbs * 10) / 10}g | F: {Math.round(densityFats * 10) / 10}g
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
