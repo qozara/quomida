@@ -225,6 +225,7 @@
     "noComponents": "No foods added yet. Search and add constituent foods above.",
     "recipeBadge": "Recipe",
     "customBadge": "Custom",
+    "systemBadge": "System",
     "wholeRecipe": "Whole recipe",
     "breakdownTitle": "Recipe Ingredients Breakdown",
     "cooked": "cooked",
@@ -244,5 +245,39 @@
     "deleteRecipeConfirm": "Are you sure you want to delete this recipe?",
     "noFoodsFound": "No foods found",
     "noCustomFoodsYet": "No custom foods or recipes added yet"
+  },
+  "ai": {
+    "title": "Intelligence & Edge AI",
+    "description": "Configure natural language meal logging with Qozara Intelligence edge AI or your private model.",
+    "providerLabel": "Active AI Provider",
+    "providers": {
+      "qozaraIntelligence": "Qozara Intelligence (Default)",
+      "qozaraIntelligenceDesc": "Managed edge AI powered by Gemini 2.0 Flash at ai.qozara.org (5 req/day anonymous, 20 req/day with Google login).",
+      "byok": "Bring Your Own Key (BYOK)",
+      "byokDesc": "Use your personal Gemini API key. Encrypted at the edge with AES-256-GCM and stored only in your private device/cloud storage.",
+      "ollama": "Local Ollama (Offline)",
+      "ollamaDesc": "100% private, offline inference running on your local machine.",
+      "windowAi": "Browser Built-in AI",
+      "windowAiDesc": "Experimental built-in browser Gemini Nano."
+    },
+    "apiKeyLabel": "Personal Gemini API Key",
+    "apiKeyPlaceholder": "AIzaSy...",
+    "encryptKeyBtn": "Encrypt & Save Key",
+    "encryptingKey": "Encrypting at edge...",
+    "keyEncryptedSuccess": "API Key encrypted with AES-256-GCM and stored locally.",
+    "keyEncryptedNotice": "Your key is envelope-encrypted using Edge KMS and stored exclusively in your local database. Qozara never retains your key on a server.",
+    "keyConfigured": "Encrypted Personal Key configured",
+    "clearKeyBtn": "Remove Key",
+    "ollamaUrlLabel": "Ollama Endpoint URL",
+    "ollamaUrlPlaceholder": "http://localhost:11434/api",
+    "ollamaModelLabel": "Ollama Model Name",
+    "ollamaModelPlaceholder": "llama3.2",
+    "saveOllamaBtn": "Save Ollama Settings",
+    "ollamaSavedSuccess": "Ollama settings saved.",
+    "keyEncryptError": "Failed to encrypt API key",
+    "quotaNotice": "Qozara Intelligence managed tier is subject to sliding-window rate limits. Configure a personal key for unlimited usage.",
+    "parseError": "Natural language parsing failed. Falling back to catalog search.",
+    "parsingMeal": "Parsing meal with AI...",
+    "noItemsParsed": "Could not extract food items from description."
   }
 }

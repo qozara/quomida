@@ -21,9 +21,15 @@ import {
   ExternalLink,
   LifeBuoy,
   Wifi,
-  Trash2
+  Trash2,
+  Sparkles,
+  Key,
+  Cpu
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { AgentClient } from '@qozara/ai-client';
+import { AI_CONFIG } from '../config/ai.js';
+import type { AiProviderType } from '@quomida/domain-core';
 
 const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || 'support@qozara.org';
 const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@qozara.org';
@@ -84,6 +90,85 @@ export const SettingsModal: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false);
 
   const [isChecking, setIsChecking] = useState(false);
+
+  // AI & Qozara Intelligence State
+  const [aiProvider, setAiProvider] = useState<AiProviderType>(
+    userSettings.ai_settings?.provider || AI_CONFIG.defaultProvider
+  );
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [ollamaUrl, setOllamaUrl] = useState(
+    userSettings.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl
+  );
+  const [ollamaModel, setOllamaModel] = useState(
+    userSettings.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel
+  );
+  const [isEncryptingKey, setIsEncryptingKey] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+
+  const handleSaveAiProvider = async (newProvider: AiProviderType) => {
+    setAiProvider(newProvider);
+    await updateUserSettings({
+      ai_settings: {
+        provider: newProvider,
+        ciphertext: userSettings.ai_settings?.ciphertext,
+        ollama_base_url: ollamaUrl,
+        ollama_model: ollamaModel,
+      },
+    });
+  };
+
+  const handleEncryptAndSaveKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+    setIsEncryptingKey(true);
+    setAiFeedback(null);
+    try {
+      const client = new AgentClient(AI_CONFIG.proxyUrl);
+      const ciphertext = await client.encryptApiKey(apiKeyInput.trim());
+      await updateUserSettings({
+        ai_settings: {
+          provider: 'byok',
+          ciphertext,
+          ollama_base_url: ollamaUrl,
+          ollama_model: ollamaModel,
+        },
+      });
+      setAiProvider('byok');
+      setApiKeyInput('');
+      setAiFeedback(t.ai?.keyEncryptedSuccess);
+    } catch (err: any) {
+      setAiFeedback(err?.message || t.ai?.keyEncryptError);
+    } finally {
+      setIsEncryptingKey(false);
+    }
+  };
+
+  const handleClearApiKey = async () => {
+    await updateUserSettings({
+      ai_settings: {
+        provider: AI_CONFIG.defaultProvider,
+        ciphertext: undefined,
+        ollama_base_url: ollamaUrl,
+        ollama_model: ollamaModel,
+      },
+    });
+    setAiProvider(AI_CONFIG.defaultProvider);
+    setAiFeedback(null);
+  };
+
+  const handleSaveOllamaSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateUserSettings({
+      ai_settings: {
+        provider: 'ollama',
+        ciphertext: userSettings.ai_settings?.ciphertext,
+        ollama_base_url: ollamaUrl.trim(),
+        ollama_model: ollamaModel.trim(),
+      },
+    });
+    setAiProvider('ollama');
+    setAiFeedback(t.ai?.ollamaSavedSuccess);
+  };
 
   if (!isSettingsOpen) return null;
 
@@ -249,6 +334,168 @@ export const SettingsModal: React.FC = () => {
             <span>{isSaved ? 'Goals Saved!' : 'Save Targets'}</span>
           </button>
         </form>
+
+        {/* Section: Intelligence & Edge AI */}
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>{t.ai?.title || 'Intelligence & Edge AI'}</span>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-mono uppercase bg-slate-950 px-2 py-0.5 rounded border border-emerald-800/50">
+              {aiProvider}
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {t.ai?.description || 'Configure natural language meal logging with Qozara Intelligence edge AI or your private model.'}
+            </p>
+
+            {/* Provider Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.ai?.providerLabel || 'Active AI Provider'}
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  {
+                    id: 'qozara-intelligence' as const,
+                    title: t.ai?.providers?.qozaraIntelligence || 'Qozara Intelligence (Default)',
+                    desc: t.ai?.providers?.qozaraIntelligenceDesc || 'Managed Gemini 2.0 Flash at ai.qozara.org'
+                  },
+                  {
+                    id: 'byok' as const,
+                    title: t.ai?.providers?.byok || 'Bring Your Own Key (BYOK)',
+                    desc: t.ai?.providers?.byokDesc || 'Personal key envelope-encrypted at edge (AES-256-GCM)'
+                  },
+                  {
+                    id: 'ollama' as const,
+                    title: t.ai?.providers?.ollama || 'Local Ollama (Offline)',
+                    desc: t.ai?.providers?.ollamaDesc || 'Private local offline inference'
+                  },
+                  {
+                    id: 'window.ai' as const,
+                    title: t.ai?.providers?.windowAi || 'Browser Built-in AI',
+                    desc: t.ai?.providers?.windowAiDesc || 'Experimental browser Gemini Nano'
+                  }
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleSaveAiProvider(p.id)}
+                    className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-0.5 ${
+                      aiProvider === p.id
+                        ? 'bg-emerald-950/40 border-emerald-500/80 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${aiProvider === p.id ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                      {p.title}
+                    </span>
+                    <span className="text-[10px] text-slate-400 pl-3.5 leading-tight">{p.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* BYOK Section */}
+            {aiProvider === 'byok' && (
+              <form onSubmit={handleEncryptAndSaveKey} className="space-y-2 pt-2 border-t border-slate-900">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{t.ai?.apiKeyLabel || 'Personal Gemini API Key'}</span>
+                  </label>
+                  {userSettings.ai_settings?.ciphertext && (
+                    <button
+                      type="button"
+                      onClick={handleClearApiKey}
+                      className="text-[10px] text-rose-400 hover:underline"
+                    >
+                      {t.ai?.clearKeyBtn || 'Remove Key'}
+                    </button>
+                  )}
+                </div>
+
+                {userSettings.ai_settings?.ciphertext && (
+                  <div className="bg-emerald-950/50 border border-emerald-800/60 rounded-xl p-2 text-[11px] text-emerald-300 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>{t.ai?.keyConfigured || 'Encrypted Personal Key configured'}</span>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder={t.ai?.apiKeyPlaceholder || 'AIzaSy...'}
+                    className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isEncryptingKey || !apiKeyInput.trim()}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-xl text-xs flex items-center gap-1 transition-all"
+                  >
+                    {isEncryptingKey ? (t.ai?.encryptingKey || 'Encrypting...') : (t.ai?.encryptKeyBtn || 'Save Key')}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  {t.ai?.keyEncryptedNotice || 'Your key is envelope-encrypted at edge (AES-256-GCM) and stored only in local storage.'}
+                </p>
+              </form>
+            )}
+
+            {/* Ollama Section */}
+            {aiProvider === 'ollama' && (
+              <form onSubmit={handleSaveOllamaSettings} className="space-y-2 pt-2 border-t border-slate-900">
+                <div className="flex items-center gap-1 text-xs font-semibold text-slate-300">
+                  <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t.ai?.providers?.ollama || 'Ollama Configuration'}</span>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">
+                    {t.ai?.ollamaUrlLabel || 'Ollama Endpoint URL'}
+                  </label>
+                  <input
+                    type="text"
+                    value={ollamaUrl}
+                    onChange={(e) => setOllamaUrl(e.target.value)}
+                    placeholder={t.ai?.ollamaUrlPlaceholder || 'http://localhost:11434/api'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">
+                    {t.ai?.ollamaModelLabel || 'Ollama Model Name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={ollamaModel}
+                    onChange={(e) => setOllamaModel(e.target.value)}
+                    placeholder={t.ai?.ollamaModelPlaceholder || 'llama3.2'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold rounded-xl text-xs transition-all"
+                >
+                  {t.ai?.saveOllamaBtn}
+                </button>
+              </form>
+            )}
+
+            {/* Feedback message */}
+            {aiFeedback && (
+              <p className="text-[11px] text-emerald-400 font-medium pt-1 border-t border-slate-900">
+                {aiFeedback}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* Section 3: BYOS Sync Info */}
         <div className="space-y-3 pt-2 border-t border-slate-800">

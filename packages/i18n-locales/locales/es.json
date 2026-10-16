@@ -225,6 +225,7 @@
     "noComponents": "Aún no se agregaron alimentos. Busca y agrega componentes arriba.",
     "recipeBadge": "Receta",
     "customBadge": "Personalizado",
+    "systemBadge": "Sistema",
     "wholeRecipe": "Receta entera",
     "breakdownTitle": "Desglose de Ingredientes de la Receta",
     "cooked": "cocido",
@@ -244,5 +245,39 @@
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
     "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas"
+  },
+  "ai": {
+    "title": "Inteligencia y Edge AI",
+    "description": "Configura el registro de comidas en lenguaje natural con la IA perimetral de Qozara Intelligence o tu modelo privado.",
+    "providerLabel": "Proveedor de IA Activo",
+    "providers": {
+      "qozaraIntelligence": "Qozara Intelligence (Predeterminado)",
+      "qozaraIntelligenceDesc": "IA perimetral gestionada impulsada por Gemini 2.0 Flash en ai.qozara.org (5 sol/día anónimo, 20 sol/día con cuenta Google).",
+      "byok": "Trae Tu Propia Clave (BYOK)",
+      "byokDesc": "Usa tu clave personal de Gemini. Se encripta en el perímetro con AES-256-GCM y se guarda solo en tu almacenamiento privado.",
+      "ollama": "Ollama Local (Offline)",
+      "ollamaDesc": "Inferencia 100% privada y fuera de línea ejecutándose en tu máquina local.",
+      "windowAi": "IA Integrada en Navegador",
+      "windowAiDesc": "Gemini Nano integrado experimental en el navegador."
+    },
+    "apiKeyLabel": "Clave API Personal de Gemini",
+    "apiKeyPlaceholder": "AIzaSy...",
+    "encryptKeyBtn": "Encriptar y Guardar Clave",
+    "encryptingKey": "Encriptando en el perímetro...",
+    "keyEncryptedSuccess": "Clave API encriptada con AES-256-GCM y guardada localmente.",
+    "keyEncryptedNotice": "Tu clave se encripta con KMS perimetral y se almacena exclusivamente en tu base de datos local. Qozara nunca guarda tu clave en servidores.",
+    "keyConfigured": "Clave personal encriptada configurada",
+    "clearKeyBtn": "Eliminar Clave",
+    "ollamaUrlLabel": "URL del Endpoint de Ollama",
+    "ollamaUrlPlaceholder": "http://localhost:11434/api",
+    "ollamaModelLabel": "Nombre del Modelo Ollama",
+    "ollamaModelPlaceholder": "llama3.2",
+    "saveOllamaBtn": "Guardar Configuración de Ollama",
+    "ollamaSavedSuccess": "Configuración de Ollama guardada.",
+    "keyEncryptError": "Error al encriptar la clave API",
+    "quotaNotice": "Qozara Intelligence está sujeto a límites de uso diario. Configura una clave personal para uso ilimitado.",
+    "parseError": "Falló el análisis en lenguaje natural. Volviendo a la búsqueda manual del catálogo.",
+    "parsingMeal": "Analizando comida con IA...",
+    "noItemsParsed": "No se pudieron extraer alimentos de la descripción."
   }
 }

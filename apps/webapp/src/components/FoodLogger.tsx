@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
 import { CatalogSearchManager } from '@quomida/domain-core';
-import { parseNaturalLanguageLog, MockLLMProvider } from '@quomida/llm-engine';
+import { parseNaturalLanguageLog, QozaraAiMealParser } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
+import { AI_CONFIG } from '../config/ai.js';
 
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
@@ -12,11 +13,12 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, recipeFoods = [], t, setIsSettingsOpen } = useApp();
+  const { ingredients, recipeFoods = [], t, setIsSettingsOpen, userSettings } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
@@ -77,21 +79,47 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
     if (!aiQuery.trim()) return;
 
     setIsParsing(true);
-    const mockProvider = new MockLLMProvider();
-    const parsed = await parseNaturalLanguageLog(aiQuery, mockProvider);
-    setIsParsing(false);
+    setParseError(null);
 
-    if (parsed && parsed.items.length > 0) {
-      const foodQuery = parsed.items[0].foodQuery;
-      const match = await searchManager.resolveAiMatch(foodQuery, ingredients, remoteService);
+    try {
+      const getAuthToken = async (): Promise<string | null> => {
+        const token = userSettings?.active_cloud_provider?.credentials?.access_token;
+        return typeof token === 'string' ? token : null;
+      };
 
-      if (match) {
-        onSelectIngredient(match, 'meal_lunch');
-        setAiQuery('');
-      } else if (ingredients.length > 0) {
-        onSelectIngredient(ingredients[0], 'meal_lunch');
-        setAiQuery('');
+      const aiProvider = new QozaraAiMealParser({
+        proxyUrl: AI_CONFIG.proxyUrl,
+        provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+        ciphertext: userSettings?.ai_settings?.ciphertext,
+        ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+        ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+        getAuthToken
+      });
+
+      const parsed = await parseNaturalLanguageLog(aiQuery, aiProvider);
+      setIsParsing(false);
+
+      if (parsed && parsed.items.length > 0) {
+        const foodQuery = parsed.items[0].foodQuery;
+        const match = await searchManager.resolveAiMatch(foodQuery, ingredients, remoteService, recipeFoods);
+
+        if (match) {
+          onSelectIngredient(match, 'meal_lunch');
+          setAiQuery('');
+        } else {
+          setActiveInputTab('search');
+          setSearchQuery(foodQuery);
+        }
+      } else {
+        setParseError(t.ai.noItemsParsed);
+        setActiveInputTab('search');
+        setSearchQuery(aiQuery);
       }
+    } catch (err) {
+      setIsParsing(false);
+      setParseError(t.ai.parseError);
+      setActiveInputTab('search');
+      setSearchQuery(aiQuery);
     }
   };
 
@@ -184,20 +212,20 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                           </div>
                           {'kind' in ing && ing.kind === 'recipe' ? (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                              {t.recipes?.recipeBadge || 'Recipe'}
+                              {t.recipes.recipeBadge}
                             </span>
                           ) : ing.source === 'custom' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Custom</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">{t.recipes.customBadge}</span>
                           ) : ing.source === 'system' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">System</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">{t.recipes.systemBadge}</span>
                           ) : null}
                         </div>
                         {'kind' in ing && ing.kind === 'recipe' ? (
                           <div className="text-xs text-slate-400 mt-0.5">
                             <span className="font-semibold text-slate-200">
-                              {t.recipes?.totalDish || 'Total'}: {Math.round(ing.total_macros.calories)} kcal
+                              {t.recipes.totalDish}: {Math.round(ing.total_macros.calories)} kcal
                             </span>
-                            <span className="text-slate-400"> ({ing.cooked_weight_g}g {t.recipes?.cooked || 'cooked'})</span>
+                            <span className="text-slate-400"> ({ing.cooked_weight_g}g {t.recipes.cooked})</span>
                             <span className="text-slate-600"> • </span>
                             <span>{Math.round(ing.calories_100g * 10) / 10} kcal/100g</span>
                           </div>
@@ -231,13 +259,16 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
             placeholder={t.search.aiPlaceholder}
             className="w-full p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner resize-none"
           />
+          {parseError && (
+            <p className="text-xs text-rose-400 px-1">{parseError}</p>
+          )}
           <button
             type="submit"
             disabled={isParsing || !aiQuery.trim()}
             className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
           >
             <Sparkles className="w-4 h-4" />
-            <span>{isParsing ? 'Analyzing...' : t.search.parseButton}</span>
+            <span>{isParsing ? t.ai.parsingMeal : t.search.parseButton}</span>
           </button>
         </form>
       )}
