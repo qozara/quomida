@@ -362,7 +362,7 @@ export const SettingsModal: React.FC = () => {
                   {
                     id: 'qozara-intelligence' as const,
                     title: t.ai?.providers?.qozaraIntelligence || 'Qozara Intelligence (Default)',
-                    desc: t.ai?.providers?.qozaraIntelligenceDesc || 'Managed Gemini 2.0 Flash at ai.qozara.org'
+                    desc: t.ai?.providers?.qozaraIntelligenceDesc || 'Managed Gemini 2.0 Flash edge AI'
                   },
                   {
                     id: 'byok' as const,

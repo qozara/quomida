@@ -252,7 +252,7 @@
     "providerLabel": "Active AI Provider",
     "providers": {
       "qozaraIntelligence": "Qozara Intelligence (Default)",
-      "qozaraIntelligenceDesc": "Managed edge AI powered by Gemini 2.0 Flash at ai.qozara.org (5 req/day anonymous, 20 req/day with Google login).",
+      "qozaraIntelligenceDesc": "Managed edge AI powered by Gemini 2.0 Flash (5 req/day anonymous, 20 req/day with Google login).",
       "byok": "Bring Your Own Key (BYOK)",
       "byokDesc": "Use your personal Gemini API key. Encrypted at the edge with AES-256-GCM and stored only in your private device/cloud storage.",
       "ollama": "Local Ollama (Offline)",

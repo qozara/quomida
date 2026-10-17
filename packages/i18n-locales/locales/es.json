@@ -252,7 +252,7 @@
     "providerLabel": "Proveedor de IA Activo",
     "providers": {
       "qozaraIntelligence": "Qozara Intelligence (Predeterminado)",
-      "qozaraIntelligenceDesc": "IA perimetral gestionada impulsada por Gemini 2.0 Flash en ai.qozara.org (5 sol/día anónimo, 20 sol/día con cuenta Google).",
+      "qozaraIntelligenceDesc": "IA perimetral gestionada impulsada por Gemini 2.0 Flash (5 sol/día anónimo, 20 sol/día con cuenta Google).",
       "byok": "Trae Tu Propia Clave (BYOK)",
       "byokDesc": "Usa tu clave personal de Gemini. Se encripta en el perímetro con AES-256-GCM y se guarda solo en tu almacenamiento privado.",
       "ollama": "Ollama Local (Offline)",
