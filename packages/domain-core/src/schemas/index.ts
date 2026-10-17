@@ -141,6 +141,16 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
       },
       required: ['id']
     },
+    ai_settings: {
+      type: 'object',
+      properties: {
+        provider: { type: 'string', enum: ['qozara-intelligence', 'byok', 'ollama', 'window.ai'] },
+        ciphertext: { type: 'string' },
+        ollama_base_url: { type: 'string' },
+        ollama_model: { type: 'string' }
+      },
+      required: ['provider']
+    },
     updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']

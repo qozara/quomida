@@ -23,7 +23,34 @@ function getGitCommitHash(): string {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const cspDomain = env.VITE_CATALOG_BASE_URL ? (new URL(env.VITE_CATALOG_BASE_URL).origin) : '';
+  const rawCatalogUrl = (env.VITE_CATALOG_BASE_URL || process.env.VITE_CATALOG_BASE_URL || '').trim();
+  const rawAiProxyUrl = (env.VITE_AI_PROXY_URL || process.env.VITE_AI_PROXY_URL || '').trim();
+
+  let cspCatalogDomain = '';
+  if (rawCatalogUrl) {
+    try {
+      cspCatalogDomain = new URL(rawCatalogUrl).origin;
+    } catch {
+      try {
+        cspCatalogDomain = new URL(`https://${rawCatalogUrl}`).origin;
+      } catch {
+        // Ignore invalid URL formatting
+      }
+    }
+  }
+
+  let cspAiDomain = '';
+  if (rawAiProxyUrl) {
+    try {
+      cspAiDomain = new URL(rawAiProxyUrl).origin;
+    } catch {
+      try {
+        cspAiDomain = new URL(`https://${rawAiProxyUrl}`).origin;
+      } catch {
+        // Ignore invalid URL formatting
+      }
+    }
+  }
 
   return {
     plugins: [
@@ -45,7 +72,13 @@ export default defineConfig(({ mode }) => {
       {
         name: 'csp-injector',
         transformIndexHtml(html) {
-          return html.replace('__VITE_CSP_CATALOG_DOMAIN__', cspDomain ? ` ${cspDomain}` : '');
+          return html
+            .replace('__VITE_CSP_CATALOG_DOMAIN__', cspCatalogDomain ? ` ${cspCatalogDomain}` : '')
+            .replace('__VITE_CSP_AI_DOMAIN__', cspAiDomain ? ` ${cspAiDomain}` : '')
+            .replace(/connect-src\s+([^;]+);/, (_match, group) => {
+              const cleaned = group.trim().replace(/\s+/g, ' ');
+              return `connect-src ${cleaned};`;
+            });
         }
       },
       {

@@ -249,7 +249,13 @@ export class RemoteCatalogService implements ICatalogProvider {
     // Safely escape and quote each token to prevent FTS5 keyword collisions (AND, OR, NOT, col:)
     const matchQuery = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
 
-    const worker = await this.getWorker();
+    let worker: any;
+    try {
+      worker = await this.getWorker();
+    } catch (e) {
+      console.warn('[RemoteCatalogService] Worker initialization error:', e);
+      return [];
+    }
 
     // 1. Try FTS5 query (fastest, typo-tolerant trigram/prefix)
     const ftsSql = `
@@ -308,7 +314,14 @@ export class RemoteCatalogService implements ICatalogProvider {
     const safeFoodId = baseFoodId.replace(/[^a-zA-Z0-9_\-]/g, '');
     if (!safeFoodId) return [];
 
-    const worker = await this.getWorker();
+    let worker: any;
+    try {
+      worker = await this.getWorker();
+    } catch (e) {
+      console.warn('[RemoteCatalogService] Worker initialization error:', e);
+      return [];
+    }
+
     const sql = `
       SELECT 
         id as id,

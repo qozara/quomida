@@ -3,6 +3,7 @@ export * from './schemas/index.js';
 export * from './calculations/index.js';
 export * from './catalog/CatalogSearchManager.js';
 export * from './catalog/PortionManager.js';
+export * from './catalog/BatchAiMealResolver.js';
 export * from './catalog/FoodCatalogManager.js';
 export * from './recipes/RecipeManager.js';
 export * from './logging/DailyLogManager.js';
