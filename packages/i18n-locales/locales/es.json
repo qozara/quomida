@@ -278,6 +278,16 @@
     "quotaNotice": "Qozara Intelligence está sujeto a límites de uso diario. Configura una clave personal para uso ilimitado.",
     "parseError": "Falló el análisis en lenguaje natural. Volviendo a la búsqueda manual del catálogo.",
     "parsingMeal": "Analizando comida con IA...",
-    "noItemsParsed": "No se pudieron extraer alimentos de la descripción."
+    "noItemsParsed": "No se pudieron extraer alimentos de la descripción.",
+    "batchReviewTitle": "Revisar Comida Detectada",
+    "batchReviewSubtitle": "Revisa los alimentos y porciones detectadas antes de registrar",
+    "logBatchAction": "Registrar {count} Alimentos en Diario",
+    "logSingleAction": "Registrar en Diario",
+    "unmatchedNotice": "Alimento no encontrado en el catálogo",
+    "unmatchedBadge": "No Encontrado",
+    "mealTotal": "Macros Totales de la Comida",
+    "removeItemAria": "Eliminar alimento de la comida",
+    "searchSubstitute": "Buscar sustituto en el catálogo",
+    "selectMeal": "Momento del día"
   }
 }

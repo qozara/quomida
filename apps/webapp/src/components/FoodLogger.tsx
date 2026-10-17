@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { CatalogSearchManager } from '@quomida/domain-core';
+import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedAiBatchMeal } from '@quomida/domain-core';
+import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
 import { parseNaturalLanguageLog, QozaraAiMealParser } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
+import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
 
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
@@ -13,7 +14,7 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, recipeFoods = [], t, setIsSettingsOpen, userSettings } = useApp();
+  const { ingredients, recipeFoods = [], t, setIsSettingsOpen, userSettings, db } = useApp();
   const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuery, setAiQuery] = useState('');
@@ -22,6 +23,9 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [batchResolver] = useState(() => new BatchAiMealResolver(searchManager));
+  const [batchMeal, setBatchMeal] = useState<ResolvedAiBatchMeal | null>(null);
+  const [isBatchReviewOpen, setIsBatchReviewOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isFullCatalog, setIsFullCatalog] = useState(() => remoteService.isFullCatalogLoaded);
 
@@ -100,26 +104,33 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       setIsParsing(false);
 
       if (parsed && parsed.items.length > 0) {
-        const foodQuery = parsed.items[0].foodQuery;
-        const match = await searchManager.resolveAiMatch(foodQuery, ingredients, remoteService, recipeFoods);
-
-        if (match) {
-          onSelectIngredient(match, 'meal_lunch');
-          setAiQuery('');
-        } else {
-          setActiveInputTab('search');
-          setSearchQuery(foodQuery);
+        let customPortions: Portion[] = [];
+        if (db) {
+          try {
+            const pdocs = await db.portions.find().exec();
+            customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+          } catch (e) {
+            console.warn('[FoodLogger] Failed to query local portions for batch:', e);
+          }
         }
+
+        const resolved = await batchResolver.resolveBatch({
+          rawInput: aiQuery,
+          rawItems: parsed.items,
+          customIngredients: ingredients,
+          customRecipes: recipeFoods,
+          customPortions,
+          catalogProvider: remoteService
+        });
+
+        setBatchMeal(resolved);
+        setIsBatchReviewOpen(true);
       } else {
-        setParseError(t.ai.noItemsParsed);
-        setActiveInputTab('search');
-        setSearchQuery(aiQuery);
+        setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
       }
     } catch (err) {
       setIsParsing(false);
-      setParseError(t.ai.parseError);
-      setActiveInputTab('search');
-      setSearchQuery(aiQuery);
+      setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
     }
   };
 
@@ -271,6 +282,20 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
             <span>{isParsing ? t.ai.parsingMeal : t.search.parseButton}</span>
           </button>
         </form>
+      )}
+
+      {/* Batch AI Multi-Ingredient Review Modal */}
+      {isBatchReviewOpen && batchMeal && (
+        <BatchAiMealReviewModal
+          isOpen={isBatchReviewOpen}
+          batchMeal={batchMeal}
+          onClose={() => setIsBatchReviewOpen(false)}
+          onLoggedSuccess={() => {
+            setAiQuery('');
+            setIsBatchReviewOpen(false);
+            setBatchMeal(null);
+          }}
+        />
       )}
 
     </section>
