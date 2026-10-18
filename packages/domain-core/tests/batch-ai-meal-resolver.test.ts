@@ -358,6 +358,71 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       expect(item.macros.protein).toBeCloseTo(29.0, 1);
     });
 
+    it('resolves "cené una milanesa con puré de papas." into dinner, Milanesa and pure de papas', async () => {
+      const catalogMock: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (q: string) => {
+          const norm = q.toLowerCase();
+          if (norm.includes('milanesa')) {
+            return [
+              {
+                id: 'ing-off-7798372240096',
+                name: 'Milanesa',
+                source: 'system',
+                lang: 'es',
+                calories_100g: 215,
+                protein_100g: 15,
+                carbs_100g: 18,
+                fats_100g: 10,
+                contentHash: 'hash-milanesa'
+              }
+            ];
+          }
+          if (norm.includes('pure') || norm.includes('puré') || norm.includes('papa')) {
+            return [
+              {
+                id: 'ing-off-7730306001779',
+                name: 'pure de papas',
+                source: 'system',
+                lang: 'es',
+                calories_100g: 85,
+                protein_100g: 2,
+                carbs_100g: 15,
+                fats_100g: 1.5,
+                contentHash: 'hash-pure'
+              }
+            ];
+          }
+          return [];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([]),
+      };
+
+      const result = await resolver.resolveBatch({
+        rawInput: 'cené una milanesa con puré de papas.',
+        rawItems: [
+          { foodQuery: 'milanesa', quantity: 1, unit: 'unit' },
+          { foodQuery: 'puré de papas', quantity: 1, unit: 'portion' }
+        ],
+        customIngredients: [],
+        catalogProvider: catalogMock,
+      });
+
+      expect(result.detectedMealType).toBe('meal_dinner');
+      expect(result.items).toHaveLength(2);
+
+      const milanesa = result.items[0];
+      expect(milanesa.food?.name).toBe('Milanesa');
+      expect(milanesa.quantity).toBe(1);
+      expect(milanesa.selectedPortionName).toBe('1 unidad');
+      expect(milanesa.calculatedWeightGrams).toBe(100);
+
+      const pure = result.items[1];
+      expect(pure.food?.name).toBe('pure de papas');
+      expect(pure.quantity).toBe(1);
+      expect(pure.selectedPortionName).toBe('1 porción');
+      expect(pure.calculatedWeightGrams).toBe(150);
+    });
+
     it('normalizes meal types from explicit string or detects from verbs', () => {
       expect(normalizeMealType('breakfast')).toBe('meal_breakfast');
       expect(normalizeMealType('desayuno')).toBe('meal_breakfast');
@@ -367,6 +432,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
 
       expect(detectMealTypeFromText('desayuné dos empanadas')).toBe('meal_breakfast');
       expect(detectMealTypeFromText('merendé un café con tostadas')).toBe('meal_snack');
+      expect(detectMealTypeFromText('cené una milanesa con puré de papas.')).toBe('meal_dinner');
     });
   });
 });

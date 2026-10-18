@@ -248,6 +248,20 @@ export class BatchAiMealResolver {
           });
         }
 
+        const hasPortion = availablePortions.some(p =>
+          /portion|porci[oó]n|plato/i.test(p.name)
+        );
+        if (!hasPortion) {
+          availablePortions.push({
+            id: `port-std-portion-${match.id}`,
+            base_food_id: match.id,
+            name: '1 porción',
+            equivalent_weight_g: 150,
+            source: 'system',
+            tag: 'Generic'
+          });
+        }
+
         const selectedPortionName = matchPortionUnit(item.unit, availablePortions);
         const quantity = item.quantity > 0 ? item.quantity : 1;
         const calculatedWeightGrams = convertPortionToGrams(

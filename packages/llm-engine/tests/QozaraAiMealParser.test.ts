@@ -197,4 +197,111 @@ describe('QozaraAiMealParser', () => {
       unit: 'unidad',
     });
   });
+
+  it('should split compound meals like "milanesa con puré de papas" into separate main and side items', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        meal_type: 'dinner',
+        food_items: [
+          { food_name: 'milanesa con puré de papas', quantity: 1, unit: 'plato' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('cené una milanesa con puré de papas.');
+
+    expect(result.detectedMealType).toBe('dinner');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toEqual({
+      foodQuery: 'milanesa',
+      quantity: 1,
+      unit: 'unit',
+    });
+    expect(result.items[1]).toEqual({
+      foodQuery: 'puré de papas',
+      quantity: 1,
+      unit: 'portion',
+    });
+  });
+
+  it('should preserve indivisible compound dishes like "café con leche"', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        meal_type: 'breakfast',
+        food_items: [
+          { food_name: 'café con leche', quantity: 1, unit: 'taza' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('desayuné un café con leche');
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      foodQuery: 'café con leche',
+      quantity: 1,
+      unit: 'taza',
+    });
+  });
+
+  it('should handle multiple tool calls array in response.tool_calls', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_calls',
+      tool_calls: [
+        {
+          function: {
+            name: 'log_meal',
+            arguments: JSON.stringify({ food_items: [{ food_name: 'milanesa', quantity: 1, unit: 'unit' }], meal_type: 'dinner' })
+          }
+        },
+        {
+          function: {
+            name: 'log_meal',
+            arguments: JSON.stringify({ food_items: [{ food_name: 'puré de papas', quantity: 1, unit: 'portion' }] })
+          }
+        }
+      ]
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('cené una milanesa con puré de papas');
+
+    expect(result.detectedMealType).toBe('dinner');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].foodQuery).toBe('milanesa');
+    expect(result.items[1].foodQuery).toBe('puré de papas');
+  });
+
+  it('should extract plain text bullet points when model replies in conversational text without tool calls', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'text',
+      content: 'He registrado para tu cena:\n- 1 milanesa\n- 1 porción de puré de papas',
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('cené una milanesa con puré de papas');
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].foodQuery).toBe('milanesa');
+    expect(result.items[1].foodQuery).toBe('puré de papas');
+    expect(result.items[1].unit).toBe('porción');
+  });
 });
