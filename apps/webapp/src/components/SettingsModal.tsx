@@ -27,7 +27,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
-import { AgentClient } from '@qozara/ai-client';
+import { AiKeyEncryptionService } from '@quomida/llm-engine';
 import { AI_CONFIG } from '../config/ai.js';
 import type { AiProviderType } from '@quomida/domain-core';
 
@@ -123,8 +123,7 @@ export const SettingsModal: React.FC = () => {
     setIsEncryptingKey(true);
     setAiFeedback(null);
     try {
-      const client = new AgentClient(AI_CONFIG.proxyUrl);
-      const ciphertext = await client.encryptApiKey(apiKeyInput.trim());
+      const ciphertext = await AiKeyEncryptionService.encryptApiKey(apiKeyInput.trim(), AI_CONFIG.proxyUrl);
       await updateUserSettings({
         ai_settings: {
           provider: 'byok',

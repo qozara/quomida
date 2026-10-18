@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedAiBatchMeal } from '@quomida/domain-core';
 import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
-import { QozaraAiMealParser } from '@quomida/llm-engine';
+import { AiMealService, AiMealError } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
 import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
@@ -91,51 +91,57 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         return typeof token === 'string' ? token : null;
       };
 
-      const aiProvider = new QozaraAiMealParser({
-        proxyUrl: AI_CONFIG.proxyUrl,
-        provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
-        ciphertext: userSettings?.ai_settings?.ciphertext,
-        ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
-        ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
-        getAuthToken
+      let customPortions: Portion[] = [];
+      if (db) {
+        try {
+          const pdocs = await db.portions.find().exec();
+          customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+        } catch (e) {
+          console.warn('[FoodLogger] Failed to query local portions for batch:', e);
+        }
+      }
+
+      const aiService = new AiMealService({
+        parserConfig: {
+          proxyUrl: AI_CONFIG.proxyUrl,
+          provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+          ciphertext: userSettings?.ai_settings?.ciphertext,
+          ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+          ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+          getAuthToken
+        },
+        searchManager,
+        batchResolver
       });
 
-      const parsed = await aiProvider.parse(aiQuery);
-      setIsParsing(false);
+      const resolved = await aiService.processMeal({
+        input: aiQuery,
+        customIngredients: ingredients,
+        customRecipes: recipeFoods,
+        customPortions,
+        catalogProvider: remoteService
+      });
 
-      if (parsed && parsed.items.length > 0) {
-        let customPortions: Portion[] = [];
-        if (db) {
-          try {
-            const pdocs = await db.portions.find().exec();
-            customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
-          } catch (e) {
-            console.warn('[FoodLogger] Failed to query local portions for batch:', e);
-          }
+      setIsParsing(false);
+      setBatchMeal(resolved);
+      setIsBatchReviewOpen(true);
+    } catch (err: unknown) {
+      setIsParsing(false);
+      if (err instanceof AiMealError) {
+        switch (err.code) {
+          case 'RATE_LIMIT_EXCEEDED':
+            setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
+            break;
+          case 'AI_DISABLED':
+            setParseError(t.ai?.aiDisabled || 'AI is disabled. Please configure your AI provider in Settings.');
+            break;
+          case 'NO_ITEMS_PARSED':
+            setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
+            break;
+          default:
+            setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
+            break;
         }
-
-        const resolved = await batchResolver.resolveBatch({
-          rawInput: aiQuery,
-          rawItems: parsed.items,
-          customIngredients: ingredients,
-          customRecipes: recipeFoods,
-          customPortions,
-          catalogProvider: remoteService,
-          detectedMealType: parsed.detectedMealType
-        });
-
-        setBatchMeal(resolved);
-        setIsBatchReviewOpen(true);
-      } else {
-        setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
-      }
-    } catch (err: any) {
-      setIsParsing(false);
-      const errMsg = err?.message || String(err);
-      if (/RATE_LIMIT|quota|Too Many Requests|429/i.test(errMsg)) {
-        setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
-      } else if (/AI is disabled/i.test(errMsg)) {
-        setParseError(t.ai?.aiDisabled || 'AI is disabled. Please configure your AI provider in Settings.');
       } else {
         setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
       }
