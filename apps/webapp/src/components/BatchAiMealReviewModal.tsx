@@ -6,12 +6,15 @@ import type {
   BaseIngredient,
   TaggedPortion,
   ResolvedAiBatchMeal,
-  ResolvedAiMealItem
+  ResolvedAiMealItem,
+  Portion
 } from '@quomida/domain-core';
 import {
   convertPortionToGrams,
   calculateItemMacros,
-  CatalogSearchManager
+  CatalogSearchManager,
+  PortionManager,
+  matchPortionUnit
 } from '@quomida/domain-core';
 import {
   Sparkles,
@@ -49,7 +52,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   onClose,
   onLoggedSuccess
 }) => {
-  const { logBatchFoodItems, ingredients, recipeFoods = [], t } = useApp();
+  const { logBatchFoodItems, ingredients, recipeFoods = [], db, t } = useApp();
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
   const [items, setItems] = useState<ResolvedAiMealItem[]>(() => batchMeal?.items || []);
@@ -59,6 +62,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   const [substituteResults, setSubstituteResults] = useState<(FoodItem | BaseIngredient)[]>([]);
 
   const [searchManager] = useState(() => new CatalogSearchManager());
+  const [portionManager] = useState(() => new PortionManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
 
   // Re-sync state whenever batchMeal changes
@@ -183,25 +187,45 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
     }
   };
 
-  // Replace unmatched item with user-selected food
-  const handleSelectSubstitute = (itemId: string, food: FoodItem | BaseIngredient) => {
+  // Replace item with user-selected food
+  const handleSelectSubstitute = async (itemId: string, food: FoodItem | BaseIngredient) => {
     const normalizedFood: FoodItem = 'kind' in food ? food : { ...food, kind: 'ingredient' };
+
+    let customPortions: Portion[] = [];
+    if (db) {
+      try {
+        const pdocs = await db.portions.find().exec();
+        customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+      } catch (e) {
+        console.warn('[BatchAiMealReviewModal] Failed to query local portions for substitute:', e);
+      }
+    }
+
+    const availablePortions = await portionManager.resolvePortions({
+      ingredient: normalizedFood,
+      customPortions,
+      catalogProvider: remoteService
+    });
+
+    const hasUnitPortion = availablePortions.some(p =>
+      /unit|unidad|pieza|medium|mediana|chica|grande|serving/i.test(p.name)
+    );
+    if (!hasUnitPortion) {
+      availablePortions.unshift({
+        id: `port-std-unit-${normalizedFood.id}`,
+        base_food_id: normalizedFood.id,
+        name: '1 unidad',
+        equivalent_weight_g: 100,
+        source: 'system',
+        tag: 'Generic'
+      });
+    }
 
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== itemId) return it;
-        const availablePortions: TaggedPortion[] = [
-          {
-            id: `port-def-${normalizedFood.id}`,
-            base_food_id: normalizedFood.id,
-            name: '1 porción',
-            equivalent_weight_g: 100,
-            source: 'custom',
-            tag: 'Generic'
-          }
-        ];
-        const selectedPortionName = 'g';
-        const quantity = it.quantity > 0 ? it.quantity : 100;
+        const selectedPortionName = matchPortionUnit(it.selectedPortionName, availablePortions);
+        const quantity = it.quantity > 0 ? it.quantity : 1;
         const weightGrams = convertPortionToGrams(quantity, selectedPortionName, availablePortions);
         const rawMacros = calculateItemMacros(normalizedFood, weightGrams);
 
@@ -389,15 +413,39 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                   )}
                 </div>
 
-                {/* Delete Item Button */}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveItem(item.id)}
-                  aria-label={t.ai?.removeItemAria || 'Remove item from meal'}
-                  className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Change/search food button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeSubstituteId === item.id) {
+                        setActiveSubstituteId(null);
+                      } else {
+                        setActiveSubstituteId(item.id);
+                        setSubstituteQuery(item.rawQuery || item.food?.name || '');
+                      }
+                    }}
+                    aria-label={t.ai?.changeItem || 'Change food match'}
+                    title={t.ai?.changeItem || 'Change food match'}
+                    className={`p-2 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                      activeSubstituteId === item.id
+                        ? 'text-emerald-400 bg-slate-800'
+                        : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+
+                  {/* Delete Item Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(item.id)}
+                    aria-label={t.ai?.removeItemAria || 'Remove item from meal'}
+                    className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Matched item: Quantity Stepper & Portion Unit Dropdown */}
@@ -462,55 +510,65 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                 </div>
               )}
 
-              {/* Unmatched item fallback helper */}
-              {item.unmatched && (
+              {/* Substitute Search dropdown when active */}
+              {activeSubstituteId === item.id ? (
+                <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl space-y-2 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-300">
+                      {t.ai?.searchSubstitute || 'Search catalog for substitute'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubstituteId(null)}
+                      className="text-slate-400 hover:text-white p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="text"
+                      value={substituteQuery}
+                      onChange={(e) => setSubstituteQuery(e.target.value)}
+                      placeholder={t.ai?.searchSubstitute || 'Search catalog for substitute'}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  {substituteResults.length > 0 && (
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-800 text-xs">
+                      {substituteResults.map((cand) => (
+                        <button
+                          key={cand.id}
+                          type="button"
+                          onClick={() => handleSelectSubstitute(item.id, cand)}
+                          className="w-full text-left p-2.5 hover:bg-slate-800 text-slate-200 flex justify-between items-center transition-colors min-h-[44px]"
+                        >
+                          <span className="font-semibold truncate pr-2">{cand.name}</span>
+                          <span className="text-[10px] text-slate-400 shrink-0">{cand.calories_100g} kcal/100g</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : item.unmatched ? (
                 <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-xl space-y-2">
                   <p className="text-xs text-amber-300">
                     {t.ai?.unmatchedNotice || 'Food not found in catalog'}
                   </p>
-                  {activeSubstituteId === item.id ? (
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
-                        <input
-                          type="text"
-                          value={substituteQuery}
-                          onChange={(e) => setSubstituteQuery(e.target.value)}
-                          placeholder={t.ai?.searchSubstitute || 'Search catalog for substitute'}
-                          className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                      {substituteResults.length > 0 && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl max-h-36 overflow-y-auto divide-y divide-slate-800 text-xs">
-                          {substituteResults.map((cand) => (
-                            <button
-                              key={cand.id}
-                              type="button"
-                              onClick={() => handleSelectSubstitute(item.id, cand)}
-                              className="w-full text-left p-2.5 hover:bg-slate-800 text-slate-200 flex justify-between items-center transition-colors min-h-[44px]"
-                            >
-                              <span className="font-semibold">{cand.name}</span>
-                              <span className="text-[10px] text-slate-400">{cand.calories_100g} kcal/100g</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubstituteId(item.id);
-                        setSubstituteQuery(item.rawQuery);
-                      }}
-                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[44px]"
-                    >
-                      <Search className="w-3.5 h-3.5" />
-                      <span>{t.ai?.searchSubstitute || 'Search catalog for substitute'}</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSubstituteId(item.id);
+                      setSubstituteQuery(item.rawQuery);
+                    }}
+                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[44px]"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>{t.ai?.searchSubstitute || 'Search catalog for substitute'}</span>
+                  </button>
                 </div>
-              )}
+              ) : null}
             </div>
           ))}
 

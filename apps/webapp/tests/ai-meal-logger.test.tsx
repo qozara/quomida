@@ -37,6 +37,17 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fats_100g: 0.2
   };
 
+  const mockEmpanada: BaseIngredient = {
+    id: 'cust-empanada',
+    name: 'Empanada de Carne',
+    source: 'custom',
+    lang: 'es',
+    calories_100g: 250,
+    protein_100g: 8,
+    carbs_100g: 30,
+    fats_100g: 10
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -52,7 +63,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     onSelectMock = vi.fn();
 
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
-      ingredients: [mockCustomEgg, mockApple],
+      ingredients: [mockCustomEgg, mockApple, mockEmpanada],
       recipes: [],
       recipeFoods: [],
       t: dictionaries.en,
@@ -206,5 +217,42 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(screen.getByText('Unmatched')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'comida extraterrestre xyz' })).toBeDefined();
     expect(screen.getByText('Food not found in catalog')).toBeDefined();
+  });
+
+  it('successfully processes "desayuné dos empanadas" with proxy food_items and food_name format', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        meal_type: 'breakfast',
+        food_items: [
+          { food_name: 'empanada', quantity: 2, unit: 'unit' }
+        ]
+      }
+    });
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: 'desayuné dos empanadas' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    // Wait for the Batch Review Modal to open
+    await waitFor(() => {
+      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
+    });
+
+    // Check that heading shows the raw input
+    expect(screen.getByRole('heading', { name: 'desayuné dos empanadas' })).toBeDefined();
+
+    // Verify quantity input is 2
+    const quantityInput = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantityInput.value).toBe('2');
+
+    // Verify change food match button exists
+    const changeBtn = screen.getByLabelText('Change food match');
+    expect(changeBtn).toBeDefined();
   });
 });

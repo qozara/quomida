@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   detectMealTypeFromText,
+  normalizeMealType,
   matchPortionUnit,
   BatchAiMealResolver,
   type RawParsedAiItem
@@ -234,6 +235,69 @@ describe('BatchAiMealResolver & Portion Matching', () => {
 
       // Total calories only accounts for matched items
       expect(result.totalMacros.calories).toBe(result.items[0].macros.calories);
+    });
+
+    it('resolves "desayuné dos empanadas" to breakfast, unit portions and 200g weight', async () => {
+      const empanadaProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (q: string) => {
+          return [
+            {
+              id: 'ing-tapa-empanada',
+              name: 'Tapa Empanada',
+              source: 'system',
+              lang: 'es',
+              calories_100g: 300,
+              protein_100g: 7,
+              carbs_100g: 43,
+              fats_100g: 11,
+              contentHash: 'h1',
+            },
+            {
+              id: 'ing-empanadas-pollo',
+              name: 'Empanadas De Pollo',
+              source: 'system',
+              lang: 'es',
+              calories_100g: 192,
+              protein_100g: 9.9,
+              carbs_100g: 20.2,
+              fats_100g: 8.0,
+              contentHash: 'h2',
+            },
+          ];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([]),
+      };
+
+      const result = await resolver.resolveBatch({
+        rawInput: 'desayuné dos empanadas',
+        rawItems: [{ foodQuery: 'empanada', quantity: 2, unit: 'unit' }],
+        customIngredients: [],
+        catalogProvider: empanadaProvider,
+      });
+
+      // Meal type detected as breakfast
+      expect(result.detectedMealType).toBe('meal_breakfast');
+      expect(result.items).toHaveLength(1);
+
+      const item = result.items[0];
+      // Intelligently ranked Empanadas De Pollo above Tapa Empanada
+      expect(item.food?.name).toBe('Empanadas De Pollo');
+      expect(item.quantity).toBe(2);
+      expect(item.selectedPortionName).toBe('1 unidad');
+      expect(item.calculatedWeightGrams).toBe(200); // 2 * 100g
+      expect(item.macros.calories).toBe(384); // 200g * 1.92
+      expect(item.macros.protein).toBeCloseTo(19.8, 1);
+    });
+
+    it('normalizes meal types from explicit string or detects from verbs', () => {
+      expect(normalizeMealType('breakfast')).toBe('meal_breakfast');
+      expect(normalizeMealType('desayuno')).toBe('meal_breakfast');
+      expect(normalizeMealType('lunch')).toBe('meal_lunch');
+      expect(normalizeMealType('dinner')).toBe('meal_dinner');
+      expect(normalizeMealType('snack')).toBe('meal_snack');
+
+      expect(detectMealTypeFromText('desayuné dos empanadas')).toBe('meal_breakfast');
+      expect(detectMealTypeFromText('merendé un café con tostadas')).toBe('meal_snack');
     });
   });
 });

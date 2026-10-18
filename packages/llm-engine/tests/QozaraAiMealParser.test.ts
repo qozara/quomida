@@ -116,4 +116,85 @@ describe('QozaraAiMealParser', () => {
       undefined
     );
   });
+
+  it('should parse real proxy food_items structure with food_name and meal_type', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        meal_type: 'breakfast',
+        food_items: [
+          { food_name: 'empanada', quantity: 2, unit: 'unit' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+      provider: 'qozara-intelligence',
+    });
+
+    const result = await parser.parse('desayuné dos empanadas');
+
+    expect(result.rawInput).toBe('desayuné dos empanadas');
+    expect(result.detectedMealType).toBe('breakfast');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      foodQuery: 'empanada',
+      quantity: 2,
+      unit: 'unit',
+    });
+  });
+
+  it('should parse stringified JSON tool_call arguments', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: JSON.stringify({
+        meal_type: 'dinner',
+        food_items: [
+          { food_name: 'pizza', quantity: 3, unit: 'slice' }
+        ],
+      }),
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('cené 3 porciones de pizza');
+
+    expect(result.detectedMealType).toBe('dinner');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      foodQuery: 'pizza',
+      quantity: 3,
+      unit: 'slice',
+    });
+  });
+
+  it('should normalize alternate key names like alimento, nombre, cantidad, unidad', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        alimentos: [
+          { alimento: 'manzana roja', cantidad: '1.5', medida: 'unidad' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({
+      proxyUrl: 'https://test-proxy.local',
+    });
+
+    const result = await parser.parse('una manzana roja y media');
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      foodQuery: 'manzana roja',
+      quantity: 1.5,
+      unit: 'unidad',
+    });
+  });
 });

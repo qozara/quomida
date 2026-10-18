@@ -7,6 +7,7 @@ export interface ParsedMealItem {
 export interface ParsedNaturalLanguageMeal {
   rawInput: string;
   items: ParsedMealItem[];
+  detectedMealType?: string;
 }
 
 export interface LLMProvider {

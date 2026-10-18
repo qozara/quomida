@@ -288,6 +288,7 @@
     "mealTotal": "Total Meal Macros",
     "removeItemAria": "Remove item from meal",
     "searchSubstitute": "Search catalog for substitute",
+    "changeItem": "Change food match",
     "selectMeal": "Meal Time"
   }
 }

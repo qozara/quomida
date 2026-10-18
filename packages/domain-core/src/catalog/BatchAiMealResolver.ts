@@ -43,6 +43,23 @@ export interface BatchAiMealOptions {
   customPortions?: Portion[];
   catalogProvider?: ICatalogProvider;
   currentHour?: number;
+  detectedMealType?: MealType | string;
+}
+
+/**
+ * Normalizes an explicit LLM-detected meal string into a typed MealType.
+ */
+export function normalizeMealType(raw?: string): MealType | null {
+  if (!raw) return null;
+  const lower = raw.trim().toLowerCase();
+  if (/breakfast|desayun/i.test(lower)) return 'meal_breakfast';
+  if (/lunch|almuerz|almorc/i.test(lower)) return 'meal_lunch';
+  if (/dinner|cen/i.test(lower)) return 'meal_dinner';
+  if (/snack|meriend|merend|colaci[oó]n/i.test(lower)) return 'meal_snack';
+  if (lower === 'meal_breakfast' || lower === 'meal_lunch' || lower === 'meal_dinner' || lower === 'meal_snack') {
+    return lower as MealType;
+  }
+  return null;
 }
 
 /**
@@ -53,7 +70,7 @@ export function detectMealTypeFromText(text: string, currentHour?: number): Meal
 
   if (/(desayun|breakfast)/i.test(lower)) return 'meal_breakfast';
   if (/(almuerz|almorc|lunch)/i.test(lower)) return 'meal_lunch';
-  if (/(meriend|snack|colaci[oó]n)/i.test(lower)) return 'meal_snack';
+  if (/(meriend|merend|snack|colaci[oó]n|t[eé])/i.test(lower)) return 'meal_snack';
   if (/(cen[aáeé]|dinner)/i.test(lower)) return 'meal_dinner';
 
   const hour = currentHour !== undefined ? currentHour : new Date().getHours();
@@ -162,10 +179,12 @@ export class BatchAiMealResolver {
       customRecipes = [],
       customPortions = [],
       catalogProvider,
-      currentHour
+      currentHour,
+      detectedMealType: explicitMealType
     } = options;
 
-    const detectedMealType = detectMealTypeFromText(rawInput, currentHour);
+    const detectedMealType =
+      normalizeMealType(explicitMealType) || detectMealTypeFromText(rawInput, currentHour);
 
     const resolvedItems: ResolvedAiMealItem[] = await Promise.all(
       rawItems.map(async (item, idx) => {
@@ -213,6 +232,21 @@ export class BatchAiMealResolver {
           customPortions,
           catalogProvider
         });
+
+        // Ensure a unit/piece portion exists for discrete foods
+        const hasUnitPortion = availablePortions.some(p =>
+          /unit|unidad|pieza|medium|mediana|chica|grande|serving/i.test(p.name)
+        );
+        if (!hasUnitPortion) {
+          availablePortions.unshift({
+            id: `port-std-unit-${match.id}`,
+            base_food_id: match.id,
+            name: '1 unidad',
+            equivalent_weight_g: 100,
+            source: 'system',
+            tag: 'Generic'
+          });
+        }
 
         const selectedPortionName = matchPortionUnit(item.unit, availablePortions);
         const quantity = item.quantity > 0 ? item.quantity : 1;

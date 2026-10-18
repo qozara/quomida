@@ -120,7 +120,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           customIngredients: ingredients,
           customRecipes: recipeFoods,
           customPortions,
-          catalogProvider: remoteService
+          catalogProvider: remoteService,
+          detectedMealType: parsed.detectedMealType
         });
 
         setBatchMeal(resolved);

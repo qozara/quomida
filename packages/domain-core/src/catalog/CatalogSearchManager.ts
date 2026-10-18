@@ -120,9 +120,26 @@ export class CatalogSearchManager {
     // 3. Query catalog provider
     if (catalogProvider) {
       try {
-        const catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 1);
+        const catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 10);
         if (catalogResults.length > 0) {
-          return { ...catalogResults[0], kind: 'ingredient' };
+          const queryHasDough = /tapa|masa|disco|wrap/i.test(normQuery);
+          const scored = catalogResults.map(item => {
+            const normName = normalizeFoodName(item.name);
+            let score = 0;
+
+            if (normName === normQuery) score += 100;
+            else if (normName.startsWith(normQuery)) score += 50;
+            else if (normName.includes(normQuery)) score += 20;
+
+            if (!queryHasDough && /^(tapa|tapas|masa|masas|disco|discos)\b/i.test(normName)) {
+              score -= 40;
+            }
+
+            return { item, score };
+          });
+
+          scored.sort((a, b) => b.score - a.score);
+          return { ...scored[0].item, kind: 'ingredient' };
         }
       } catch (err) {
         console.error('[CatalogSearchManager] AI catalog fallback failed:', err);
