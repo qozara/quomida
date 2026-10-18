@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedAiBatchMeal } from '@quomida/domain-core';
 import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
-import { parseNaturalLanguageLog, QozaraAiMealParser } from '@quomida/llm-engine';
+import { QozaraAiMealParser } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
 import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
@@ -100,7 +100,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         getAuthToken
       });
 
-      const parsed = await parseNaturalLanguageLog(aiQuery, aiProvider);
+      const parsed = await aiProvider.parse(aiQuery);
       setIsParsing(false);
 
       if (parsed && parsed.items.length > 0) {
@@ -129,9 +129,16 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       } else {
         setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
       }
-    } catch (err) {
+    } catch (err: any) {
       setIsParsing(false);
-      setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
+      const errMsg = err?.message || String(err);
+      if (/RATE_LIMIT|quota|Too Many Requests|429/i.test(errMsg)) {
+        setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
+      } else if (/AI is disabled/i.test(errMsg)) {
+        setParseError(t.ai?.aiDisabled || 'AI is disabled. Please configure your AI provider in Settings.');
+      } else {
+        setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
+      }
     }
   };
 
@@ -272,7 +279,18 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
             className="w-full p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner resize-none"
           />
           {parseError && (
-            <p className="text-xs text-rose-400 px-1">{parseError}</p>
+            <div className="space-y-1.5 px-1" aria-live="polite">
+              <p className="text-xs text-rose-400 leading-relaxed">{parseError}</p>
+              {(parseError === t.ai?.quotaNotice || parseError === t.ai?.aiDisabled) && (
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-xs text-emerald-400 underline hover:text-emerald-300 font-semibold block transition-colors"
+                >
+                  {t.ai?.openSettingsBtn || t.sync.actions.storageSettings}
+                </button>
+              )}
+            </div>
           )}
           <button
             type="submit"

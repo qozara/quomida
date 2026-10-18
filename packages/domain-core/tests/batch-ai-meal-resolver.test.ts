@@ -289,6 +289,75 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       expect(item.macros.protein).toBeCloseTo(19.8, 1);
     });
 
+    it('resolves "comí dos hamburguesas de carne en la cena" to dinner, unit portions and 200g weight', async () => {
+      const burgerProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (q: string) => {
+          if (q.includes('carne') && q.includes('hamburguesa')) {
+            return [
+              {
+                id: 'ing-hamburguesa',
+                name: 'Hamburguesa',
+                source: 'system',
+                lang: 'es',
+                calories_100g: 191,
+                protein_100g: 14.5,
+                carbs_100g: 0.4,
+                fats_100g: 14.6,
+                contentHash: 'h-burg-1',
+              },
+              {
+                id: 'ing-hamburguesa-vacuna',
+                name: 'Hamburguesas vacunas',
+                source: 'system',
+                lang: 'es',
+                calories_100g: 226,
+                protein_100g: 16.0,
+                carbs_100g: 1.0,
+                fats_100g: 17.0,
+                contentHash: 'h-burg-2',
+              },
+            ];
+          }
+          if (q.includes('hamburguesa')) {
+            return [
+              {
+                id: 'ing-hamburguesa',
+                name: 'Hamburguesa',
+                source: 'system',
+                lang: 'es',
+                calories_100g: 191,
+                protein_100g: 14.5,
+                carbs_100g: 0.4,
+                fats_100g: 14.6,
+                contentHash: 'h-burg-1',
+              },
+            ];
+          }
+          return [];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([]),
+      };
+
+      const result = await resolver.resolveBatch({
+        rawInput: 'comí dos hamburguesas de carne en la cena',
+        rawItems: [{ foodQuery: 'hamburguesa de carne', quantity: 2, unit: 'unit' }],
+        customIngredients: [],
+        catalogProvider: burgerProvider,
+      });
+
+      // Meal type detected as dinner from "en la cena"
+      expect(result.detectedMealType).toBe('meal_dinner');
+      expect(result.items).toHaveLength(1);
+
+      const item = result.items[0];
+      expect(item.food?.name).toBe('Hamburguesa');
+      expect(item.quantity).toBe(2);
+      expect(item.selectedPortionName).toBe('1 unidad');
+      expect(item.calculatedWeightGrams).toBe(200); // 2 * 100g
+      expect(item.macros.calories).toBe(382); // 200g * 1.91
+      expect(item.macros.protein).toBeCloseTo(29.0, 1);
+    });
+
     it('normalizes meal types from explicit string or detects from verbs', () => {
       expect(normalizeMealType('breakfast')).toBe('meal_breakfast');
       expect(normalizeMealType('desayuno')).toBe('meal_breakfast');

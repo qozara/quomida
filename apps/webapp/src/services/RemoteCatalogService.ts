@@ -243,11 +243,15 @@ export class RemoteCatalogService implements ICatalogProvider {
 
   async searchIngredients(query: string, limit: number = 20): Promise<BaseIngredient[]> {
     const sanitizedQuery = query.replace(/[^\w\s\u00C0-\u017F]/g, '');
-    const tokens = sanitizedQuery.split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
+    const rawTokens = sanitizedQuery.split(/\s+/).filter(Boolean);
+    if (rawTokens.length === 0) return [];
 
-    // Safely escape and quote each token to prevent FTS5 keyword collisions (AND, OR, NOT, col:)
-    const matchQuery = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
+    const STOP_WORDS = new Set([
+      'de', 'del', 'con', 'en', 'la', 'el', 'los', 'las', 'un', 'una', 'y', 'al', 'a',
+      'para', 'por', 'of', 'with', 'and', 'the', 'in', 'for'
+    ]);
+    const filteredTokens = rawTokens.filter(t => !STOP_WORDS.has(t.toLowerCase()));
+    const tokens = filteredTokens.length > 0 ? filteredTokens : rawTokens;
 
     let worker: any;
     try {
@@ -257,52 +261,65 @@ export class RemoteCatalogService implements ICatalogProvider {
       return [];
     }
 
-    // 1. Try FTS5 query (fastest, typo-tolerant trigram/prefix)
-    const ftsSql = `
-      SELECT 
-        b.id as id,
-        b.name as name,
-        b.source as source,
-        b.lang as lang,
-        b.calories_100g as calories_100g,
-        b.protein_100g as protein_100g,
-        b.carbs_100g as carbs_100g,
-        b.fats_100g as fats_100g,
-        b.contentHash as contentHash
-      FROM base_ingredients b
-      JOIN base_ingredients_fts f ON b.id = f.id 
-      WHERE f.base_ingredients_fts MATCH '${matchQuery.replace(/'/g, "''")}'
-      LIMIT ${limit}
-    `;
-
-    try {
+    const runFts = async (matchExpr: string): Promise<BaseIngredient[]> => {
+      const ftsSql = `
+        SELECT 
+          b.id as id,
+          b.name as name,
+          b.source as source,
+          b.lang as lang,
+          b.calories_100g as calories_100g,
+          b.protein_100g as protein_100g,
+          b.carbs_100g as carbs_100g,
+          b.fats_100g as fats_100g,
+          b.contentHash as contentHash
+        FROM base_ingredients b
+        JOIN base_ingredients_fts f ON b.id = f.id 
+        WHERE f.base_ingredients_fts MATCH '${matchExpr.replace(/'/g, "''")}'
+        LIMIT ${limit}
+      `;
       const res = await worker('exec', { sql: ftsSql, rowMode: 'array' } as any);
       const rows = res?.result?.resultRows || [];
-      if (rows.length > 0) {
-        return this.mapRowsToIngredients(rows);
+      return rows.length > 0 ? this.mapRowsToIngredients(rows) : [];
+    };
+
+    // 1. Try strict FTS5 AND query first
+    try {
+      const andMatch = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
+      const andResults = await runFts(andMatch);
+      if (andResults.length > 0) return andResults;
+
+      // 2. Try flexible FTS5 OR query if multi-token
+      if (tokens.length > 1) {
+        const orMatch = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' OR ');
+        const orResults = await runFts(orMatch);
+        if (orResults.length > 0) return orResults;
       }
     } catch (e) {
       console.warn('[RemoteCatalogService] FTS query error, falling back to LIKE:', e);
     }
 
-    // 2. Fallback to LIKE substring query on local database
-    const likeSql = `
-      SELECT 
-        b.id as id,
-        b.name as name,
-        b.source as source,
-        b.lang as lang,
-        b.calories_100g as calories_100g,
-        b.protein_100g as protein_100g,
-        b.carbs_100g as carbs_100g,
-        b.fats_100g as fats_100g,
-        b.contentHash as contentHash
-      FROM base_ingredients b
-      WHERE name LIKE '%${sanitizedQuery.replace(/'/g, "''")}%'
-      LIMIT ${limit}
-    `;
-
+    // 3. Fallback to LIKE substring query on local database
     try {
+      const likeClause = tokens.length > 1
+        ? tokens.map(t => `name LIKE '%${t.replace(/'/g, "''")}%'`).join(' OR ')
+        : `name LIKE '%${sanitizedQuery.replace(/'/g, "''")}%'`;
+
+      const likeSql = `
+        SELECT 
+          b.id as id,
+          b.name as name,
+          b.source as source,
+          b.lang as lang,
+          b.calories_100g as calories_100g,
+          b.protein_100g as protein_100g,
+          b.carbs_100g as carbs_100g,
+          b.fats_100g as fats_100g,
+          b.contentHash as contentHash
+        FROM base_ingredients b
+        WHERE ${likeClause}
+        LIMIT ${limit}
+      `;
       const res = await worker('exec', { sql: likeSql, rowMode: 'array' } as any);
       return this.mapRowsToIngredients(res?.result?.resultRows || []);
     } catch {

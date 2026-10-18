@@ -14,7 +14,8 @@ export interface QozaraAiMealParserConfig {
 export const DEFAULT_LOG_MEAL_SYSTEM_PROMPT =
   'You are a precise nutritional intake parser for Quomida.\n' +
   'Analyze the user\'s natural language meal description and call the `log_meal` tool with each identified food item, quantity, unit, and detected meal type.\n' +
-  'Normalize food names to their canonical, base form in Spanish or English matching nutritional catalogs.\n' +
+  'Extract individual food names in their canonical, base singular form (e.g., "dos hamburguesas de carne" -> food_name: "hamburguesa", "dos empanadas de carne" -> food_name: "empanada", "un café con leche" -> food_name: "café con leche"). Do not include quantities or conversational words in food_name.\n' +
+  'Identify the meal category (breakfast, lunch, dinner, snack) if mentioned or implied (e.g., "desayuné" -> breakfast, "en la cena" -> dinner, "merendé" -> snack).\n' +
   'If an item has no explicit quantity, assume 1 unit or a standard portion.';
 
 export const LOG_MEAL_TOOL = {

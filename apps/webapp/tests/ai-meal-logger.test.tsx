@@ -48,6 +48,17 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fats_100g: 10
   };
 
+  const mockBurger: BaseIngredient = {
+    id: 'sys-burger',
+    name: 'Hamburguesa',
+    source: 'system',
+    lang: 'es',
+    calories_100g: 191,
+    protein_100g: 14.5,
+    carbs_100g: 0.4,
+    fats_100g: 14.6
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -63,7 +74,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     onSelectMock = vi.fn();
 
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
-      ingredients: [mockCustomEgg, mockApple, mockEmpanada],
+      ingredients: [mockCustomEgg, mockApple, mockEmpanada, mockBurger],
       recipes: [],
       recipeFoods: [],
       t: dictionaries.en,
@@ -254,5 +265,128 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     // Verify change food match button exists
     const changeBtn = screen.getByLabelText('Change food match');
     expect(changeBtn).toBeDefined();
+  });
+
+  it('processes "comí dos hamburguesas de carne en la cena" with meal_dinner and 2 units', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        meal_type: 'dinner',
+        food_items: [
+          { food_name: 'hamburguesa', quantity: 2, unit: 'unit' }
+        ]
+      }
+    });
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: 'comí dos hamburguesas de carne en la cena' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    // Wait for the Batch Review Modal to open
+    await waitFor(() => {
+      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
+    });
+
+    // Check raw query heading
+    expect(screen.getByRole('heading', { name: 'comí dos hamburguesas de carne en la cena' })).toBeDefined();
+
+    // Verify quantity input is 2
+    const quantityInput = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantityInput.value).toBe('2');
+
+    // Click Log button
+    const logButton = screen.getByRole('button', { name: /Log to Diary/i });
+    fireEvent.click(logButton);
+
+    await waitFor(() => {
+      expect(logBatchFoodItemsMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [loggedItems, loggedMealType] = logBatchFoodItemsMock.mock.calls[0];
+    expect(loggedMealType).toBe('meal_dinner');
+    expect(loggedItems[0].food.name).toBe('Hamburguesa');
+    expect(loggedItems[0].quantity).toBe(2);
+  });
+
+  it('displays quota notice with settings link when proxy returns RATE_LIMIT_EXCEEDED error', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'text',
+      error: 'RATE_LIMIT_EXCEEDED'
+    });
+
+    const setIsSettingsOpenMock = vi.fn();
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockCustomEgg, mockApple, mockEmpanada, mockBurger],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.en,
+      setIsSettingsOpen: setIsSettingsOpenMock,
+      userSettings: {
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      db: null
+    } as any);
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: 'comí dos hamburguesas de carne en la cena' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    await waitFor(() => {
+      expect(screen.getByText(dictionaries.en.ai.quotaNotice)).toBeDefined();
+    });
+
+    // Verify button to open settings exists and triggers setIsSettingsOpen
+    const settingsBtn = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.openSettingsBtn, 'i') });
+    expect(settingsBtn).toBeDefined();
+    fireEvent.click(settingsBtn);
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+  });
+
+  it('displays ai disabled notice with settings link when AI provider returns AI is disabled error', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'text',
+      error: 'AI is disabled'
+    });
+
+    const setIsSettingsOpenMock = vi.fn();
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockCustomEgg, mockApple, mockEmpanada, mockBurger],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.en,
+      setIsSettingsOpen: setIsSettingsOpenMock,
+      userSettings: {
+        ai_settings: { provider: 'disabled' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      db: null
+    } as any);
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: 'comí dos hamburguesas' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    await waitFor(() => {
+      expect(screen.getByText(dictionaries.en.ai.aiDisabled)).toBeDefined();
+    });
+
+    const settingsBtn = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.openSettingsBtn, 'i') });
+    expect(settingsBtn).toBeDefined();
+    fireEvent.click(settingsBtn);
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
   });
 });

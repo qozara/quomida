@@ -103,16 +103,26 @@ export class CatalogSearchManager {
 
     // 1. Check custom recipes
     if (customRecipes && customRecipes.length > 0) {
-      const recipeMatch = customRecipes.find(r =>
-        normalizeFoodName(r.name).includes(normQuery)
-      );
+      const recipeMatch = customRecipes.find(r => {
+        const normName = normalizeFoodName(r.name);
+        return (
+          normName === normQuery ||
+          normName.includes(normQuery) ||
+          (normName.length >= 3 && normQuery.includes(normName))
+        );
+      });
       if (recipeMatch) return recipeMatch;
     }
 
     // 2. Check custom ingredients
-    const customMatch = customIngredients.find(item =>
-      normalizeFoodName(item.name).includes(normQuery)
-    );
+    const customMatch = customIngredients.find(item => {
+      const normName = normalizeFoodName(item.name);
+      return (
+        normName === normQuery ||
+        normName.includes(normQuery) ||
+        (normName.length >= 3 && normQuery.includes(normName))
+      );
+    });
     if (customMatch) {
       return { ...customMatch, kind: 'ingredient' };
     }
@@ -120,7 +130,14 @@ export class CatalogSearchManager {
     // 3. Query catalog provider
     if (catalogProvider) {
       try {
-        const catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 10);
+        let catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 10);
+        const queryTokens = normQuery.split(/\s+/).filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|al|a|para|por|of|with|and|the|in)$/i.test(t));
+        const primaryToken = queryTokens[0] || normQuery;
+
+        if (catalogResults.length === 0 && queryTokens.length > 1) {
+          catalogResults = await catalogProvider.searchIngredients(primaryToken, 10);
+        }
+
         if (catalogResults.length > 0) {
           const queryHasDough = /tapa|masa|disco|wrap/i.test(normQuery);
           const scored = catalogResults.map(item => {
@@ -128,11 +145,18 @@ export class CatalogSearchManager {
             let score = 0;
 
             if (normName === normQuery) score += 100;
-            else if (normName.startsWith(normQuery)) score += 50;
-            else if (normName.includes(normQuery)) score += 20;
+            else if (normName.startsWith(normQuery)) score += 60;
+            else if (normName.includes(normQuery)) score += 40;
+
+            if (normName.startsWith(primaryToken)) score += 50;
+            else if (normName.includes(primaryToken)) score += 30;
+
+            for (const token of queryTokens) {
+              if (normName.includes(token)) score += 15;
+            }
 
             if (!queryHasDough && /^(tapa|tapas|masa|masas|disco|discos)\b/i.test(normName)) {
-              score -= 40;
+              score -= 50;
             }
 
             return { item, score };
