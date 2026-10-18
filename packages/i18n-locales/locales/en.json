@@ -278,6 +278,7 @@
     "quotaNotice": "Daily AI quota reached (5 req/day anonymous, 20/day with Google account). Sign in or set your personal Gemini key in Settings.",
     "aiDisabled": "AI is disabled. Please configure your AI provider in Settings.",
     "openSettingsBtn": "Open AI Settings →",
+    "tokenExpiredNotice": "Your Google session has expired or is invalid. Please reconnect your account in Settings to use the 20 req/day quota.",
     "parseError": "Natural language parsing failed. Falling back to catalog search.",
     "parsingMeal": "Parsing meal with AI...",
     "noItemsParsed": "Could not extract food items from description.",

@@ -389,4 +389,101 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fireEvent.click(settingsBtn);
     expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
   });
+
+  it('correctly passes Google OAuth accessToken from active_cloud_provider credentials to AI provider', async () => {
+    let capturedGetAuthToken: any = null;
+    vi.spyOn(AiProviderFactory, 'createProvider').mockImplementation(async (_config: any, getAuthToken: any) => {
+      capturedGetAuthToken = getAuthToken;
+      return {
+        id: 'mock-provider',
+        mode: 'cloud',
+        chat: mockChat.mockResolvedValueOnce({
+          type: 'tool_call',
+          tool: 'log_meal',
+          arguments: {
+            items: [{ foodQuery: 'huevo revuelto', quantity: 1, unit: 'unit' }]
+          }
+        }),
+        checkAvailability: vi.fn().mockResolvedValue(true),
+        getSetupMessage: vi.fn().mockReturnValue(null)
+      } as any;
+    });
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockCustomEgg],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.en,
+      setIsSettingsOpen: vi.fn(),
+      userSettings: {
+        active_cloud_provider: {
+          id: 'google-drive-sheets',
+          credentials: {
+            accessToken: 'ya29.google-test-oauth-token',
+            expiresAt: Date.now() + 3600000
+          }
+        },
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      db: null
+    } as any);
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: '1 huevo' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    await waitFor(() => {
+      expect(capturedGetAuthToken).not.toBeNull();
+    });
+
+    const token = await capturedGetAuthToken();
+    expect(token).toBe('ya29.google-test-oauth-token');
+  });
+
+  it('displays token expired notice with settings link when Google token is expired or unauthorized', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'text',
+      error: 'Invalid or expired Google token'
+    });
+
+    const setIsSettingsOpenMock = vi.fn();
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockCustomEgg],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.en,
+      setIsSettingsOpen: setIsSettingsOpenMock,
+      userSettings: {
+        active_cloud_provider: {
+          id: 'google-drive-sheets',
+          credentials: { accessToken: 'expired-token' }
+        },
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      db: null
+    } as any);
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.tabAi, 'i') }));
+    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.aiPlaceholder), {
+      target: { value: '1 huevo' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
+
+    await waitFor(() => {
+      expect(screen.getByText(dictionaries.en.ai.tokenExpiredNotice)).toBeDefined();
+    });
+
+    const settingsBtn = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.openSettingsBtn, 'i') });
+    expect(settingsBtn).toBeDefined();
+    fireEvent.click(settingsBtn);
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+  });
 });

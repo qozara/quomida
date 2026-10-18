@@ -278,6 +278,7 @@
     "quotaNotice": "Límite diario de IA alcanzado (5 consultas/día anónimo, 20/día con cuenta Google). Inicia sesión o configura tu propia clave de Gemini en Ajustes.",
     "aiDisabled": "La IA está desactivada. Por favor configura tu proveedor de IA en Ajustes.",
     "openSettingsBtn": "Abrir Ajustes de IA →",
+    "tokenExpiredNotice": "Tu sesión de Google ha expirado o no es válida. Reconecta tu cuenta en Ajustes para usar el límite de 20 consultas/día.",
     "parseError": "Falló el análisis en lenguaje natural. Volviendo a la búsqueda manual del catálogo.",
     "parsingMeal": "Analizando comida con IA...",
     "noItemsParsed": "No se pudieron extraer alimentos de la descripción.",

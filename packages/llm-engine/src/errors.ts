@@ -37,7 +37,7 @@ export function classifyAiError(err: unknown): AiMealError {
   if (/Failed to fetch|Network error|ECONNREFUSED|ENOTFOUND/i.test(msg)) {
     return new AiMealError('NETWORK_ERROR', msg, err);
   }
-  if (/Unauthorized|401|403|Forbidden/i.test(msg)) {
+  if (/Unauthorized|401|403|Forbidden|expired Google token|Invalid.*token/i.test(msg)) {
     return new AiMealError('AUTHENTICATION_REQUIRED', msg, err);
   }
 

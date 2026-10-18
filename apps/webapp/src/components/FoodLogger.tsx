@@ -87,8 +87,17 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
     try {
       const getAuthToken = async (): Promise<string | null> => {
-        const token = userSettings?.active_cloud_provider?.credentials?.access_token;
-        return typeof token === 'string' ? token : null;
+        // Read Google OAuth token if authenticated in webapp user settings
+        const creds = userSettings?.active_cloud_provider?.credentials;
+        if (typeof creds === 'string' && creds.trim()) {
+          return creds.trim();
+        }
+        const token = creds?.accessToken || creds?.access_token || creds?.token;
+        if (typeof token === 'string' && token.trim()) {
+          return token.trim();
+        }
+
+        return null;
       };
 
       let customPortions: Portion[] = [];
@@ -129,6 +138,9 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       setIsParsing(false);
       if (err instanceof AiMealError) {
         switch (err.code) {
+          case 'AUTHENTICATION_REQUIRED':
+            setParseError(t.ai?.tokenExpiredNotice || 'Your Google session has expired or is invalid. Please reconnect in Settings.');
+            break;
           case 'RATE_LIMIT_EXCEEDED':
             setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
             break;
@@ -287,7 +299,9 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           {parseError && (
             <div className="space-y-1.5 px-1" aria-live="polite">
               <p className="text-xs text-rose-400 leading-relaxed">{parseError}</p>
-              {(parseError === t.ai?.quotaNotice || parseError === t.ai?.aiDisabled) && (
+              {(parseError === t.ai?.quotaNotice ||
+                parseError === t.ai?.aiDisabled ||
+                parseError === t.ai?.tokenExpiredNotice) && (
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
