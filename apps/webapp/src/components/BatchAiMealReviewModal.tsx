@@ -7,14 +7,17 @@ import type {
   TaggedPortion,
   ResolvedAiBatchMeal,
   ResolvedAiMealItem,
-  Portion
+  Portion,
+  Recipe
 } from '@quomida/domain-core';
 import {
   convertPortionToGrams,
   calculateItemMacros,
   CatalogSearchManager,
   PortionManager,
-  matchPortionUnit
+  matchPortionUnit,
+  BatchAiMealResolver,
+  RecipeManager
 } from '@quomida/domain-core';
 import {
   Sparkles,
@@ -52,7 +55,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   onClose,
   onLoggedSuccess
 }) => {
-  const { logBatchFoodItems, ingredients, recipeFoods = [], db, t } = useApp();
+  const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t } = useApp();
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
   const [items, setItems] = useState<ResolvedAiMealItem[]>(() => batchMeal?.items || []);
@@ -63,7 +66,22 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
 
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [portionManager] = useState(() => new PortionManager());
+  const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [batchResolver] = useState(() => new BatchAiMealResolver(searchManager, portionManager, recipeManager));
+
+  const existingRecipes = useMemo<Recipe[]>(() => {
+    if (recipes.length > 0) return recipes;
+    return recipeFoods.map((r) => r.recipe).filter(Boolean) as Recipe[];
+  }, [recipes, recipeFoods]);
+
+  const activeSynthesizedRecipe = useMemo(() => {
+    return batchResolver.computeSynthesizedRecipe(
+      items,
+      batchMeal?.compositeDishName,
+      existingRecipes
+    );
+  }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver]);
 
   // Re-sync state whenever batchMeal changes
   useEffect(() => {
@@ -283,14 +301,35 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const itemsToLog = validItems.map((it) => ({
-        food: it.food!,
-        quantity: it.quantity,
-        portionName: it.selectedPortionName,
-        availablePortions: it.availablePortions
-      }));
+      if (activeSynthesizedRecipe) {
+        // Case A: Composite Dish (validItems.length >= 2)
+        if (!activeSynthesizedRecipe.isExistingDuplicate && addRecipe) {
+          await addRecipe(activeSynthesizedRecipe.recipe);
+        }
 
-      await logBatchFoodItems(itemsToLog, mealType);
+        await logBatchFoodItems(
+          [
+            {
+              food: activeSynthesizedRecipe.foodItem,
+              quantity: 1,
+              portionName: 'Whole recipe',
+              availablePortions: (activeSynthesizedRecipe.foodItem as any).portions
+            }
+          ],
+          mealType
+        );
+      } else {
+        // Case B: Single Atomic Food (validItems.length === 1)
+        const itemsToLog = validItems.map((it) => ({
+          food: it.food!,
+          quantity: it.quantity,
+          portionName: it.selectedPortionName,
+          availablePortions: it.availablePortions
+        }));
+
+        await logBatchFoodItems(itemsToLog, mealType);
+      }
+
       setIsSubmitting(false);
       onClose();
       onLoggedSuccess?.();
@@ -578,6 +617,30 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Composite Recipe Banner */}
+        {activeSynthesizedRecipe && (
+          <div className="bg-purple-950/30 border border-purple-800/50 rounded-2xl p-3 shrink-0 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 shrink-0">
+                <Utensils className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white truncate">
+                  {activeSynthesizedRecipe.recipe.name}
+                </div>
+                <div className="text-xs text-purple-300 font-medium">
+                  {activeSynthesizedRecipe.isExistingDuplicate
+                    ? (t.ai?.existingRecipeMatchedBadge || 'Matched existing recipe in your library')
+                    : (t.ai?.autoSavedRecipeBadge || 'Will be saved to My Recipes and logged as a single dish')}
+                </div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 shrink-0">
+              {t.recipes?.recipeBadge || 'Recipe'}
+            </span>
+          </div>
+        )}
 
         {/* Total Meal Nutrition Summary Card */}
         {validItems.length > 0 && (

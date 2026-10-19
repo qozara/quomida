@@ -33,6 +33,9 @@
   "search": {
     "placeholder": "Buscar alimento o corte (ej. Peceto, Palta, Milanesa)...",
     "aiPlaceholder": "Describe lo que comiste (ej. 2 empanadas de carne y ensalada mixta)...",
+    "unifiedPlaceholder": "Buscar alimento, receta guardada o describir comida...",
+    "findMoreTitle": "✨ Buscar más o componer plato para «{query}»",
+    "findMoreSubtitle": "Analiza ingredientes y arma un plato compuesto sin registrar de inmediato",
     "tabSearch": "Búsqueda en Catálogo",
     "tabAi": "Registro IA",
     "parseButton": "Analizar Comida",
@@ -292,6 +295,8 @@
     "removeItemAria": "Eliminar alimento de la comida",
     "searchSubstitute": "Buscar sustituto en el catálogo",
     "changeItem": "Cambiar alimento",
-    "selectMeal": "Momento del día"
+    "selectMeal": "Momento del día",
+    "autoSavedRecipeBadge": "Se guardará en Mis Recetas y se registrará como un único plato",
+    "existingRecipeMatchedBadge": "Coincide con una receta existente en tu biblioteca"
   }
 }

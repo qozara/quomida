@@ -304,4 +304,98 @@ describe('QozaraAiMealParser', () => {
     expect(result.items[1].foodQuery).toBe('puré de papas');
     expect(result.items[1].unit).toBe('porción');
   });
+
+  it('should format user prompt with available catalog candidates when context is provided', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        food_items: [
+          { food_name: 'Huevo frito', quantity: 2, unit: 'unit', candidate_id: 'egg-1' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+    const candidates = [
+      {
+        id: 'egg-1',
+        name: 'Huevo frito',
+        kind: 'ingredient' as const,
+        calories_100g: 196.2,
+        protein_100g: 13.6,
+        carbs_100g: 0.8,
+        fats_100g: 15.3,
+      },
+      {
+        id: 'toast-1',
+        name: 'Tostada de pan blanco',
+        kind: 'ingredient' as const,
+        calories_100g: 265,
+        protein_100g: 9,
+        carbs_100g: 49,
+        fats_100g: 3.2,
+      }
+    ];
+
+    const result = await parser.parse('dos huevos fritos', { candidates });
+
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    const chatCallArgs = mockChat.mock.calls[0][0];
+    const userMsg = chatCallArgs.messages[0].content;
+    expect(userMsg).toContain('User description: "dos huevos fritos"');
+    expect(userMsg).toContain('Available Catalog Candidates (use exact `id` in `candidate_id` if applicable):');
+    expect(userMsg).toContain('- id: "egg-1" | name: "Huevo frito" (196 kcal/100g, P:13.6g, C:0.8g, F:15.3g)');
+    expect(userMsg).toContain('- id: "toast-1" | name: "Tostada de pan blanco" (265 kcal/100g, P:9g, C:49g, F:3.2g)');
+
+    expect(result.items[0]).toEqual({
+      foodQuery: 'Huevo frito',
+      quantity: 2,
+      unit: 'unit',
+      candidateId: 'egg-1',
+    });
+  });
+
+  it('should extract composite_dish_name and candidate_id from tool call arguments', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        composite_dish_name: 'Milanesa con puré de papas',
+        food_items: [
+          { food_name: 'milanesa', quantity: 1, unit: 'unit', candidate_id: 'rec-milanesa-1' },
+          { food_name: 'puré de papas', quantity: 1, unit: 'portion', candidate_id: 'ing-pure-1' }
+        ],
+      },
+    });
+
+    const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+    const result = await parser.parse('milanesa con puré de papas');
+
+    expect(result.compositeDishName).toBe('Milanesa con puré de papas');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].candidateId).toBe('rec-milanesa-1');
+    expect(result.items[1].candidateId).toBe('ing-pure-1');
+  });
+
+  it('should support camelCase compositeDishName and candidateId', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        compositeDishName: 'Arroz con pollo',
+        foodItems: [
+          { foodName: 'arroz', quantity: 100, unit: 'g', candidateId: 'ing-arroz-1' },
+          { foodName: 'pollo', quantity: 150, unit: 'g', candidateId: 'ing-pollo-1' }
+        ]
+      }
+    });
+
+    const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+    const result = await parser.parse('arroz con pollo');
+
+    expect(result.compositeDishName).toBe('Arroz con pollo');
+    expect(result.items[0].candidateId).toBe('ing-arroz-1');
+    expect(result.items[1].candidateId).toBe('ing-pollo-1');
+  });
 });

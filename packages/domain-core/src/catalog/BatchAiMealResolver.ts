@@ -4,16 +4,28 @@ import type {
   FoodItem,
   RecipeFoodItem,
   MealType,
-  MacroSnapshot
+  MacroSnapshot,
+  Recipe,
+  RecipeComponent
 } from '../types.js';
 import { CatalogSearchManager, type ICatalogProvider } from './CatalogSearchManager.js';
 import { PortionManager, type TaggedPortion } from './PortionManager.js';
+import { RecipeManager } from '../recipes/RecipeManager.js';
 import { convertPortionToGrams, calculateItemMacros, createMacroSnapshot } from '../calculations/index.js';
 
 export interface RawParsedAiItem {
   foodQuery: string;
   quantity: number;
   unit: string;
+  candidateId?: string;
+  canonicalName?: string;
+  name?: string;
+}
+
+export interface SynthesizedCompositeRecipe {
+  recipe: Recipe;
+  foodItem: RecipeFoodItem;
+  isExistingDuplicate: boolean;
 }
 
 export interface ResolvedAiMealItem {
@@ -33,6 +45,8 @@ export interface ResolvedAiBatchMeal {
   detectedMealType: MealType;
   items: ResolvedAiMealItem[];
   totalMacros: MacroSnapshot;
+  compositeDishName?: string;
+  synthesizedRecipe?: SynthesizedCompositeRecipe;
 }
 
 export interface BatchAiMealOptions {
@@ -44,7 +58,11 @@ export interface BatchAiMealOptions {
   catalogProvider?: ICatalogProvider;
   currentHour?: number;
   detectedMealType?: MealType | string;
+  compositeDishName?: string;
+  existingRecipes?: Recipe[];
 }
+
+export type ResolveBatchOptions = BatchAiMealOptions;
 
 /**
  * Normalizes an explicit LLM-detected meal string into a typed MealType.
@@ -158,18 +176,21 @@ export function matchPortionUnit(unit: string, availablePortions: TaggedPortion[
 export class BatchAiMealResolver {
   private readonly searchManager: CatalogSearchManager;
   private readonly portionManager: PortionManager;
+  private readonly recipeManager: RecipeManager;
 
   constructor(
     searchManager: CatalogSearchManager = new CatalogSearchManager(),
-    portionManager: PortionManager = new PortionManager()
+    portionManager: PortionManager = new PortionManager(),
+    recipeManager: RecipeManager = new RecipeManager()
   ) {
     this.searchManager = searchManager;
     this.portionManager = portionManager;
+    this.recipeManager = recipeManager;
   }
 
   /**
    * Resolves a collection of parsed meal entities in parallel, matches portions,
-   * and computes individual and cumulative macro snapshots.
+   * computes individual and cumulative macro snapshots, and synthesizes composite recipes.
    */
   async resolveBatch(options: BatchAiMealOptions): Promise<ResolvedAiBatchMeal> {
     const {
@@ -180,7 +201,9 @@ export class BatchAiMealResolver {
       customPortions = [],
       catalogProvider,
       currentHour,
-      detectedMealType: explicitMealType
+      detectedMealType: explicitMealType,
+      compositeDishName,
+      existingRecipes
     } = options;
 
     const detectedMealType =
@@ -205,12 +228,43 @@ export class BatchAiMealResolver {
           };
         }
 
-        const match = await this.searchManager.resolveAiMatch(
-          query,
-          customIngredients,
-          catalogProvider,
-          customRecipes
-        );
+        let match: FoodItem | null = null;
+
+        // 1. If candidateId is provided (grounded RAG), resolve directly against local sources or catalog provider
+        if (item.candidateId) {
+          const recipeMatch = customRecipes.find(r => r.id === item.candidateId);
+          if (recipeMatch) {
+            match = recipeMatch;
+          } else {
+            const customMatch = customIngredients.find(i => i.id === item.candidateId);
+            if (customMatch) {
+              match = { ...customMatch, kind: 'ingredient' };
+            } else if (catalogProvider) {
+              try {
+                const searchStr = (item.canonicalName || item.name || query).trim();
+                if (searchStr) {
+                  const catalogResults = await catalogProvider.searchIngredients(searchStr, 10);
+                  const found = catalogResults.find(c => c.id === item.candidateId);
+                  if (found) {
+                    match = { ...found, kind: 'ingredient' };
+                  }
+                }
+              } catch (err) {
+                console.error('[BatchAiMealResolver] Candidate provider lookup failed:', err);
+              }
+            }
+          }
+        }
+
+        // 2. Fall back to fuzzy AI match resolution
+        if (!match) {
+          match = await this.searchManager.resolveAiMatch(
+            query,
+            customIngredients,
+            catalogProvider,
+            customRecipes
+          );
+        }
 
         if (!match) {
           return {
@@ -286,13 +340,249 @@ export class BatchAiMealResolver {
       })
     );
 
-    // Compute cumulative total macros across all matched items
+    const totalMacros = this.computeTotalMacros(resolvedItems);
+
+    const allExistingRecipes: Recipe[] =
+      existingRecipes && existingRecipes.length > 0
+        ? existingRecipes
+        : customRecipes.map(r => r.recipe || {
+            id: r.id,
+            name: r.name,
+            ingredients: (r as any).ingredients || [],
+            yield_factor: r.yield_factor ?? 1.0,
+            updatedAt: r.updatedAt
+          });
+
+    const synthesizedRecipe = this.computeSynthesizedRecipe(
+      resolvedItems,
+      compositeDishName,
+      allExistingRecipes
+    );
+
+    return {
+      rawInput,
+      detectedMealType,
+      items: resolvedItems,
+      totalMacros,
+      compositeDishName,
+      synthesizedRecipe
+    };
+  }
+
+  /**
+   * Synthesizes a composite Recipe proposal when >= 2 items resolve to valid foods,
+   * checking existing recipes for nutritional and component equivalence.
+   */
+  computeSynthesizedRecipe(
+    items: ResolvedAiMealItem[],
+    compositeDishName?: string,
+    existingRecipes: Recipe[] = []
+  ): SynthesizedCompositeRecipe | undefined {
+    const validItems = items.filter(
+      it => it.food !== null && !it.unmatched && it.calculatedWeightGrams > 0
+    );
+
+    if (validItems.length < 2) {
+      return undefined;
+    }
+
+    let dishName = '';
+    if (compositeDishName && compositeDishName.trim()) {
+      const trimmed = compositeDishName.trim();
+      dishName = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    } else {
+      const foodNames = validItems.map(it => it.food!.name);
+      if (foodNames.length === 2) {
+        dishName = `${foodNames[0]} con ${foodNames[1]}`;
+      } else {
+        const allButLast = foodNames.slice(0, -1).join(', ');
+        dishName = `${allButLast} y ${foodNames[foodNames.length - 1]}`;
+      }
+      dishName = dishName.charAt(0).toUpperCase() + dishName.slice(1);
+    }
+
+    const components: RecipeComponent[] = validItems.map(it =>
+      this.recipeManager.buildComponent(
+        it.food!,
+        it.calculatedWeightGrams,
+        { quantity: it.quantity, portionName: it.selectedPortionName }
+      )
+    );
+
+    const candidateRecipe = this.recipeManager.createRecipe({
+      name: dishName,
+      ingredients: components
+    });
+
+    const existingMatch = this.recipeManager.findEquivalentRecipe(candidateRecipe, existingRecipes);
+    if (existingMatch) {
+      return {
+        recipe: existingMatch,
+        foodItem: this.recipeManager.toFoodItem(existingMatch),
+        isExistingDuplicate: true
+      };
+    }
+
+    return {
+      recipe: candidateRecipe,
+      foodItem: this.recipeManager.toFoodItem(candidateRecipe),
+      isExistingDuplicate: false
+    };
+  }
+
+  /**
+   * Recalculates an item in a resolved batch and re-evaluates auto-recipe synthesis.
+   */
+  recalculateItem(
+    meal: ResolvedAiBatchMeal,
+    itemId: string,
+    updates: { quantity?: number; portionName?: string },
+    options?: {
+      customRecipes?: RecipeFoodItem[];
+      existingRecipes?: Recipe[];
+      compositeDishName?: string;
+    }
+  ): ResolvedAiBatchMeal {
+    const updatedItems = meal.items.map(it => {
+      if (it.id !== itemId || it.unmatched || !it.food) return it;
+
+      let targetQty = updates.quantity !== undefined ? updates.quantity : it.quantity;
+      const newPortionName = updates.portionName || it.selectedPortionName;
+
+      if (newPortionName === 'g' && targetQty === 1) {
+        targetQty = 100;
+      } else if (it.selectedPortionName === 'g' && newPortionName !== 'g' && targetQty >= 50) {
+        targetQty = 1;
+      }
+
+      const weightGrams = convertPortionToGrams(
+        targetQty,
+        newPortionName,
+        it.availablePortions
+      );
+      const rawMacros = calculateItemMacros(it.food, weightGrams);
+      return {
+        ...it,
+        selectedPortionName: newPortionName,
+        quantity: targetQty,
+        calculatedWeightGrams: weightGrams,
+        macros: createMacroSnapshot(rawMacros)
+      };
+    });
+
+    const totalMacros = this.computeTotalMacros(updatedItems);
+
+    const allExisting =
+      options?.existingRecipes && options.existingRecipes.length > 0
+        ? options.existingRecipes
+        : (options?.customRecipes || []).map(r => r.recipe || {
+            id: r.id,
+            name: r.name,
+            ingredients: (r as any).ingredients || [],
+            yield_factor: r.yield_factor ?? 1.0,
+            updatedAt: r.updatedAt
+          });
+
+    const compositeDishName = options?.compositeDishName ?? meal.compositeDishName;
+    const synthesizedRecipe = this.computeSynthesizedRecipe(
+      updatedItems,
+      compositeDishName,
+      allExisting
+    );
+
+    return {
+      ...meal,
+      items: updatedItems,
+      totalMacros,
+      compositeDishName,
+      synthesizedRecipe
+    };
+  }
+
+  /**
+   * Swaps the food of an item in a resolved batch and re-evaluates auto-recipe synthesis.
+   */
+  swapItemFood(
+    meal: ResolvedAiBatchMeal,
+    itemId: string,
+    newFood: FoodItem | BaseIngredient,
+    availablePortions: TaggedPortion[] = [],
+    options?: {
+      quantity?: number;
+      portionName?: string;
+      customRecipes?: RecipeFoodItem[];
+      existingRecipes?: Recipe[];
+      compositeDishName?: string;
+    }
+  ): ResolvedAiBatchMeal {
+    const normalizedFood: FoodItem = 'kind' in newFood ? newFood : { ...newFood, kind: 'ingredient' };
+
+    const updatedItems = meal.items.map(it => {
+      if (it.id !== itemId) return it;
+
+      const portions = availablePortions.length > 0 ? availablePortions : it.availablePortions;
+      const selectedPortionName = matchPortionUnit(
+        options?.portionName ?? it.selectedPortionName,
+        portions
+      );
+      const quantity =
+        options?.quantity !== undefined && options.quantity > 0
+          ? options.quantity
+          : it.quantity > 0
+            ? it.quantity
+            : 1;
+
+      const weightGrams = convertPortionToGrams(quantity, selectedPortionName, portions);
+      const rawMacros = calculateItemMacros(normalizedFood, weightGrams);
+
+      return {
+        ...it,
+        food: normalizedFood,
+        unmatched: false,
+        availablePortions: portions,
+        selectedPortionName,
+        quantity,
+        calculatedWeightGrams: weightGrams,
+        macros: createMacroSnapshot(rawMacros)
+      };
+    });
+
+    const totalMacros = this.computeTotalMacros(updatedItems);
+
+    const allExisting =
+      options?.existingRecipes && options.existingRecipes.length > 0
+        ? options.existingRecipes
+        : (options?.customRecipes || []).map(r => r.recipe || {
+            id: r.id,
+            name: r.name,
+            ingredients: (r as any).ingredients || [],
+            yield_factor: r.yield_factor ?? 1.0,
+            updatedAt: r.updatedAt
+          });
+
+    const compositeDishName = options?.compositeDishName ?? meal.compositeDishName;
+    const synthesizedRecipe = this.computeSynthesizedRecipe(
+      updatedItems,
+      compositeDishName,
+      allExisting
+    );
+
+    return {
+      ...meal,
+      items: updatedItems,
+      totalMacros,
+      compositeDishName,
+      synthesizedRecipe
+    };
+  }
+
+  private computeTotalMacros(items: ResolvedAiMealItem[]): MacroSnapshot {
     let totalCals = 0;
     let totalProt = 0;
     let totalCarbs = 0;
     let totalFats = 0;
 
-    for (const item of resolvedItems) {
+    for (const item of items) {
       if (!item.unmatched) {
         totalCals += item.macros.calories;
         totalProt += item.macros.protein;
@@ -301,18 +591,11 @@ export class BatchAiMealResolver {
       }
     }
 
-    const totalMacros: MacroSnapshot = {
+    return {
       calories: Math.round(totalCals * 10) / 10,
       protein: Math.round(totalProt * 10) / 10,
       carbs: Math.round(totalCarbs * 10) / 10,
       fats: Math.round(totalFats * 10) / 10
-    };
-
-    return {
-      rawInput,
-      detectedMealType,
-      items: resolvedItems,
-      totalMacros
     };
   }
 }

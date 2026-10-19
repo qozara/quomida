@@ -1,7 +1,7 @@
-import type { LLMProvider, ParsedNaturalLanguageMeal } from './types.js';
+import type { LLMProvider, ParsedNaturalLanguageMeal, LLMParseContext } from './types.js';
 
 export class MockLLMProvider implements LLMProvider {
-  async parse(input: string): Promise<ParsedNaturalLanguageMeal> {
+  async parse(input: string, _context?: LLMParseContext): Promise<ParsedNaturalLanguageMeal> {
     const lower = input.toLowerCase();
     const items = [];
 
@@ -31,10 +31,11 @@ export class MockLLMProvider implements LLMProvider {
  */
 export async function parseNaturalLanguageLog(
   input: string,
-  provider: LLMProvider
+  provider: LLMProvider,
+  context?: LLMParseContext
 ): Promise<ParsedNaturalLanguageMeal | null> {
   try {
-    return await provider.parse(input);
+    return await provider.parse(input, context);
   } catch (error) {
     console.warn('[LLM Engine] Parsing failed or timed out. Degrading to fallback search bar.', error);
     return null;

@@ -107,7 +107,7 @@ await adapter.repair();
 ---
 
 ## 📚 References
-- Architecture & Dual Migrations: [`docs/persistence-and-migrations.md`](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/persistence-and-migrations.md)
-- ADR 0010: [Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
-- ADR 0012: [Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
-- ADR 0013: [Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)
+- Architecture & Dual Migrations: [`docs/persistence-and-migrations.md`](../persistence-and-migrations.md)
+- ADR 0010: [Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](../adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
+- ADR 0012: [Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](../adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
+- ADR 0013: [Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](../adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)

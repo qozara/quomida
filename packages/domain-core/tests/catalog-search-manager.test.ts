@@ -358,5 +358,139 @@ describe('CatalogSearchManager', () => {
     expect(match?.id).toBe('rec-special-mora');
     expect(match?.kind).toBe('recipe');
   });
+
+  describe('retrieveRagCandidates', () => {
+    const mockRecipes: any[] = [
+      {
+        kind: 'recipe',
+        id: 'rec-milanesa-pure',
+        name: 'Milanesa con puré de papas',
+        source: 'custom',
+        calories_100g: 150,
+        protein_100g: 9,
+        carbs_100g: 16,
+        fats_100g: 6
+      }
+    ];
+
+    const mockIngredients: BaseIngredient[] = [
+      {
+        id: 'cust-milanesa',
+        name: 'Milanesa casera',
+        source: 'custom',
+        lang: 'es',
+        calories_100g: 215,
+        protein_100g: 15,
+        carbs_100g: 18,
+        fats_100g: 10
+      }
+    ];
+
+    const mockCatalogProvider: ICatalogProvider = {
+      searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+        const q = query.toLowerCase();
+        const catalogDb = [
+          {
+            id: 'sys-milanesa-carne',
+            name: 'Milanesa de carne',
+            source: 'system' as const,
+            lang: 'es',
+            calories_100g: 220,
+            protein_100g: 16,
+            carbs_100g: 17,
+            fats_100g: 11
+          },
+          {
+            id: 'sys-pure-papas',
+            name: 'Puré de papas',
+            source: 'system' as const,
+            lang: 'es',
+            calories_100g: 85,
+            protein_100g: 2,
+            carbs_100g: 15,
+            fats_100g: 1.5
+          },
+          {
+            id: 'sys-papa-hervida',
+            name: 'Papa hervida',
+            source: 'system' as const,
+            lang: 'es',
+            calories_100g: 77,
+            protein_100g: 2,
+            carbs_100g: 17,
+            fats_100g: 0.1
+          }
+        ];
+        return catalogDb.filter(i => i.name.toLowerCase().includes(q));
+      }),
+      getPortionsForIngredient: vi.fn().mockResolvedValue([])
+    };
+
+    it('extracts candidates by stripping meal verbs, time markers, and quantities', async () => {
+      const candidates = await manager.retrieveRagCandidates(
+        'cené una milanesa con puré de papas ayer',
+        mockIngredients,
+        mockCatalogProvider,
+        mockRecipes,
+        10
+      );
+
+      expect(candidates.length).toBeGreaterThan(0);
+      const names = candidates.map(c => c.name.toLowerCase());
+      expect(names.some(n => n.includes('milanesa'))).toBe(true);
+      expect(names.some(n => n.includes('pure') || n.includes('puré'))).toBe(true);
+    });
+
+    it('prioritizes custom recipes and ingredients before catalog items and deduplicates by id', async () => {
+      const candidates = await manager.retrieveRagCandidates(
+        'milanesa',
+        mockIngredients,
+        mockCatalogProvider,
+        mockRecipes,
+        10
+      );
+
+      // Recipe should be first, custom ingredient second, catalog third
+      expect(candidates[0].id).toBe('rec-milanesa-pure');
+      expect(candidates[0].kind).toBe('recipe');
+      expect(candidates[1].id).toBe('cust-milanesa');
+      expect(candidates[1].kind).toBe('ingredient');
+
+      // Deduplication check: unique IDs
+      const ids = candidates.map(c => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('singularizes plurals to find candidate records (e.g. papas -> papa)', async () => {
+      const candidates = await manager.retrieveRagCandidates(
+        'dos papas',
+        [],
+        mockCatalogProvider,
+        [],
+        5
+      );
+
+      expect(candidates.some(c => c.id === 'sys-papa-hervida')).toBe(true);
+    });
+
+    it('handles empty or verb-only input gracefully', async () => {
+      const emptyResult = await manager.retrieveRagCandidates('', [], mockCatalogProvider, []);
+      expect(emptyResult).toEqual([]);
+
+      const verbOnlyResult = await manager.retrieveRagCandidates('cené hoy ayer', [], mockCatalogProvider, []);
+      expect(verbOnlyResult).toEqual([]);
+    });
+
+    it('respects maxCandidates limit', async () => {
+      const candidates = await manager.retrieveRagCandidates(
+        'milanesa con pure de papas',
+        mockIngredients,
+        mockCatalogProvider,
+        mockRecipes,
+        2
+      );
+      expect(candidates.length).toBeLessThanOrEqual(2);
+    });
+  });
 });
 

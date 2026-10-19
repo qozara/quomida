@@ -434,5 +434,236 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       expect(detectMealTypeFromText('merendé un café con tostadas')).toBe('meal_snack');
       expect(detectMealTypeFromText('cené una milanesa con puré de papas.')).toBe('meal_dinner');
     });
+
+    describe('Candidate ID Grounding & Auto-Recipe Synthesis (ADR 0022)', () => {
+      const mockMilanesaIng: BaseIngredient = {
+        id: 'ing-milanesa-123',
+        name: 'Milanesa de Ternera',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 220,
+        protein_100g: 18,
+        carbs_100g: 15,
+        fats_100g: 10
+      };
+
+      const mockPureIng: BaseIngredient = {
+        id: 'ing-pure-456',
+        name: 'Puré de Papas Casero',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 90,
+        protein_100g: 2,
+        carbs_100g: 16,
+        fats_100g: 2
+      };
+
+      const groundedCatalogProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+          const q = query.toLowerCase();
+          const list = [mockMilanesaIng, mockPureIng];
+          return list.filter(i => i.name.toLowerCase().includes(q) || i.id === query);
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([])
+      };
+
+      it('resolves items directly using candidateId when matched in custom ingredients', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          {
+            foodQuery: 'huevo revuelto',
+            quantity: 1,
+            unit: 'unit',
+            candidateId: 'cust-egg' // Matches mockCustomIngredients
+          }
+        ];
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'Desayuno',
+          rawItems,
+          customIngredients: mockCustomIngredients,
+          customRecipes: mockRecipes
+        });
+
+        expect(result.items[0].food?.id).toBe('cust-egg');
+        expect(result.items[0].unmatched).toBe(false);
+      });
+
+      it('resolves items directly using candidateId when matched via catalog provider search', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          {
+            foodQuery: 'milanesa',
+            quantity: 1,
+            unit: 'unit',
+            candidateId: 'ing-milanesa-123'
+          }
+        ];
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'Almuerzo',
+          rawItems,
+          customIngredients: [],
+          catalogProvider: groundedCatalogProvider
+        });
+
+        expect(result.items[0].food?.id).toBe('ing-milanesa-123');
+        expect(result.items[0].food?.name).toBe('Milanesa de Ternera');
+      });
+
+      it('synthesizes a new Recipe when >= 2 items are resolved with automatic joined name', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
+          { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
+        ];
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'milanesa con puré',
+          rawItems,
+          customIngredients: [mockMilanesaIng, mockPureIng]
+        });
+
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe?.isExistingDuplicate).toBe(false);
+        expect(result.synthesizedRecipe?.recipe.name).toBe('Milanesa de Ternera con Puré de Papas Casero');
+        expect(result.synthesizedRecipe?.recipe.ingredients).toHaveLength(2);
+        expect(result.synthesizedRecipe?.foodItem.kind).toBe('recipe');
+        expect(result.synthesizedRecipe?.foodItem.calories_100g).toBeGreaterThan(0);
+      });
+
+      it('uses explicit compositeDishName when provided for synthesized recipe', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
+          { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
+        ];
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'milanesa con puré',
+          rawItems,
+          customIngredients: [mockMilanesaIng, mockPureIng],
+          compositeDishName: 'milanesa con puré clásica'
+        });
+
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe?.recipe.name).toBe('Milanesa con puré clásica');
+      });
+
+      it('detects existing duplicate recipe and marks isExistingDuplicate: true', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
+          { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
+        ];
+
+        // Existing recipe with exact same tokens: "Milanesa de ternera con puré de papas casero"
+        const existingRecipe: any = {
+          id: 'rec-milanesa-existing',
+          name: 'Milanesa de ternera con puré de papas casero',
+          ingredients: [
+            {
+              food_id: 'ing-milanesa-123',
+              name: 'Milanesa de Ternera',
+              weight_g: 100,
+              calories_100g: 220,
+              protein_100g: 18,
+              carbs_100g: 15,
+              fats_100g: 10
+            },
+            {
+              food_id: 'ing-pure-456',
+              name: 'Puré de Papas Casero',
+              weight_g: 150,
+              calories_100g: 90,
+              protein_100g: 2,
+              carbs_100g: 16,
+              fats_100g: 2
+            }
+          ],
+          yield_factor: 1.0
+        };
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'milanesa con puré',
+          rawItems,
+          customIngredients: [mockMilanesaIng, mockPureIng],
+          existingRecipes: [existingRecipe]
+        });
+
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe?.isExistingDuplicate).toBe(true);
+        expect(result.synthesizedRecipe?.recipe.id).toBe('rec-milanesa-existing');
+      });
+
+      it('does NOT synthesize a recipe when only 1 item is resolved', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' }
+        ];
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'solo milanesa',
+          rawItems,
+          customIngredients: [mockMilanesaIng]
+        });
+
+        expect(result.synthesizedRecipe).toBeUndefined();
+      });
+
+      it('recalculates item quantity and updates synthesized recipe', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
+          { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
+        ];
+
+        const initial = await resolver.resolveBatch({
+          rawInput: 'milanesa con puré',
+          rawItems,
+          customIngredients: [mockMilanesaIng, mockPureIng]
+        });
+
+        const updated = resolver.recalculateItem(
+          initial,
+          initial.items[0].id,
+          { quantity: 2, portionName: '1 unidad' }
+        );
+
+        expect(updated.items[0].quantity).toBe(2);
+        expect(updated.items[0].calculatedWeightGrams).toBe(200);
+        expect(updated.items[0].macros.calories).toBe(440);
+        expect(updated.synthesizedRecipe?.recipe.ingredients[0].weight_g).toBe(200);
+      });
+
+      it('swaps item food and recomputes synthesized recipe', async () => {
+        const rawItems: RawParsedAiItem[] = [
+          { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
+          { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
+        ];
+
+        const initial = await resolver.resolveBatch({
+          rawInput: 'milanesa con puré',
+          rawItems,
+          customIngredients: [mockMilanesaIng, mockPureIng]
+        });
+
+        const newFood: BaseIngredient = {
+          id: 'ing-arroz-999',
+          name: 'Arroz Blanco',
+          source: 'system',
+          lang: 'es',
+          calories_100g: 130,
+          protein_100g: 2.5,
+          carbs_100g: 28,
+          fats_100g: 0.3
+        };
+
+        const updated = resolver.swapItemFood(
+          initial,
+          initial.items[1].id,
+          newFood,
+          [{ id: 'p-arroz', base_food_id: newFood.id, name: '1 porción', equivalent_weight_g: 150, tag: 'Standard' }]
+        );
+
+        expect(updated.items[1].food?.id).toBe('ing-arroz-999');
+        expect(updated.items[1].food?.name).toBe('Arroz Blanco');
+        expect(updated.synthesizedRecipe?.recipe.ingredients[1].food_id).toBe('ing-arroz-999');
+        expect(updated.synthesizedRecipe?.recipe.name).toBe('Milanesa de Ternera con Arroz Blanco');
+      });
+    });
   });
 });

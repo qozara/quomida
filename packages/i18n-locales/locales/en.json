@@ -33,6 +33,9 @@
   "search": {
     "placeholder": "Search food or cuts (e.g. Peceto, Aguacate, Milanesa)...",
     "aiPlaceholder": "Describe what you ate (e.g. 2 beef empanadas and mixed salad)...",
+    "unifiedPlaceholder": "Search food, saved recipes, or describe your meal...",
+    "findMoreTitle": "✨ Find more or compose dish for \"{query}\"",
+    "findMoreSubtitle": "Analyzes ingredients and builds a composite dish without logging immediately",
     "tabSearch": "Catalog Search",
     "tabAi": "AI Natural Log",
     "parseButton": "Parse Meal",
@@ -292,6 +295,8 @@
     "removeItemAria": "Remove item from meal",
     "searchSubstitute": "Search catalog for substitute",
     "changeItem": "Change food match",
-    "selectMeal": "Meal Time"
+    "selectMeal": "Meal Time",
+    "autoSavedRecipeBadge": "Will be saved to My Recipes and logged as a single dish",
+    "existingRecipeMatchedBadge": "Matched existing recipe in your library"
   }
 }

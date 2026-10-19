@@ -4,10 +4,12 @@ import type {
   Portion,
   ResolvedAiBatchMeal,
   ICatalogProvider,
-  MealType
+  MealType,
+  RagCatalogCandidate,
+  Recipe
 } from '@quomida/domain-core';
 import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
-import type { LLMProvider, ParsedNaturalLanguageMeal } from './types.js';
+import type { LLMProvider, ParsedNaturalLanguageMeal, LLMParseContext } from './types.js';
 import { QozaraAiMealParser, type QozaraAiMealParserConfig } from './QozaraAiMealParser.js';
 import { AiMealError, classifyAiError } from './errors.js';
 
@@ -19,6 +21,7 @@ export interface ProcessAiMealOptions {
   catalogProvider?: ICatalogProvider;
   currentHour?: number;
   explicitMealType?: MealType | string;
+  existingRecipes?: Recipe[];
 }
 
 export interface AiMealServiceConfig {
@@ -40,6 +43,7 @@ export interface AiMealServiceConfig {
  */
 export class AiMealService {
   private readonly provider: LLMProvider;
+  private readonly searchManager: CatalogSearchManager;
   private readonly batchResolver: BatchAiMealResolver;
 
   constructor(config: AiMealServiceConfig = {}) {
@@ -51,22 +55,22 @@ export class AiMealService {
       this.provider = new QozaraAiMealParser({ proxyUrl: '' });
     }
 
-    const searchManager = config.searchManager ?? new CatalogSearchManager();
-    this.batchResolver = config.batchResolver ?? new BatchAiMealResolver(searchManager);
+    this.searchManager = config.searchManager ?? new CatalogSearchManager();
+    this.batchResolver = config.batchResolver ?? new BatchAiMealResolver(this.searchManager);
   }
 
   /**
    * Parses natural language text into structured food query items.
    * Throws typed AiMealError on failure.
    */
-  async parseNaturalLanguage(input: string): Promise<ParsedNaturalLanguageMeal> {
+  async parseNaturalLanguage(input: string, context?: LLMParseContext): Promise<ParsedNaturalLanguageMeal> {
     const trimmed = (input || '').trim();
     if (!trimmed) {
       return { rawInput: '', items: [] };
     }
 
     try {
-      const result = await this.provider.parse(trimmed);
+      const result = await this.provider.parse(trimmed, context);
       if (!result || !result.items || result.items.length === 0) {
         throw new AiMealError('NO_ITEMS_PARSED', 'Could not extract food items from description.');
       }
@@ -93,10 +97,26 @@ export class AiMealService {
       customPortions = [],
       catalogProvider,
       currentHour,
-      explicitMealType
+      explicitMealType,
+      existingRecipes
     } = options;
 
-    const parsed = await this.parseNaturalLanguage(input);
+    let ragCandidates: RagCatalogCandidate[] = [];
+    try {
+      ragCandidates = await this.searchManager.retrieveRagCandidates(
+        input,
+        customIngredients,
+        catalogProvider,
+        customRecipes
+      );
+    } catch {
+      ragCandidates = [];
+    }
+
+    const parsed = await this.parseNaturalLanguage(
+      input,
+      ragCandidates.length > 0 ? { candidates: ragCandidates } : undefined
+    );
 
     try {
       const resolved = await this.batchResolver.resolveBatch({
@@ -107,7 +127,9 @@ export class AiMealService {
         customPortions,
         catalogProvider,
         currentHour,
-        detectedMealType: explicitMealType || parsed.detectedMealType
+        detectedMealType: explicitMealType || parsed.detectedMealType,
+        compositeDishName: parsed.compositeDishName,
+        existingRecipes
       });
 
       return resolved;

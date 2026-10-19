@@ -3,7 +3,8 @@ import type {
   Portion,
   FoodItem,
   RecipeFoodItem,
-  FoodKind
+  FoodKind,
+  RagCatalogCandidate
 } from '../types.js';
 
 export interface ICatalogProvider {
@@ -222,6 +223,165 @@ export class CatalogSearchManager {
     }
 
     return result.slice(0, limit);
+  }
+
+  /**
+   * Builds focused candidate search queries from raw natural language meal descriptions.
+   * Strips meal verbs, time markers, quantities, and culinary connectors.
+   */
+  buildRagQueries(rawInput: string): string[] {
+    if (!rawInput || !rawInput.trim()) return [];
+
+    const mealVerbsAndTimeRegex =
+      /\b(?:desayuné|desayune|almorcé|almorce|cené|cene|merendé|merende|comí|comi|tomé|tome|desayuno|almuerzo|cena|merienda|hoy|ayer|ate|had|for|breakfast|lunch|dinner|snack)\b/gi;
+
+    const numbersAndQuantitiesRegex =
+      /\b(?:\d+|un|una|dos|tres|cuatro|cinco|medio|media)\b/gi;
+
+    const dishConnectorSplitRegex = /\b(?:con|y|with|and)\b|,/gi;
+
+    const stripConnectorsRegex = /\b(?:con|y|de|del|en|la|el|al|los|las|the|of|in|to|with|and)\b/gi;
+
+    const queries: string[] = [];
+    const seenQueries = new Set<string>();
+
+    const addQuery = (q: string) => {
+      const clean = q.trim();
+      const norm = normalizeFoodName(clean);
+      if (clean.length >= 2 && norm && !seenQueries.has(norm)) {
+        seenQueries.add(norm);
+        queries.push(clean);
+      }
+    };
+
+    // 1. Connector-separated phrases
+    const segments = rawInput.split(dishConnectorSplitRegex);
+    for (const seg of segments) {
+      const phrase = seg
+        .replace(mealVerbsAndTimeRegex, ' ')
+        .replace(numbersAndQuantitiesRegex, ' ')
+        .replace(/[^\w\sáéíóúÁÉÍÓÚñÑüÜ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (phrase.length >= 2) {
+        addQuery(phrase);
+      }
+    }
+
+    // 2. Individual content tokens >= 3 chars (+ singularized variants)
+    const strippedInput = rawInput
+      .replace(mealVerbsAndTimeRegex, ' ')
+      .replace(numbersAndQuantitiesRegex, ' ')
+      .replace(stripConnectorsRegex, ' ')
+      .replace(/[^\w\sáéíóúÁÉÍÓÚñÑüÜ]/g, ' ');
+
+    const tokens = strippedInput
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(t => t.length >= 3);
+
+    for (const token of tokens) {
+      addQuery(token);
+      if (token.length > 3) {
+        if (/[bcdfghjklmnñpqrstvwxyz]es$/i.test(token)) {
+          addQuery(token.slice(0, -2));
+        } else if (/[aeiou]s$/i.test(token)) {
+          addQuery(token.slice(0, -1));
+        }
+      }
+    }
+
+    return queries;
+  }
+
+  /**
+   * Gathers Top-K candidate foods (custom recipes -> custom ingredients -> catalog ingredients)
+   * for grounding natural language LLM parsing and dish synthesis.
+   */
+  async retrieveRagCandidates(
+    rawInput: string,
+    customIngredients: BaseIngredient[] = [],
+    catalogProvider?: ICatalogProvider,
+    customRecipes: RecipeFoodItem[] = [],
+    maxCandidates: number = 20
+  ): Promise<RagCatalogCandidate[]> {
+    const queries = this.buildRagQueries(rawInput);
+    if (queries.length === 0) {
+      return [];
+    }
+
+    const seenIds = new Set<string>();
+    const candidates: RagCatalogCandidate[] = [];
+
+    const addCandidate = (cand: RagCatalogCandidate) => {
+      if (!seenIds.has(cand.id) && candidates.length < maxCandidates) {
+        seenIds.add(cand.id);
+        candidates.push(cand);
+      }
+    };
+
+    const toRecipeCandidate = (r: RecipeFoodItem): RagCatalogCandidate => ({
+      id: r.id,
+      name: r.name,
+      kind: 'recipe',
+      calories_100g: r.calories_100g,
+      protein_100g: r.protein_100g,
+      carbs_100g: r.carbs_100g,
+      fats_100g: r.fats_100g
+    });
+
+    const toIngredientCandidate = (i: BaseIngredient): RagCatalogCandidate => ({
+      id: i.id,
+      name: i.name,
+      kind: 'ingredient',
+      calories_100g: i.calories_100g,
+      protein_100g: i.protein_100g,
+      carbs_100g: i.carbs_100g,
+      fats_100g: i.fats_100g
+    });
+
+    // 1. Check custom recipes first across all queries
+    for (const q of queries) {
+      if (candidates.length >= maxCandidates) break;
+      const normQ = normalizeFoodName(q);
+      for (const r of customRecipes) {
+        if (normalizeFoodName(r.name).includes(normQ)) {
+          addCandidate(toRecipeCandidate(r));
+        }
+      }
+    }
+
+    // 2. Check custom ingredients second across all queries
+    for (const q of queries) {
+      if (candidates.length >= maxCandidates) break;
+      const normQ = normalizeFoodName(q);
+      for (const ing of customIngredients) {
+        if (normalizeFoodName(ing.name).includes(normQ)) {
+          addCandidate(toIngredientCandidate(ing));
+        }
+      }
+    }
+
+    // 3. Search catalogProvider for queries
+    if (catalogProvider && candidates.length < maxCandidates) {
+      const providerSearches = queries.map(q =>
+        catalogProvider.searchIngredients(q, 10).catch(() => [])
+      );
+      const results = await Promise.allSettled(providerSearches);
+
+      for (const res of results) {
+        if (candidates.length >= maxCandidates) break;
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          for (const item of res.value) {
+            addCandidate(toIngredientCandidate(item));
+            if (candidates.length >= maxCandidates) break;
+          }
+        }
+      }
+    }
+
+    return candidates;
   }
 }
 

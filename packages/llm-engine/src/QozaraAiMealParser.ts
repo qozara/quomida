@@ -1,5 +1,5 @@
 import { AiProviderFactory, type AuthTokenGetter, type AiFactoryConfig } from '@qozara/ai-client';
-import type { LLMProvider, ParsedNaturalLanguageMeal, ParsedMealItem } from './types.js';
+import type { LLMProvider, ParsedNaturalLanguageMeal, ParsedMealItem, LLMParseContext } from './types.js';
 
 export interface QozaraAiMealParserConfig {
   proxyUrl: string;
@@ -23,7 +23,9 @@ export const DEFAULT_LOG_MEAL_SYSTEM_PROMPT =
   '2. Extract individual food names in their canonical, base singular form (e.g., "dos hamburguesas de carne" -> food_name: "hamburguesa", "dos empanadas" -> food_name: "empanada"). Do not include quantities or conversational words in food_name.\n' +
   '3. Identify the meal category (breakfast, lunch, dinner, snack) if mentioned or implied (e.g., "desayuné" -> breakfast, "cené" / "en la cena" -> dinner, "almorcé" -> lunch, "merendé" -> snack).\n' +
   '4. If an item has no explicit quantity, assume 1 unit or a standard portion.\n' +
-  '5. ALWAYS invoke the `log_meal` tool. Do not reply with plain conversational text.';
+  '5. If `Available Catalog Candidates` are provided in the user prompt, prefer selecting the matching candidate\'s exact `id` in `candidate_id` and its `name` in `canonical_name` or `food_name`.\n' +
+  '6. If the user described a composite dish combining 2 or more ingredients (e.g., "milanesa con puré de papas"), populate `composite_dish_name` with the clean dish title (e.g., "Milanesa con puré de papas") while still decomposing each constituent ingredient in `food_items`.\n' +
+  '7. ALWAYS invoke the `log_meal` tool. Do not reply with plain conversational text.';
 
 export const LOG_MEAL_TOOL = {
   name: 'log_meal',
@@ -36,6 +38,10 @@ export const LOG_MEAL_TOOL = {
         enum: ['breakfast', 'lunch', 'dinner', 'snack'],
         description: 'The meal category (breakfast/desayuno, lunch/almuerzo, dinner/cena, snack/merienda).'
       },
+      composite_dish_name: {
+        type: 'string',
+        description: "If the user described a combined dish or meal (e.g. 'milanesa con puré de papas', 'arroz con pollo'), provide its clean canonical dish title (e.g. 'Milanesa con puré de papas')."
+      },
       food_items: {
         type: 'array',
         description: 'List of individual food items found in the meal.',
@@ -45,6 +51,10 @@ export const LOG_MEAL_TOOL = {
             food_name: {
               type: 'string',
               description: 'The canonical search term for the food item in its base singular form (e.g. "empanada", "manzana", "arroz").'
+            },
+            candidate_id: {
+              type: 'string',
+              description: "If one of the provided catalog candidates matches this food item, set its exact id here."
             },
             quantity: {
               type: 'number',
@@ -331,10 +341,16 @@ function normalizeMealItem(raw: any): ParsedMealItem | null {
     ? rawUnit.trim()
     : 'unit';
 
+  const rawCandidateId = raw.candidate_id ?? raw.candidateId;
+  const candidateId = typeof rawCandidateId === 'string' && rawCandidateId.trim().length > 0
+    ? rawCandidateId.trim()
+    : undefined;
+
   return {
     foodQuery: rawFood.trim(),
     quantity,
-    unit
+    unit,
+    ...(candidateId ? { candidateId } : {})
   };
 }
 
@@ -343,6 +359,31 @@ function extractMealType(data: any): string | undefined {
   const rawMeal = data.meal_type || data.mealType || data.meal || data.tipo_comida || data.tipoComida;
   if (typeof rawMeal === 'string' && rawMeal.trim()) {
     return rawMeal.trim().toLowerCase();
+  }
+  return undefined;
+}
+
+function extractCompositeDishName(data: any): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const rawDish =
+    data.composite_dish_name ||
+    data.compositeDishName ||
+    data.composite_dish ||
+    data.compositeDish;
+  if (typeof rawDish === 'string' && rawDish.trim()) {
+    return rawDish.trim();
+  }
+  if (data.log_meal && typeof data.log_meal === 'object') {
+    const nested = extractCompositeDishName(data.log_meal);
+    if (nested) return nested;
+  }
+  if (data.parameters && typeof data.parameters === 'object') {
+    const nested = extractCompositeDishName(data.parameters);
+    if (nested) return nested;
+  }
+  if (data.arguments && typeof data.arguments === 'object') {
+    const nested = extractCompositeDishName(data.arguments);
+    if (nested) return nested;
   }
   return undefined;
 }
@@ -385,9 +426,19 @@ export class QozaraAiMealParser implements LLMProvider {
     }
   }
 
-  async parse(input: string): Promise<ParsedNaturalLanguageMeal> {
+  async parse(input: string, context?: LLMParseContext): Promise<ParsedNaturalLanguageMeal> {
     if (!input || !input.trim()) {
       return { rawInput: input || '', items: [] };
+    }
+
+    const trimmed = (input || '').trim();
+
+    let userMessageContent = trimmed;
+    if (context?.candidates && context.candidates.length > 0) {
+      const candidatesBlock = context.candidates
+        .map(c => `- id: "${c.id}" | name: "${c.name}" (${Math.round(c.calories_100g)} kcal/100g, P:${c.protein_100g}g, C:${c.carbs_100g}g, F:${c.fats_100g}g)`)
+        .join('\n');
+      userMessageContent = `User description: "${trimmed}"\n\nAvailable Catalog Candidates (use exact \`id\` in \`candidate_id\` if applicable):\n${candidatesBlock}`;
     }
 
     const factoryConfig: AiFactoryConfig = {
@@ -401,7 +452,7 @@ export class QozaraAiMealParser implements LLMProvider {
     const provider = await AiProviderFactory.createProvider(factoryConfig, this.config.getAuthToken);
 
     const response = await provider.chat({
-      messages: [{ role: 'user', content: input.trim() }],
+      messages: [{ role: 'user', content: userMessageContent }],
       tools: [LOG_MEAL_TOOL],
       systemPrompt: this.config.systemPrompt || DEFAULT_LOG_MEAL_SYSTEM_PROMPT,
     });
@@ -412,6 +463,7 @@ export class QozaraAiMealParser implements LLMProvider {
 
     let parsedData: any = null;
     let detectedMealType: string | undefined;
+    let compositeDishName: string | undefined;
 
     // 1. Tool call(s) extraction
     if (response.type === 'tool_call' && response.arguments) {
@@ -425,6 +477,7 @@ export class QozaraAiMealParser implements LLMProvider {
         const callData = extractRawData(callArgs);
         if (callData) {
           if (!detectedMealType) detectedMealType = extractMealType(callData);
+          if (!compositeDishName) compositeDishName = extractCompositeDishName(callData);
           aggregated.push(...extractRawItems(callData));
         }
       }
@@ -438,6 +491,7 @@ export class QozaraAiMealParser implements LLMProvider {
           const callData = extractRawData(callArgs);
           if (callData) {
             if (!detectedMealType) detectedMealType = extractMealType(callData);
+            if (!compositeDishName) compositeDishName = extractCompositeDishName(callData);
             aggregated.push(...extractRawItems(callData));
           }
         }
@@ -454,6 +508,9 @@ export class QozaraAiMealParser implements LLMProvider {
     if (!detectedMealType && parsedData) {
       detectedMealType = extractMealType(parsedData);
     }
+    if (!compositeDishName && parsedData) {
+      compositeDishName = extractCompositeDishName(parsedData);
+    }
 
     let rawItems = extractRawItems(parsedData);
 
@@ -464,7 +521,8 @@ export class QozaraAiMealParser implements LLMProvider {
         return {
           rawInput: input,
           items: fallbackItems,
-          ...(detectedMealType ? { detectedMealType } : {})
+          ...(detectedMealType ? { detectedMealType } : {}),
+          ...(compositeDishName ? { compositeDishName } : {})
         };
       }
     }
@@ -476,7 +534,8 @@ export class QozaraAiMealParser implements LLMProvider {
         return {
           rawInput: input,
           items: fallbackFromInput,
-          ...(detectedMealType ? { detectedMealType } : {})
+          ...(detectedMealType ? { detectedMealType } : {}),
+          ...(compositeDishName ? { compositeDishName } : {})
         };
       }
     }
@@ -490,7 +549,8 @@ export class QozaraAiMealParser implements LLMProvider {
     return {
       rawInput: input,
       items,
-      ...(detectedMealType ? { detectedMealType } : {})
+      ...(detectedMealType ? { detectedMealType } : {}),
+      ...(compositeDishName ? { compositeDishName } : {})
     };
   }
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AiMealService } from '../src/AiMealService.js';
 import { AiMealError } from '../src/errors.js';
 import type { LLMProvider } from '../src/types.js';
-import type { BaseIngredient, ICatalogProvider } from '@quomida/domain-core';
+import type { BaseIngredient, ICatalogProvider, Recipe } from '@quomida/domain-core';
 
 describe('AiMealService - Headless Natural Language Meal Orchestrator', () => {
   const mockEgg: BaseIngredient = {
@@ -158,5 +158,182 @@ describe('AiMealService - Headless Natural Language Meal Orchestrator', () => {
 
     // Check cumulative total macros
     expect(resolved.totalMacros.calories).toBe(657); // 392 + 265
+  });
+
+  it('passes context to provider.parse when provided in parseNaturalLanguage', async () => {
+    const mockProvider: LLMProvider = {
+      parse: vi.fn().mockResolvedValue({
+        rawInput: 'dos huevos fritos',
+        items: [{ foodQuery: 'huevo frito', quantity: 2, unit: 'unit' }],
+      }),
+    };
+
+    const service = new AiMealService({ provider: mockProvider });
+    const context = {
+      candidates: [
+        {
+          id: 'egg-1',
+          name: 'Huevo frito',
+          kind: 'ingredient' as const,
+          calories_100g: 196,
+          protein_100g: 13.6,
+          carbs_100g: 0.8,
+          fats_100g: 15.3,
+        }
+      ]
+    };
+
+    await service.parseNaturalLanguage('dos huevos fritos', context);
+    expect(mockProvider.parse).toHaveBeenCalledWith('dos huevos fritos', context);
+  });
+
+  it('retrieves RAG candidates and grounds LLM parsing during processMeal', async () => {
+    const mockProvider: LLMProvider = {
+      parse: vi.fn().mockResolvedValue({
+        rawInput: 'dos huevos fritos',
+        items: [
+          { foodQuery: 'huevo frito', quantity: 2, unit: 'unit', candidateId: 'egg-1' }
+        ],
+        detectedMealType: 'breakfast',
+      }),
+    };
+
+    const mockSearchManager = {
+      retrieveRagCandidates: vi.fn().mockResolvedValue([
+        {
+          id: 'egg-1',
+          name: 'Huevo frito',
+          kind: 'ingredient',
+          calories_100g: 196,
+          protein_100g: 13.6,
+          carbs_100g: 0.8,
+          fats_100g: 15.3,
+        }
+      ]),
+      search: vi.fn().mockResolvedValue({ items: [mockEgg], recipeCount: 0, customCount: 0, catalogCount: 1 }),
+      findSingleFoodMatch: vi.fn().mockResolvedValue(mockEgg),
+    };
+
+    const mockBatchResolver = {
+      resolveBatch: vi.fn().mockResolvedValue({
+        rawInput: 'dos huevos fritos',
+        detectedMealType: 'meal_breakfast',
+        items: [],
+        totalMacros: { calories: 392, protein: 27.2, carbs: 1.6, fats: 30.6 },
+      }),
+    };
+
+    const service = new AiMealService({
+      provider: mockProvider,
+      searchManager: mockSearchManager as any,
+      batchResolver: mockBatchResolver as any,
+    });
+
+    await service.processMeal({
+      input: 'dos huevos fritos',
+      catalogProvider: mockCatalogProvider,
+    });
+
+    expect(mockSearchManager.retrieveRagCandidates).toHaveBeenCalledWith(
+      'dos huevos fritos',
+      [],
+      mockCatalogProvider,
+      []
+    );
+    expect(mockProvider.parse).toHaveBeenCalledWith('dos huevos fritos', {
+      candidates: [
+        expect.objectContaining({ id: 'egg-1', name: 'Huevo frito' }),
+      ],
+    });
+    expect(mockBatchResolver.resolveBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawInput: 'dos huevos fritos',
+        rawItems: expect.arrayContaining([
+          expect.objectContaining({ foodQuery: 'huevo frito', candidateId: 'egg-1' })
+        ]),
+      })
+    );
+  });
+
+  it('handles candidate retrieval errors gracefully and falls back to ungrounded parse', async () => {
+    const mockProvider: LLMProvider = {
+      parse: vi.fn().mockResolvedValue({
+        rawInput: 'una manzana',
+        items: [{ foodQuery: 'manzana', quantity: 1, unit: 'unit' }],
+      }),
+    };
+
+    const mockSearchManager = {
+      retrieveRagCandidates: vi.fn().mockRejectedValue(new Error('Search catalog down')),
+      findSingleFoodMatch: vi.fn().mockResolvedValue(null),
+    };
+
+    const mockBatchResolver = {
+      resolveBatch: vi.fn().mockResolvedValue({
+        rawInput: 'una manzana',
+        detectedMealType: 'meal_snack',
+        items: [],
+        totalMacros: { calories: 52, protein: 0.3, carbs: 14, fats: 0.2 },
+      }),
+    };
+
+    const service = new AiMealService({
+      provider: mockProvider,
+      searchManager: mockSearchManager as any,
+      batchResolver: mockBatchResolver as any,
+    });
+
+    const resolved = await service.processMeal({ input: 'una manzana' });
+    expect(resolved).toBeDefined();
+    expect(mockProvider.parse).toHaveBeenCalledWith('una manzana', undefined);
+  });
+
+  it('forwards compositeDishName and existingRecipes to batchResolver.resolveBatch', async () => {
+    const mockProvider: LLMProvider = {
+      parse: vi.fn().mockResolvedValue({
+        rawInput: 'milanesa con puré de papas',
+        compositeDishName: 'Milanesa con puré de papas',
+        items: [
+          { foodQuery: 'milanesa', quantity: 1, unit: 'unit' },
+          { foodQuery: 'puré de papas', quantity: 1, unit: 'portion' },
+        ],
+      }),
+    };
+
+    const mockBatchResolver = {
+      resolveBatch: vi.fn().mockResolvedValue({
+        rawInput: 'milanesa con puré de papas',
+        detectedMealType: 'meal_dinner',
+        compositeDishName: 'Milanesa con puré de papas',
+        items: [],
+        totalMacros: { calories: 600, protein: 35, carbs: 50, fats: 25 },
+      }),
+    };
+
+    const existingRecipes: Recipe[] = [
+      {
+        id: 'recipe-milanesa-pure',
+        name: 'Milanesa con puré',
+        yield_factor: 1,
+        ingredients: [],
+      }
+    ];
+
+    const service = new AiMealService({
+      provider: mockProvider,
+      batchResolver: mockBatchResolver as any,
+    });
+
+    await service.processMeal({
+      input: 'milanesa con puré de papas',
+      existingRecipes,
+    });
+
+    expect(mockBatchResolver.resolveBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compositeDishName: 'Milanesa con puré de papas',
+        existingRecipes,
+      })
+    );
   });
 });

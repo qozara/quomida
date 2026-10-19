@@ -241,11 +241,11 @@ To provide a seamless, multi-device experience (e.g. switching between phone and
 
 ## 📚 Related Architectural Decision Records
 
-* [ADR 0001: RxDB + IndexedDB Local-First Client Engine](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0001-rxdb-indexeddb-local-first-engine.md)
-* [ADR 0002: Bring Your Own Storage (BYOS) & Decoupled Sync Adapter](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0002-byos-decoupled-sync-adapter-pattern.md)
-* [ADR 0010: Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
-* [ADR 0011: Build-Time Schema Validation & Database Recovery UX](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0011-build-time-schema-validation-and-recovery.md)
-* [ADR 0012: Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
-* [ADR 0013: Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)
-* [ADR 0015: Decoupled Catalog Hydration & Multi-Tier Delta Synchronization](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0015-decoupled-catalog-hydration-and-two-file-delta-sync.md)
-* [ADR 0018: Hybrid Offline-First Data Strategy (WASM SQLite VFS)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/0018-hybrid-offline-first-data-strategy.md)
+* [ADR 0001: RxDB + IndexedDB Local-First Client Engine](./adr/0001-rxdb-indexeddb-local-first-engine.md)
+* [ADR 0002: Bring Your Own Storage (BYOS) & Decoupled Sync Adapter](./adr/0002-byos-decoupled-sync-adapter-pattern.md)
+* [ADR 0010: Storage Strategy Pattern & Composite Multi-Format Cloud Sync Connectors](./adr/0010-storage-strategy-composite-cloud-sync-connectors.md)
+* [ADR 0011: Build-Time Schema Validation & Database Recovery UX](./adr/0011-build-time-schema-validation-and-recovery.md)
+* [ADR 0012: Cloud Spreadsheet Schema Validation, Dynamic Header Mapping & Remediation](./adr/0012-schema-validation-dynamic-mapping-and-remediation.md)
+* [ADR 0013: Dual-Layer Migration Engines and Three-Tier Version Tracking Architecture](./adr/0013-dual-migration-frameworks-and-three-tier-versioning.md)
+* [ADR 0015: Decoupled Catalog Hydration & Multi-Tier Delta Synchronization](./adr/0015-decoupled-catalog-hydration-and-two-file-delta-sync.md)
+* [ADR 0018: Hybrid Offline-First Data Strategy (WASM SQLite VFS)](./adr/0018-hybrid-offline-first-data-strategy.md)

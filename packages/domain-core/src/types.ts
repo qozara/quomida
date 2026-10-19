@@ -69,6 +69,16 @@ export interface RecipeFoodItem extends NutrientDensity {
 
 export type FoodItem = IngredientFoodItem | RecipeFoodItem;
 
+export interface RagCatalogCandidate {
+  id: string;
+  name: string;
+  kind: FoodKind;
+  calories_100g: number;
+  protein_100g: number;
+  carbs_100g: number;
+  fats_100g: number;
+}
+
 export interface Portion {
   id: string;
   base_food_id: string;

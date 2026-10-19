@@ -14,10 +14,8 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, recipeFoods = [], t, setIsSettingsOpen, userSettings, db } = useApp();
-  const [activeInputTab, setActiveInputTab] = useState<'search' | 'ai'>('search');
+  const { ingredients, recipes = [], recipeFoods = [], t, setIsSettingsOpen, userSettings, db } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
-  const [aiQuery, setAiQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
@@ -76,11 +74,12 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       isCancelled = true; 
       clearTimeout(timerId);
     };
-  }, [searchQuery, ingredients, searchManager, remoteService]);
+  }, [searchQuery, ingredients, recipeFoods, searchManager, remoteService]);
 
-  const handleAiParse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiQuery.trim()) return;
+  const handleAiParse = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
 
     setIsParsing(true);
     setParseError(null);
@@ -124,12 +123,13 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       });
 
       const resolved = await aiService.processMeal({
-        input: aiQuery,
+        input: query,
         customIngredients: ingredients,
         customRecipes: recipeFoods,
+        existingRecipes: recipes,
         customPortions,
         catalogProvider: remoteService
-      });
+      } as any);
 
       setIsParsing(false);
       setBatchMeal(resolved);
@@ -162,166 +162,162 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
   return (
     <section className="w-full glass-card rounded-3xl p-5 border border-slate-800/90 shadow-xl space-y-4">
-      
-      {/* Segmented Control Input Switcher */}
-      <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
-        <button
-          type="button"
-          onClick={() => setActiveInputTab('search')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
-            activeInputTab === 'search'
-              ? 'bg-emerald-500 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span>{t.search.tabSearch}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveInputTab('ai')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
-            activeInputTab === 'ai'
-              ? 'bg-emerald-500 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>{t.search.tabAi}</span>
-        </button>
-      </div>
-
-      {/* Input Field: Search */}
-      {activeInputTab === 'search' ? (
+      {/* Unified Search & Smart Escalation Form */}
+      <form onSubmit={handleAiParse} className="relative">
         <div className="relative">
           <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
           <input
             type="text"
             id="input-food-search"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.search.placeholder}
-            className="w-full pl-11 pr-4 py-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (parseError) setParseError(null);
+            }}
+            placeholder={t.search.unifiedPlaceholder || t.search.placeholder}
+            className="w-full pl-11 pr-12 py-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
           />
+          <button
+            type="submit"
+            id="btn-smart-resolve"
+            disabled={isParsing || !searchQuery.trim()}
+            aria-label={t.search.parseButton}
+            className="absolute right-2 top-2 p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-emerald-400 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+          >
+            {isParsing ? (
+              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+          </button>
+        </div>
 
-          {/* Real-time search result list */}
-          {searchQuery.trim() !== '' && (
-            <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
-              {filteredIngredients.length === 0 && !isSearching ? (
-                <div className="p-4 text-center text-xs space-y-2.5">
-                  {!isFullCatalog ? (
-                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center gap-2">
-                      <p className="text-slate-400 leading-relaxed">
-                        {t.search.noResultsBasic}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="min-h-[44px] px-3.5 py-1.5 text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-xl transition-all flex items-center gap-1.5 active:scale-95"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>{t.search.downloadFullCatalog}</span>
-                      </button>
+        {/* Loading Feedback */}
+        {isParsing && (
+          <div className="mt-2 p-3 bg-emerald-950/40 border border-emerald-800/50 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-300" aria-live="polite">
+            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span>{t.ai.parsingMeal}</span>
+          </div>
+        )}
+
+        {/* Error Feedback */}
+        {parseError && (
+          <div className="mt-2 space-y-1.5 px-1" aria-live="polite">
+            <p className="text-xs text-rose-400 leading-relaxed">{parseError}</p>
+            {(parseError === t.ai?.quotaNotice ||
+              parseError === t.ai?.aiDisabled ||
+              parseError === t.ai?.tokenExpiredNotice) && (
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="text-xs text-emerald-400 underline hover:text-emerald-300 font-semibold block transition-colors"
+              >
+                {t.ai?.openSettingsBtn || t.sync.actions.storageSettings}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Real-time Local Search Dropdown + "Find More / Compose Dish" Footer */}
+        {searchQuery.trim().length >= 2 && !isParsing && (
+          <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
+            {filteredIngredients.length === 0 && !isSearching && searchQuery.trim().length >= 3 && (
+              <div className="p-4 text-center text-xs space-y-2.5">
+                {!isFullCatalog ? (
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center gap-2">
+                    <p className="text-slate-400 leading-relaxed">
+                      {t.search.noResultsBasic}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="min-h-[44px] px-3.5 py-1.5 text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-xl transition-all flex items-center gap-1.5 active:scale-95"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{t.search.downloadFullCatalog}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-slate-500 py-2">
+                    {t.search.noResults}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {filteredIngredients.map((ing, idx) => (
+              <button
+                key={`${ing.id}-${idx}`}
+                type="button"
+                onClick={() => {
+                  onSelectIngredient(ing, 'meal_lunch');
+                  setSearchQuery('');
+                }}
+                className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                      {ing.name}
+                    </div>
+                    {'kind' in ing && ing.kind === 'recipe' ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        {t.recipes.recipeBadge}
+                      </span>
+                    ) : ing.source === 'custom' ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">{t.recipes.customBadge}</span>
+                    ) : ing.source === 'system' ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">{t.recipes.systemBadge}</span>
+                    ) : null}
+                  </div>
+                  {'kind' in ing && ing.kind === 'recipe' ? (
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      <span className="font-semibold text-slate-200">
+                        {t.recipes.totalDish}: {Math.round(ing.total_macros.calories)} kcal
+                      </span>
+                      <span className="text-slate-400"> ({ing.cooked_weight_g}g {t.recipes.cooked})</span>
+                      <span className="text-slate-600"> • </span>
+                      <span>{Math.round(ing.calories_100g * 10) / 10} kcal/100g</span>
                     </div>
                   ) : (
-                    <div className="text-slate-500 py-2">
-                      {t.search.noResults}
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
                     </div>
                   )}
                 </div>
-              ) : (
-                <>
-                  {filteredIngredients.map((ing, idx) => (
-                    <button
-                      key={`${ing.id}-${idx}`}
-                      type="button"
-                      onClick={() => {
-                        onSelectIngredient(ing, 'meal_lunch');
-                        setSearchQuery('');
-                      }}
-                      className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
-                            {ing.name}
-                          </div>
-                          {'kind' in ing && ing.kind === 'recipe' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                              {t.recipes.recipeBadge}
-                            </span>
-                          ) : ing.source === 'custom' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">{t.recipes.customBadge}</span>
-                          ) : ing.source === 'system' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">{t.recipes.systemBadge}</span>
-                          ) : null}
-                        </div>
-                        {'kind' in ing && ing.kind === 'recipe' ? (
-                          <div className="text-xs text-slate-400 mt-0.5">
-                            <span className="font-semibold text-slate-200">
-                              {t.recipes.totalDish}: {Math.round(ing.total_macros.calories)} kcal
-                            </span>
-                            <span className="text-slate-400"> ({ing.cooked_weight_g}g {t.recipes.cooked})</span>
-                            <span className="text-slate-600"> • </span>
-                            <span>{Math.round(ing.calories_100g * 10) / 10} kcal/100g</span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-slate-400 mt-0.5">
-                            {ing.calories_100g} kcal/100g • P: {ing.protein_100g}g | C: {ing.carbs_100g}g | F: {ing.fats_100g}g
-                          </div>
-                        )}
-                      </div>
-                      <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
-                    </button>
-                  ))}
-                  {isSearching && (
-                    <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      {t.search.searchingLocal}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Input Field: AI Natural Log */
-        <form onSubmit={handleAiParse} className="space-y-3">
-          <textarea
-            rows={2}
-            value={aiQuery}
-            onChange={(e) => setAiQuery(e.target.value)}
-            placeholder={t.search.aiPlaceholder}
-            className="w-full p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner resize-none"
-          />
-          {parseError && (
-            <div className="space-y-1.5 px-1" aria-live="polite">
-              <p className="text-xs text-rose-400 leading-relaxed">{parseError}</p>
-              {(parseError === t.ai?.quotaNotice ||
-                parseError === t.ai?.aiDisabled ||
-                parseError === t.ai?.tokenExpiredNotice) && (
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="text-xs text-emerald-400 underline hover:text-emerald-300 font-semibold block transition-colors"
-                >
-                  {t.ai?.openSettingsBtn || t.sync.actions.storageSettings}
-                </button>
-              )}
-            </div>
-          )}
-          <button
-            type="submit"
-            disabled={isParsing || !aiQuery.trim()}
-            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isParsing ? t.ai.parsingMeal : t.search.parseButton}</span>
-          </button>
-        </form>
-      )}
+                <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+              </button>
+            ))}
+
+            {isSearching && (
+              <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
+                <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                {t.search.searchingLocal}
+              </div>
+            )}
+
+            {/* At the bottom of the dropdown list, ALWAYS render the "✨ Find more / Compose dish" action button */}
+            <button
+              type="button"
+              id="btn-find-more-ai"
+              onClick={handleAiParse}
+              className="w-full p-3.5 text-left hover:bg-slate-800/90 transition-colors flex items-center justify-between group border-t border-slate-800/80 min-h-[44px]"
+            >
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                    {(t.search.findMoreTitle || '✨ Find more or compose dish for "{query}"').replace('{query}', searchQuery.trim())}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {t.search.findMoreSubtitle || 'Analyzes ingredients and builds a composite dish without logging immediately'}
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+      </form>
 
       {/* Batch AI Multi-Ingredient Review Modal */}
       {isBatchReviewOpen && batchMeal && (
@@ -330,7 +326,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
           batchMeal={batchMeal}
           onClose={() => setIsBatchReviewOpen(false)}
           onLoggedSuccess={() => {
-            setAiQuery('');
+            setSearchQuery('');
             setIsBatchReviewOpen(false);
             setBatchMeal(null);
           }}

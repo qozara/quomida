@@ -30,6 +30,35 @@ export interface CreateRecipeInput {
   yield_factor?: number;
 }
 
+export interface RecipeEquivalenceOptions {
+  /** Relative calorie tolerance (default: 0.08 = 8%) */
+  calorieToleranceRatio?: number;
+  /** Maximum L1 distance (g) across protein + carbs + fats per 100g (default: 10g) */
+  macroDeltaToleranceG?: number;
+  /** Minimum token overlap ratio for name similarity (default: 0.75) */
+  minTokenSimilarity?: number;
+  /** Minimum Jaccard similarity for component food_id sets (default: 0.8) */
+  minComponentJaccard?: number;
+}
+
+const CULINARY_STOP_WORDS = new Set([
+  'de', 'del', 'con', 'en', 'la', 'el', 'los', 'las', 'al',
+  'un', 'una', 'unos', 'unas', 'y', 'a', 'para', 'por',
+  'with', 'and', 'the', 'of', 'in', 'to'
+]);
+
+function singularizeWord(token: string): string {
+  if (token.length > 3) {
+    if (/[bcdfghjklmnñpqrstvwxyz]es$/i.test(token)) {
+      return token.slice(0, -2);
+    }
+    if (/[aeiou]s$/i.test(token)) {
+      return token.slice(0, -1);
+    }
+  }
+  return token;
+}
+
 export class RecipeManager {
   /**
    * Builds a copied, immutable RecipeComponent from any FoodItem (atomic ingredient or composite recipe).
@@ -244,5 +273,139 @@ export class RecipeManager {
       throw new Error('Servings count must be an integer between 2 and 100');
     }
     return Math.round((foodItem.cooked_weight_g / n) * 10) / 10;
+  }
+
+  /**
+   * Normalizes, strips stop words, singularizes plurals, and returns sorted unique tokens.
+   */
+  extractCanonicalTokens(name: string): string[] {
+    if (!name || typeof name !== 'string') return [];
+
+    const normalized = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ');
+
+    const rawTokens = normalized
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0 && !CULINARY_STOP_WORDS.has(t));
+
+    const singularized = rawTokens
+      .map(singularizeWord)
+      .filter(t => t.length > 0 && !CULINARY_STOP_WORDS.has(t));
+
+    return Array.from(new Set(singularized)).sort();
+  }
+
+  /**
+   * Computes Jaccard similarity (|A ∩ B| / |A ∪ B|) over canonical tokens of two names.
+   */
+  computeTokenSimilarity(nameA: string, nameB: string): number {
+    const tokensA = this.extractCanonicalTokens(nameA);
+    const tokensB = this.extractCanonicalTokens(nameB);
+
+    if (tokensA.length === 0 || tokensB.length === 0) return 0;
+
+    const setA = new Set(tokensA);
+    const setB = new Set(tokensB);
+
+    let intersectionCount = 0;
+    for (const t of setA) {
+      if (setB.has(t)) intersectionCount++;
+    }
+
+    const unionCount = new Set([...tokensA, ...tokensB]).size;
+    return unionCount > 0 ? intersectionCount / unionCount : 0;
+  }
+
+  /**
+   * Computes Jaccard similarity (|A ∩ B| / |A ∪ B|) over unique food_id sets of components.
+   */
+  computeComponentJaccard(a: RecipeComponent[], b: RecipeComponent[]): number {
+    const setA = new Set((a || []).map(c => c.food_id).filter(Boolean));
+    const setB = new Set((b || []).map(c => c.food_id).filter(Boolean));
+
+    if (setA.size === 0 || setB.size === 0) return 0;
+
+    let intersectionCount = 0;
+    for (const id of setA) {
+      if (setB.has(id)) intersectionCount++;
+    }
+
+    const unionSize = new Set([...setA, ...setB]).size;
+    return unionSize > 0 ? intersectionCount / unionSize : 0;
+  }
+
+  /**
+   * Evaluates nutritional equivalence within calorie tolerance ratio and macro L1 distance.
+   */
+  isNutritionallyEquivalent(
+    a: NutrientDensity,
+    b: NutrientDensity,
+    opts?: RecipeEquivalenceOptions
+  ): boolean {
+    const calTol = opts?.calorieToleranceRatio ?? 0.08;
+    const macroTol = opts?.macroDeltaToleranceG ?? 10;
+
+    const calDiff = Math.abs(a.calories_100g - b.calories_100g) / Math.max(b.calories_100g, 1);
+    const macroDiff =
+      Math.abs(a.protein_100g - b.protein_100g) +
+      Math.abs(a.carbs_100g - b.carbs_100g) +
+      Math.abs(a.fats_100g - b.fats_100g);
+
+    return calDiff <= calTol && macroDiff <= macroTol;
+  }
+
+  /**
+   * Finds an equivalent existing recipe based on exact tokens, high component Jaccard + nutrition,
+   * or high token similarity + nutrition.
+   */
+  findEquivalentRecipe(
+    candidate: Recipe | CreateRecipeInput,
+    existingRecipes: Recipe[],
+    opts?: RecipeEquivalenceOptions
+  ): Recipe | null {
+    if (!existingRecipes || existingRecipes.length === 0) return null;
+
+    const candidateTokens = this.extractCanonicalTokens(candidate.name);
+    const candidateDensity: NutrientDensity =
+      (candidate as any).calories_100g !== undefined
+        ? (candidate as unknown as NutrientDensity)
+        : this.computeNutrition(candidate as Recipe).density;
+
+    const minTokenSim = opts?.minTokenSimilarity ?? 0.75;
+    const minCompJaccard = opts?.minComponentJaccard ?? 0.8;
+
+    for (const existing of existingRecipes) {
+      if ((existing as any)._deleted) continue;
+
+      const existingTokens = this.extractCanonicalTokens(existing.name);
+
+      // Signal 1: Canonical token arrays are non-empty and identical (tokenSim === 1.0)
+      const tokenSim = this.computeTokenSimilarity(candidate.name, existing.name);
+      if (candidateTokens.length > 0 && existingTokens.length > 0 && tokenSim === 1.0) {
+        return existing;
+      }
+
+      const existingDensity: NutrientDensity =
+        (existing as any).calories_100g !== undefined
+          ? (existing as unknown as NutrientDensity)
+          : this.computeNutrition(existing).density;
+
+      // Signal 2: componentJaccard >= minComponentJaccard AND isNutritionallyEquivalent
+      const compJaccard = this.computeComponentJaccard(candidate.ingredients, existing.ingredients);
+      if (compJaccard >= minCompJaccard && this.isNutritionallyEquivalent(candidateDensity, existingDensity, opts)) {
+        return existing;
+      }
+
+      // Signal 3: tokenSim >= minTokenSimilarity AND isNutritionallyEquivalent
+      if (tokenSim >= minTokenSim && this.isNutritionallyEquivalent(candidateDensity, existingDensity, opts)) {
+        return existing;
+      }
+    }
+
+    return null;
   }
 }

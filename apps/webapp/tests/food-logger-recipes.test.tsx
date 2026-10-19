@@ -68,7 +68,7 @@ describe('FoodLogger - Unified Food & Recipe Search', () => {
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
     // Type in search query matching recipe
-    const input = screen.getByPlaceholderText(dictionaries.en.search.placeholder);
+    const input = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder || dictionaries.en.search.placeholder);
     fireEvent.change(input, { target: { value: 'Guiso' } });
 
     // Wait for search result debounce
