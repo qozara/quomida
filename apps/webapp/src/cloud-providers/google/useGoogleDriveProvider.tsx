@@ -53,6 +53,7 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
         adapter, 
         credentials: { 
           accessToken: token, 
+          access_token: token,
           userEmail, 
           userName, 
           expiresAt: Date.now() + 3500000 

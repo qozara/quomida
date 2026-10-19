@@ -60,6 +60,16 @@ interface AppContextType {
     portionName: string,
     passedPortions?: Portion[]
   ) => Promise<void>;
+  logBatchFoodItems: (
+    items: Array<{
+      food: FoodItem | BaseIngredient;
+      quantity: number;
+      portionName: string;
+      availablePortions?: Portion[];
+      mealType?: MealType;
+    }>,
+    mealType: MealType
+  ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
   addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
   removeCustomIngredient: (id: string) => Promise<void>;
@@ -561,6 +571,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     forceSync().catch(console.error);
   };
 
+  const logBatchFoodItems = async (
+    items: Array<{
+      food: FoodItem | BaseIngredient;
+      quantity: number;
+      portionName: string;
+      availablePortions?: Portion[];
+      mealType?: MealType;
+    }>,
+    mealType: MealType
+  ) => {
+    if (!dbService || items.length === 0) return;
+
+    for (const item of items) {
+      const { food, quantity, portionName, availablePortions } = item;
+      let relevantPortions: Portion[] = availablePortions || [];
+
+      if (!availablePortions || availablePortions.length === 0) {
+        const rxdb = dbService.getDatabaseInstance();
+        if (rxdb) {
+          try {
+            const pdocs = await rxdb.portions.find({ selector: { base_food_id: food.id } }).exec();
+            relevantPortions = pdocs.map((d: any) => d.toJSON ? d.toJSON() : d);
+          } catch (e) {
+            console.warn('[AppContext] Failed to query portions for batch item:', e);
+          }
+        }
+      }
+
+      const isRecipe = 'kind' in food && food.kind === 'recipe';
+      let portionsToUse = relevantPortions;
+      if (isRecipe) {
+        const recipeItem = food as RecipeFoodItem;
+        const hasWhole = portionsToUse.some(p => p.name === 'Whole recipe');
+        if (!hasWhole) {
+          const wholePortion = recipeManager.getWholeRecipePortion(recipeItem);
+          portionsToUse = [wholePortion, ...portionsToUse];
+        }
+      }
+
+      const weightGrams = convertPortionToGrams(quantity, portionName, portionsToUse);
+      const rawMacros = calculateItemMacros(food, weightGrams);
+      const macrosSnapshot = createMacroSnapshot(rawMacros);
+
+      await dbService.logFood({
+        date: selectedDate,
+        meal_type: item.mealType || mealType,
+        food_reference_id: food.id,
+        food_name: food.name,
+        quantity,
+        portion_name: portionName,
+        macros: macrosSnapshot
+      });
+    }
+
+    forceSync().catch(console.error);
+  };
+
   const deleteLogItem = async (id: string) => {
     await dbService.deleteLogItem(id);
     forceSync().catch(console.error);
@@ -632,6 +699,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         repairSync,
         migrateSync,
         logFoodItem,
+        logBatchFoodItems,
         deleteLogItem,
         addCustomIngredient,
         removeCustomIngredient,

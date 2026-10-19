@@ -8,17 +8,17 @@ It is part of the **Qozara** project portfolio (alongside [Quozen](https://githu
 
 ## 📚 Architectural & Developer Documentation
 
-All architectural decisions, product specifications, component blueprints, and persistence guides are maintained in the [`docs/`](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/README.md) directory:
+All architectural decisions, product specifications, component blueprints, and persistence guides are maintained in the [`docs/`](./docs/README.md) directory:
 
-- 💾 **[Persistence, Versioning & Migrations Guide](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/persistence-and-migrations.md)** — **Critical Architecture**: The 3-tier versioning model, dual independent migration engines (RxDB Local vs `@qozara/gdocs-schema` Remote), automated backups, and developer playbook.
-- 🏗️ **[Architecture Blueprint](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/ARCHITECTURE.md)** — Monorepo packages, RxDB schemas, BYOS flow, and sequence diagrams.
-- ☁️ **[Google Drive & Sheets Connector](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/connectors/google-drive-sheets.md)** — Google OAuth configuration, dual spreadsheet model, dynamic mapping, and live E2E testing.
-- 🛠️ **[Developer CLI Harness](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/apps/cli/README.md)** — Terminal CLI for OAuth login/logout, domain calculations, and live E2E testing.
-- 📋 **[Product Specification](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/PRODUCT_SPEC.md)** — Functional requirements, wireframe specs, regional datasets, and WCAG 2.2 accessibility.
-- 📜 **[Architectural Decision Records (ADRs)](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/adr/README.md)** — MADR-standard records (0000 through 0015: RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback, Recovery UX, Dynamic Mapping, Dual Migrations, Hook Registry, Catalog Hydration).
-- 🥗 **[ETL & Catalog Hydration Pipeline](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/apps/etl-pipeline/README.md)** — Decoupled static dataset compiler, two-file delta synchronization, shift-left data sanitization, and infrastructure-agnostic CDN deployment.
-- 👩‍💻 **[Contributing & TDD Guide](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/CONTRIBUTING.md)** — Developer workflow, running unit/E2E tests, and schema migrations.
-- 🤖 **[AI Coding Agent Invariants](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/AGENTS.md)** — Critical invariants, zero-vulnerability policy, and strict isolation rules.
+- 💾 **[Persistence, Versioning & Migrations Guide](./docs/persistence-and-migrations.md)** — **Critical Architecture**: The 3-tier versioning model, dual independent migration engines (RxDB Local vs `@qozara/gdocs-schema` Remote), automated backups, and developer playbook.
+- 🏗️ **[Architecture Blueprint](./docs/ARCHITECTURE.md)** — Monorepo packages, RxDB schemas, BYOS flow, and sequence diagrams.
+- ☁️ **[Google Drive & Sheets Connector](./docs/connectors/google-drive-sheets.md)** — Google OAuth configuration, dual spreadsheet model, dynamic mapping, and live E2E testing.
+- 🛠️ **[Developer CLI Harness](./apps/cli/README.md)** — Terminal CLI for OAuth login/logout, domain calculations, and live E2E testing.
+- 📋 **[Product Specification](./docs/PRODUCT_SPEC.md)** — Functional requirements, wireframe specs, regional datasets, and WCAG 2.2 accessibility.
+- 📜 **[Architectural Decision Records (ADRs)](./docs/adr/README.md)** — MADR-standard records (0000 through 0015: RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback, Recovery UX, Dynamic Mapping, Dual Migrations, Hook Registry, Catalog Hydration).
+- 🥗 **[ETL & Catalog Hydration Pipeline](./apps/etl-pipeline/README.md)** — Decoupled static dataset compiler, two-file delta synchronization, shift-left data sanitization, and infrastructure-agnostic CDN deployment.
+- 👩‍💻 **[Contributing & TDD Guide](./docs/CONTRIBUTING.md)** — Developer workflow, running unit/E2E tests, and schema migrations.
+- 🤖 **[AI Coding Agent Invariants](./AGENTS.md)** — Critical invariants, zero-vulnerability policy, and strict isolation rules.
 
 ---
 
@@ -71,8 +71,8 @@ quomida/
 
 Quomida uses a Bring Your Own Storage (BYOS) architecture, allowing users to sync their local RxDB data to their personal cloud storage with total data ownership:
 
-- **[Google Drive & Sheets](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/connectors/google-drive-sheets.md)**: Syncs raw configuration to private Drive app data and tabular data to dual Google Sheets (`Quomida Daily Logs` and `Quomida Food Catalog`) with `@qozara/gdocs-schema` validation, dynamic header mapping, and automated safety backups.
-- **[Mock Sync Adapter](file:///Users/diegodesogos/VSCodeProjects/qozara/quomida/docs/connectors/mock-adapter.md)**: In-memory/local storage fallback used for offline local development and zero-config evaluations.
+- **[Google Drive & Sheets](./docs/connectors/google-drive-sheets.md)**: Syncs raw configuration to private Drive app data and tabular data to dual Google Sheets (`Quomida Daily Logs` and `Quomida Food Catalog`) with `@qozara/gdocs-schema` validation, dynamic header mapping, and automated safety backups.
+- **[Mock Sync Adapter](./docs/connectors/mock-adapter.md)**: In-memory/local storage fallback used for offline local development and zero-config evaluations.
 
 ---
 

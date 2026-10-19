@@ -69,6 +69,16 @@ export interface RecipeFoodItem extends NutrientDensity {
 
 export type FoodItem = IngredientFoodItem | RecipeFoodItem;
 
+export interface RagCatalogCandidate {
+  id: string;
+  name: string;
+  kind: FoodKind;
+  calories_100g: number;
+  protein_100g: number;
+  carbs_100g: number;
+  fats_100g: number;
+}
+
 export interface Portion {
   id: string;
   base_food_id: string;
@@ -99,6 +109,15 @@ export interface DailyLog {
   updatedAt?: number;
 }
 
+export type AiProviderType = 'qozara-intelligence' | 'byok' | 'ollama' | 'window.ai';
+
+export interface UserAiSettings {
+  provider: AiProviderType;
+  ciphertext?: string;
+  ollama_base_url?: string;
+  ollama_model?: string;
+}
+
 export interface UserSettings {
   id: string; // 'global_settings'
   locale: string; // e.g., 'es-AR', 'en-US'
@@ -113,6 +132,7 @@ export interface UserSettings {
     id: string;
     credentials?: any;
   };
+  ai_settings?: UserAiSettings;
   updatedAt?: number;
 }
 

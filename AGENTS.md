@@ -52,6 +52,10 @@ This document contains operational guidelines, architectural constraints, and st
    - XSS Prevention: NEVER use `dangerouslySetInnerHTML` or raw DOM injection in React.
    - Cloud Credentials: Cloud provider tokens stored in IndexedDB (RxDB) MUST use minimal scopes (e.g., `drive.file`, `drive.appdata`) and short expirations to minimize local extraction blast radius.
 
+11. **Zero Local Workstation Path / PII Leakage (NON-NEGOTIABLE)**:
+   - Repository files (code, tests, Markdown documentation, ADRs, scripts) MUST NEVER contain absolute local workstation paths (OS user home directories or `file:///` absolute URIs), developer usernames, or personal email addresses.
+   - Always use repository-relative paths (e.g., `./docs/...`, `../packages/...`) or environment variables in all documentation and scripts.
+
 ---
 
 ## 📐 Mandatory Coding Principles & Feature Lifecycle Guidelines

@@ -8,15 +8,17 @@ async function run() {
   
   console.log('Building system.sqlite at:', systemOut);
   
-  const ingredientsCsv = '/Users/diegodesogos/Library/CloudStorage/GoogleDrive-diegodesogos@gmail.com/Mi unidad/Projects/Qozara/Quomida/quomida-builtin-catalog/csv-content-generated-from-off/system_ingredients.csv';
-  const portionsCsv = '/Users/diegodesogos/Library/CloudStorage/GoogleDrive-diegodesogos@gmail.com/Mi unidad/Projects/Qozara/Quomida/quomida-builtin-catalog/csv-content-generated-from-off/system_portions.csv';
-  
-  fs.copyFileSync(ingredientsCsv, path.resolve(currentDir, 'data/raw/system/system_ingredients.csv'));
-  fs.copyFileSync(portionsCsv, path.resolve(currentDir, 'data/raw/system/system_portions.csv'));
-  
+  const ingredientsCsv = process.env.SYSTEM_INGREDIENTS_PATH || path.resolve(currentDir, 'data/examples/system_ingredients.csv');
+  const portionsCsv = process.env.SYSTEM_PORTIONS_PATH || path.resolve(currentDir, 'data/examples/system_portions.csv');
+
+  const rawSystemDir = path.resolve(currentDir, 'data/raw/system');
+  fs.mkdirSync(rawSystemDir, { recursive: true });
+  fs.copyFileSync(ingredientsCsv, path.resolve(rawSystemDir, 'system_ingredients.csv'));
+  fs.copyFileSync(portionsCsv, path.resolve(rawSystemDir, 'system_portions.csv'));
+
   await parseSystemCSV(
-    path.resolve(currentDir, 'data/raw/system/system_ingredients.csv'),
-    path.resolve(currentDir, 'data/raw/system/system_portions.csv'),
+    path.resolve(rawSystemDir, 'system_ingredients.csv'),
+    path.resolve(rawSystemDir, 'system_portions.csv'),
     systemOut
   );
   console.log('Done building system.sqlite');
