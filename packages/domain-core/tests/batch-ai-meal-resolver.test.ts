@@ -665,5 +665,209 @@ describe('BatchAiMealResolver & Portion Matching', () => {
         expect(updated.synthesizedRecipe?.recipe.name).toBe('Milanesa de Ternera con Arroz Blanco');
       });
     });
+
+    describe('Multi-Meal, Composite Dish & Default Logging Mode', () => {
+      const mockPureIng: BaseIngredient = {
+        id: 'ing-pure-1',
+        name: 'Puré de papas',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 85,
+        protein_100g: 2,
+        carbs_100g: 15,
+        fats_100g: 1.5
+      };
+
+      const mockBurgerIng: BaseIngredient = {
+        id: 'ing-burger-1',
+        name: 'Hamburguesa',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 240,
+        protein_100g: 18,
+        carbs_100g: 0,
+        fats_100g: 16
+      };
+
+      const mockMoraIng: BaseIngredient = {
+        id: 'ing-mora-1',
+        name: 'Mora congelada',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 45,
+        protein_100g: 1,
+        carbs_100g: 10,
+        fats_100g: 0.5
+      };
+
+      const mockQuesoIng: BaseIngredient = {
+        id: 'ing-queso-1',
+        name: 'Queso',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 350,
+        protein_100g: 25,
+        carbs_100g: 2,
+        fats_100g: 28
+      };
+
+      const mockPanIng: BaseIngredient = {
+        id: 'ing-pan-1',
+        name: 'Pan',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 260,
+        protein_100g: 9,
+        carbs_100g: 50,
+        fats_100g: 3
+      };
+
+      const mockPizzaIng: BaseIngredient = {
+        id: 'ing-pizza-1',
+        name: 'Pizza',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 270,
+        protein_100g: 12,
+        carbs_100g: 33,
+        fats_100g: 10
+      };
+
+      const mockCaracolitosIng: BaseIngredient = {
+        id: 'ing-pasta-1',
+        name: 'Caracolitos sabor asado',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 350,
+        protein_100g: 11,
+        carbs_100g: 72,
+        fats_100g: 2
+      };
+
+      it('Issue 1: defaults to recipe mode when input describes composite dish with "con" and no list separators', async () => {
+        const result = await resolver.resolveBatch({
+          rawInput: 'comi un puré de papas con una hamburguesa',
+          rawItems: [
+            { foodQuery: 'puré de papas', quantity: 1, unit: 'unit' },
+            { foodQuery: 'hamburguesa', quantity: 1, unit: 'unit' }
+          ],
+          customIngredients: [mockPureIng, mockBurgerIng]
+        });
+
+        expect(result.items).toHaveLength(2);
+        expect(result.isMultiMeal).toBe(false);
+        expect(result.defaultLoggingMode).toBe('recipe');
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe?.recipe.name).toBe('Puré de papas con Hamburguesa');
+      });
+
+      it('Issue 2: detects multi-meal when items have distinct meal types, disables recipe synthesis', async () => {
+        const result = await resolver.resolveBatch({
+          rawInput: 'almorcé mora congelada y cené queso',
+          rawItems: [
+            { foodQuery: 'mora congelada', quantity: 1, unit: 'unit', mealType: 'lunch' },
+            { foodQuery: 'queso', quantity: 1, unit: 'unit', mealType: 'dinner' }
+          ],
+          customIngredients: [mockMoraIng, mockQuesoIng]
+        });
+
+        expect(result.items).toHaveLength(2);
+        expect(result.items[0].mealType).toBe('meal_lunch');
+        expect(result.items[1].mealType).toBe('meal_dinner');
+        expect(result.isMultiMeal).toBe(true);
+        expect(result.defaultLoggingMode).toBe('batch');
+        expect(result.synthesizedRecipe).toBeUndefined();
+      });
+
+      it('Issue 3: defaults to batch mode when input lists separate items separated by commas and "y"', async () => {
+        const result = await resolver.resolveBatch({
+          rawInput: 'comí queso, pan, hamburguesa y mora congelada en la cena',
+          rawItems: [
+            { foodQuery: 'queso', quantity: 1, unit: 'unit', mealType: 'dinner' },
+            { foodQuery: 'pan', quantity: 1, unit: 'unit', mealType: 'dinner' },
+            { foodQuery: 'hamburguesa', quantity: 1, unit: 'unit', mealType: 'dinner' },
+            { foodQuery: 'mora congelada', quantity: 1, unit: 'unit', mealType: 'dinner' }
+          ],
+          customIngredients: [mockQuesoIng, mockPanIng, mockBurgerIng, mockMoraIng]
+        });
+
+        expect(result.items).toHaveLength(4);
+        expect(result.isMultiMeal).toBe(false);
+        expect(result.defaultLoggingMode).toBe('batch');
+        // Synthesized recipe is computed for optional toggle, but defaultLoggingMode is batch
+        expect(result.synthesizedRecipe).toBeDefined();
+      });
+
+      it('Issue 4: defaults to batch mode when items separated by "y", associating correct quantities and portions', async () => {
+        const result = await resolver.resolveBatch({
+          rawInput: 'caracolitos sabor asado y 2 porciones de pizza',
+          rawItems: [
+            { foodQuery: 'caracolitos sabor asado', quantity: 1, unit: 'unit' },
+            { foodQuery: 'pizza', quantity: 2, unit: 'portion' }
+          ],
+          customIngredients: [mockCaracolitosIng, mockPizzaIng]
+        });
+
+        expect(result.items).toHaveLength(2);
+        expect(result.items[0].quantity).toBe(1);
+        expect(result.items[1].quantity).toBe(2);
+        expect(result.isMultiMeal).toBe(false);
+        expect(result.defaultLoggingMode).toBe('batch');
+        expect(result.synthesizedRecipe).toBeDefined();
+      });
+
+      it('respects options.isCompositeDish override if provided', async () => {
+        const result = await resolver.resolveBatch({
+          rawInput: 'dos alimentos',
+          rawItems: [
+            { foodQuery: 'hamburguesa', quantity: 1, unit: 'unit' },
+            { foodQuery: 'queso', quantity: 1, unit: 'unit' }
+          ],
+          customIngredients: [mockBurgerIng, mockQuesoIng],
+          isCompositeDish: true
+        });
+
+        expect(result.defaultLoggingMode).toBe('recipe');
+        expect(result.synthesizedRecipe).toBeDefined();
+      });
+
+      it('Multilingual (EN): synthesizes English recipe title using "with" / "and" when locale is "en" or input is English', async () => {
+        const mockMashedPotatoEn: BaseIngredient = {
+          id: 'ing-en-potato',
+          name: 'Mashed potatoes',
+          source: 'system',
+          lang: 'en',
+          calories_100g: 85,
+          protein_100g: 2,
+          carbs_100g: 15,
+          fats_100g: 1.5
+        };
+        const mockBurgerEn: BaseIngredient = {
+          id: 'ing-en-burger',
+          name: 'Beef burger',
+          source: 'system',
+          lang: 'en',
+          calories_100g: 240,
+          protein_100g: 18,
+          carbs_100g: 0,
+          fats_100g: 16
+        };
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'I ate mashed potatoes with a beef burger',
+          rawItems: [
+            { foodQuery: 'mashed potatoes', quantity: 1, unit: 'portion' },
+            { foodQuery: 'beef burger', quantity: 1, unit: 'unit' }
+          ],
+          customIngredients: [mockMashedPotatoEn, mockBurgerEn],
+          locale: 'en'
+        });
+
+        expect(result.defaultLoggingMode).toBe('recipe');
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe?.recipe.name).toBe('Mashed potatoes with Beef burger');
+      });
+    });
   });
 });
+

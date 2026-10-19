@@ -55,10 +55,38 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   onClose,
   onLoggedSuccess
 }) => {
-  const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t } = useApp();
+  const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t, locale } = useApp();
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
-  const [items, setItems] = useState<ResolvedAiMealItem[]>(() => batchMeal?.items || []);
+  const [items, setItems] = useState<Array<ResolvedAiMealItem & { mealType?: MealType }>>(() =>
+    (batchMeal?.items || []).map((it) => ({
+      ...it,
+      mealType: (it as any).mealType || batchMeal?.detectedMealType || 'meal_lunch'
+    }))
+  );
+  const [loggingMode, setLoggingMode] = useState<'recipe' | 'batch'>(() => {
+    if (!batchMeal) return 'recipe';
+    const distinct = new Set<MealType>();
+    for (const it of batchMeal.items || []) {
+      distinct.add((it as any).mealType || batchMeal.detectedMealType || 'meal_lunch');
+    }
+    if (distinct.size > 1 || Boolean((batchMeal as any)?.isMultiMeal && distinct.size > 1)) {
+      return 'batch';
+    }
+    if ((batchMeal as any).defaultLoggingMode) {
+      return (batchMeal as any).defaultLoggingMode;
+    }
+    if (batchMeal.synthesizedRecipe && (batchMeal as any).defaultLoggingMode === undefined) {
+      return 'recipe';
+    }
+    if (
+      batchMeal.compositeDishName ||
+      (/\b(?:con|with)\b/i.test(batchMeal.rawInput) && !/[,\n]|\b(?:y|and)\b/i.test(batchMeal.rawInput))
+    ) {
+      return 'recipe';
+    }
+    return 'batch';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSubstituteId, setActiveSubstituteId] = useState<string | null>(null);
   const [substituteQuery, setSubstituteQuery] = useState('');
@@ -75,24 +103,72 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
     return recipeFoods.map((r) => r.recipe).filter(Boolean) as Recipe[];
   }, [recipes, recipeFoods]);
 
+  const distinctMeals = useMemo(() => {
+    const set = new Set<MealType>();
+    for (const it of items) {
+      set.add(it.mealType || mealType);
+    }
+    return set;
+  }, [items, mealType]);
+
+  const isMultiMeal = distinctMeals.size > 1 || Boolean((batchMeal as any)?.isMultiMeal && distinctMeals.size > 1);
+
   const activeSynthesizedRecipe = useMemo(() => {
     return batchResolver.computeSynthesizedRecipe(
       items,
       batchMeal?.compositeDishName,
-      existingRecipes
+      existingRecipes,
+      locale
     );
-  }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver]);
+  }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver, locale]);
 
   // Re-sync state whenever batchMeal changes
   useEffect(() => {
     if (batchMeal) {
-      setMealType(batchMeal.detectedMealType || 'meal_lunch');
-      setItems(batchMeal.items || []);
+      const detected = batchMeal.detectedMealType || 'meal_lunch';
+      setMealType(detected);
+      const loadedItems = (batchMeal.items || []).map((it) => ({
+        ...it,
+        mealType: (it as any).mealType || detected
+      }));
+      setItems(loadedItems);
       setActiveSubstituteId(null);
       setSubstituteQuery('');
       setSubstituteResults([]);
+
+      const distinct = new Set<MealType>();
+      for (const it of loadedItems) {
+        distinct.add(it.mealType || detected);
+      }
+      const multi = distinct.size > 1 || Boolean((batchMeal as any)?.isMultiMeal && distinct.size > 1);
+
+      if (multi) {
+        setLoggingMode('batch');
+      } else if ((batchMeal as any).defaultLoggingMode) {
+        setLoggingMode((batchMeal as any).defaultLoggingMode);
+      } else if (batchMeal.synthesizedRecipe && (batchMeal as any).defaultLoggingMode === undefined) {
+        setLoggingMode('recipe');
+      } else if (
+        batchMeal.compositeDishName ||
+        (/\b(?:con|with)\b/i.test(batchMeal.rawInput) && !/[,\n]|\b(?:y|and)\b/i.test(batchMeal.rawInput))
+      ) {
+        setLoggingMode('recipe');
+      } else {
+        setLoggingMode('batch');
+      }
     }
   }, [batchMeal]);
+
+  const handleSelectGlobalMeal = (m: MealType) => {
+    setMealType(m);
+    setItems((prev) => prev.map((it) => ({ ...it, mealType: m })));
+  };
+
+  const handleUpdateItemMealType = (itemId: string, newMeal: MealType) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, mealType: newMeal } : it))
+    );
+  };
 
   // Handle substitute food search
   useEffect(() => {
@@ -295,13 +371,17 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
 
   const validItems = useMemo(() => items.filter((it) => !it.unmatched && it.food), [items]);
 
+  const shouldLogAsCompositeRecipe = Boolean(
+    activeSynthesizedRecipe && loggingMode === 'recipe' && !isMultiMeal && validItems.length >= 2
+  );
+
   // Log all items to daily log in one operation
   const handleLogAll = async () => {
     if (validItems.length === 0 || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
-      if (activeSynthesizedRecipe) {
+      if (shouldLogAsCompositeRecipe && activeSynthesizedRecipe) {
         // Case A: Composite Dish (validItems.length >= 2)
         if (!activeSynthesizedRecipe.isExistingDuplicate && addRecipe) {
           await addRecipe(activeSynthesizedRecipe.recipe);
@@ -313,18 +393,20 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
               food: activeSynthesizedRecipe.foodItem,
               quantity: 1,
               portionName: 'Whole recipe',
-              availablePortions: (activeSynthesizedRecipe.foodItem as any).portions
+              availablePortions: (activeSynthesizedRecipe.foodItem as any).portions,
+              mealType
             }
           ],
           mealType
         );
       } else {
-        // Case B: Single Atomic Food (validItems.length === 1)
+        // Case B: Batch / Single / Multi-meal logging
         const itemsToLog = validItems.map((it) => ({
           food: it.food!,
           quantity: it.quantity,
           portionName: it.selectedPortionName,
-          availablePortions: it.availablePortions
+          availablePortions: it.availablePortions,
+          mealType: (it as any).mealType || mealType
         }));
 
         await logBatchFoodItems(itemsToLog, mealType);
@@ -388,12 +470,21 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
           <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
             {t.ai?.selectMeal || 'Meal Time'}
           </label>
+          {isMultiMeal && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs animate-in fade-in">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {t.ai?.multiMealDetectedNotice ||
+                  'Multiple meal times detected — each food will be logged to its assigned meal'}
+              </span>
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-2">
             {(['meal_breakfast', 'meal_lunch', 'meal_dinner', 'meal_snack'] as MealType[]).map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => setMealType(m)}
+                onClick={() => handleSelectGlobalMeal(m)}
                 className={`py-2 px-1 text-xs font-semibold rounded-xl border transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${
                   mealType === m
                     ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-sm'
@@ -435,6 +526,19 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                         {t.recipes?.systemBadge || 'System'}
                       </span>
                     )}
+
+                    {/* Per-Item Meal Time Selector */}
+                    <select
+                      aria-label="Item Meal Time"
+                      value={(item as any).mealType || mealType}
+                      onChange={(e) => handleUpdateItemMealType(item.id, e.target.value as MealType)}
+                      className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium rounded-lg px-2 py-0.5 focus:outline-none focus:border-emerald-500 min-h-[30px] cursor-pointer"
+                    >
+                      <option value="meal_breakfast">{t.dashboard.meals.breakfast}</option>
+                      <option value="meal_lunch">{t.dashboard.meals.lunch}</option>
+                      <option value="meal_dinner">{t.dashboard.meals.dinner}</option>
+                      <option value="meal_snack">{t.dashboard.meals.snack}</option>
+                    </select>
                   </div>
 
                   {!item.unmatched && item.food && (
@@ -618,27 +722,63 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
           )}
         </div>
 
-        {/* Composite Recipe Banner */}
-        {activeSynthesizedRecipe && (
-          <div className="bg-purple-950/30 border border-purple-800/50 rounded-2xl p-3 shrink-0 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 shrink-0">
-                <Utensils className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-bold text-white truncate">
-                  {activeSynthesizedRecipe.recipe.name}
-                </div>
-                <div className="text-xs text-purple-300 font-medium">
-                  {activeSynthesizedRecipe.isExistingDuplicate
-                    ? (t.ai?.existingRecipeMatchedBadge || 'Matched existing recipe in your library')
-                    : (t.ai?.autoSavedRecipeBadge || 'Will be saved to My Recipes and logged as a single dish')}
-                </div>
-              </div>
+        {/* Logging Mode Toggle: Composite Recipe vs. Batch Separate Items */}
+        {validItems.length >= 2 && !isMultiMeal && activeSynthesizedRecipe && (
+          <div className="space-y-2 shrink-0">
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/80 border border-slate-800 rounded-2xl">
+              <button
+                type="button"
+                id="btn-mode-recipe"
+                onClick={() => setLoggingMode('recipe')}
+                className={`py-2 px-2.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${
+                  loggingMode === 'recipe'
+                    ? 'bg-purple-600/20 border-purple-500/50 text-purple-300 shadow-sm'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                <Utensils className="w-3.5 h-3.5" />
+                <span className="truncate">{t.ai?.modeCombineRecipe || 'Combine as 1 Dish (Recipe)'}</span>
+              </button>
+              <button
+                type="button"
+                id="btn-mode-batch"
+                onClick={() => setLoggingMode('batch')}
+                className={`py-2 px-2.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${
+                  loggingMode === 'batch'
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-sm'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="truncate">
+                  {(t.ai?.modeSeparateItems || 'Log Separate Items ({count})').replace('{count}', String(validItems.length))}
+                </span>
+              </button>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 shrink-0">
-              {t.recipes?.recipeBadge || 'Recipe'}
-            </span>
+
+            {/* Composite Recipe Banner - only shown when loggingMode === 'recipe' */}
+            {loggingMode === 'recipe' && (
+              <div className="bg-purple-950/30 border border-purple-800/50 rounded-2xl p-3 flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 shrink-0">
+                    <Utensils className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">
+                      {activeSynthesizedRecipe.recipe.name}
+                    </div>
+                    <div className="text-xs text-purple-300 font-medium">
+                      {activeSynthesizedRecipe.isExistingDuplicate
+                        ? (t.ai?.existingRecipeMatchedBadge || 'Matched existing recipe in your library')
+                        : (t.ai?.autoSavedRecipeBadge || 'Will be saved to My Recipes and logged as a single dish')}
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 shrink-0">
+                  {t.recipes?.recipeBadge || 'Recipe'}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -679,7 +819,11 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
         >
           <Check className="w-5 h-5" />
           <span>
-            {validItems.length > 1
+            {shouldLogAsCompositeRecipe && activeSynthesizedRecipe
+              ? (activeSynthesizedRecipe.isExistingDuplicate
+                  ? (t.ai?.logRecipeDishAction || 'Log Dish to Diary')
+                  : (t.ai?.saveAndLogRecipeAction || 'Save Recipe & Log Dish'))
+              : validItems.length > 1
               ? (t.ai?.logBatchAction || 'Log {count} Items to Diary').replace('{count}', String(validItems.length))
               : (t.ai?.logSingleAction || 'Log to Diary')}
           </span>

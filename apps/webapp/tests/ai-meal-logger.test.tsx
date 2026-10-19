@@ -5,6 +5,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FoodLogger } from '../src/components/FoodLogger.js';
+import { BatchAiMealReviewModal } from '../src/components/BatchAiMealReviewModal.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { dictionaries } from '@quomida/i18n-locales';
 import { AiProviderFactory } from '@qozara/ai-client';
@@ -111,7 +112,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
     // Type into unified search bar
     const searchInput = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, { target: { value: 'Desayuné 2 huevos revueltos y una manzana roja' } });
+    fireEvent.change(searchInput, { target: { value: 'Desayuné 2 huevos revueltos con una manzana roja' } });
 
     // Submit via inline Spark submit button (#btn-smart-resolve)
     const smartResolveButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') });
@@ -123,7 +124,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     });
 
     // Check detected meal text in modal heading
-    expect(screen.getByRole('heading', { name: 'Desayuné 2 huevos revueltos y una manzana roja' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Desayuné 2 huevos revueltos con una manzana roja' })).toBeDefined();
 
     // Verify both ingredients appear in the review list
     expect(screen.getByText('Huevo Revuelto')).toBeDefined();
@@ -132,8 +133,8 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     // Verify composite recipe proposal banner is shown
     expect(screen.getByText(dictionaries.en.ai.autoSavedRecipeBadge)).toBeDefined();
 
-    // Verify Log All button displays 2 items
-    const logAllButton = screen.getByRole('button', { name: /Log 2 Items to Diary/i });
+    // Verify Log All button displays Save Recipe & Log Dish
+    const logAllButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.saveAndLogRecipeAction, 'i') });
     expect(logAllButton).toBeDefined();
 
     // Click Log All button
@@ -603,7 +604,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(screen.getByText(dictionaries.en.ai.autoSavedRecipeBadge)).toBeDefined();
 
     // Confirm log
-    const logButton = screen.getByRole('button', { name: /Log 2 Items to Diary/i });
+    const logButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.saveAndLogRecipeAction, 'i') });
     fireEvent.click(logButton);
 
     await waitFor(() => {
@@ -716,7 +717,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(screen.getByText(dictionaries.en.ai.existingRecipeMatchedBadge)).toBeDefined();
 
     // Confirm log
-    const logButton = screen.getByRole('button', { name: /Log 2 Items to Diary/i });
+    const logButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.logRecipeDishAction, 'i') });
     fireEvent.click(logButton);
 
     await waitFor(() => {
@@ -732,5 +733,316 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(loggedItems[0].food.id).toBe('rec-existing-milanesa-pure');
     expect(loggedItems[0].portionName).toBe('Whole recipe');
     expect(loggedItems[0].quantity).toBe(1);
+  });
+
+  it('Issue 1: allows toggling between composite recipe and separate items logging modes with correct button labels and actions', async () => {
+    const mockBurger: BaseIngredient = {
+      id: 'cust-burger',
+      name: 'Hamburguesa',
+      source: 'custom',
+      lang: 'es',
+      calories_100g: 191,
+      protein_100g: 14.5,
+      carbs_100g: 0.4,
+      fats_100g: 14.6
+    };
+
+    const mockPure: BaseIngredient = {
+      id: 'cust-pure',
+      name: 'Puré de papas',
+      source: 'custom',
+      lang: 'es',
+      calories_100g: 85,
+      protein_100g: 2,
+      carbs_100g: 15,
+      fats_100g: 2
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockBurger, mockPure],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.es,
+      setIsSettingsOpen: vi.fn(),
+      userSettings: {
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      addRecipe: addRecipeMock,
+      db: null
+    } as any);
+
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'log_meal',
+      arguments: {
+        composite_dish_name: 'Puré de papas con hamburguesa',
+        food_items: [
+          { food_name: 'puré de papas', quantity: 1, unit: 'portion' },
+          { food_name: 'hamburguesa', quantity: 1, unit: 'unit' }
+        ]
+      }
+    });
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    const searchInput = screen.getByPlaceholderText(dictionaries.es.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'comi un puré de papas con una hamburguesa' } });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.es.search.parseButton, 'i') }));
+
+    await waitFor(() => {
+      expect(screen.getByText(dictionaries.es.ai.batchReviewTitle)).toBeDefined();
+    });
+
+    // Verify primary button shows "Guardar Receta y Registrar Plato" and NOT "Registrar 2 Alimentos en Diario"
+    const primaryBtn = document.getElementById('btn-log-batch-ai');
+    expect(primaryBtn?.textContent).toContain('Guardar Receta y Registrar Plato');
+    expect(primaryBtn?.textContent).not.toContain('Registrar 2 Alimentos en Diario');
+
+    // Verify toggle button for separate items exists with "(2)"
+    const btnModeBatch = document.getElementById('btn-mode-batch');
+    expect(btnModeBatch).not.toBeNull();
+    expect(btnModeBatch?.textContent).toContain('Registrar por Separado (2)');
+
+    // Click toggle to switch to separate items mode
+    fireEvent.click(btnModeBatch!);
+
+    // Primary button should now show "Registrar 2 Alimentos en Diario"
+    expect(primaryBtn?.textContent).toContain('Registrar 2 Alimentos en Diario');
+    expect(primaryBtn?.textContent).not.toContain('Guardar Receta y Registrar Plato');
+
+    // Click primary button
+    fireEvent.click(primaryBtn!);
+
+    await waitFor(() => {
+      expect(logBatchFoodItemsMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Should NOT call addRecipe
+    expect(addRecipeMock).not.toHaveBeenCalled();
+
+    // Verify both items were logged separately
+    const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
+    expect(loggedItems).toHaveLength(2);
+    expect(loggedItems[0].food.name).toBe('Puré de papas');
+    expect(loggedItems[1].food.name).toBe('Hamburguesa');
+  });
+
+  it('Issue 2: displays multi-meal notice and logs items with their respective mealType when multiple meal times detected', async () => {
+    const mockMora: BaseIngredient = {
+      id: 'sys-mora',
+      name: 'Mora congelada',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 43,
+      protein_100g: 1.4,
+      carbs_100g: 9.6,
+      fats_100g: 0.5
+    };
+
+    const mockQueso: BaseIngredient = {
+      id: 'sys-queso',
+      name: 'Queso',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 350,
+      protein_100g: 25,
+      carbs_100g: 1.3,
+      fats_100g: 28
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockMora, mockQueso],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.es,
+      setIsSettingsOpen: vi.fn(),
+      userSettings: {
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      addRecipe: addRecipeMock,
+      db: null
+    } as any);
+
+    const multiMealBatch: any = {
+      rawInput: 'Mora congelada en el almuerzo y queso en la cena',
+      detectedMealType: 'meal_lunch',
+      isMultiMeal: true,
+      totalMacros: { calories: 393, protein: 26.4, carbs: 10.9, fats: 28.5 },
+      items: [
+        {
+          id: 'item-mora',
+          rawQuery: 'mora congelada',
+          food: mockMora,
+          quantity: 100,
+          selectedPortionName: 'g',
+          availablePortions: [
+            { id: 'p-mora-g', name: 'g', equivalent_weight_g: 1, base_food_id: 'sys-mora', source: 'system' }
+          ],
+          calculatedWeightGrams: 100,
+          macros: { calories: 43, protein: 1.4, carbs: 9.6, fats: 0.5 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-queso',
+          rawQuery: 'queso',
+          food: mockQueso,
+          quantity: 100,
+          selectedPortionName: 'g',
+          availablePortions: [
+            { id: 'p-queso-g', name: 'g', equivalent_weight_g: 1, base_food_id: 'sys-queso', source: 'system' }
+          ],
+          calculatedWeightGrams: 100,
+          macros: { calories: 350, protein: 25, carbs: 1.3, fats: 28 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        }
+      ]
+    };
+
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={multiMealBatch}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Verify multi-meal notice is rendered
+    expect(screen.getByText(dictionaries.es.ai.multiMealDetectedNotice)).toBeDefined();
+
+    // Verify each item card has its assigned meal time selector
+    const mealSelectors = screen.getAllByLabelText('Item Meal Time') as HTMLSelectElement[];
+    expect(mealSelectors).toHaveLength(2);
+    expect(mealSelectors[0].value).toBe('meal_lunch');
+    expect(mealSelectors[1].value).toBe('meal_dinner');
+
+    // Click primary log button
+    const logButton = document.getElementById('btn-log-batch-ai');
+    expect(logButton).not.toBeNull();
+    expect(logButton?.textContent).toContain('Registrar 2 Alimentos en Diario');
+    fireEvent.click(logButton!);
+
+    await waitFor(() => {
+      expect(logBatchFoodItemsMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Should NOT call addRecipe
+    expect(addRecipeMock).not.toHaveBeenCalled();
+
+    // Verify both items were passed to logBatchFoodItems with their respective mealType
+    const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
+    expect(loggedItems).toHaveLength(2);
+    expect(loggedItems[0].food.name).toBe('Mora congelada');
+    expect(loggedItems[0].mealType).toBe('meal_lunch');
+    expect(loggedItems[1].food.name).toBe('Queso');
+    expect(loggedItems[1].mealType).toBe('meal_dinner');
+  });
+
+  it('Issue 2 (unify meal): clicking global meal button updates all items to the unified meal and hides multi-meal notice', async () => {
+    const mockMora: BaseIngredient = {
+      id: 'sys-mora',
+      name: 'Mora congelada',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 43,
+      protein_100g: 1.4,
+      carbs_100g: 9.6,
+      fats_100g: 0.5
+    };
+
+    const mockQueso: BaseIngredient = {
+      id: 'sys-queso',
+      name: 'Queso',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 350,
+      protein_100g: 25,
+      carbs_100g: 1.3,
+      fats_100g: 28
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [mockMora, mockQueso],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.es,
+      setIsSettingsOpen: vi.fn(),
+      userSettings: {
+        ai_settings: { provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      addRecipe: addRecipeMock,
+      db: null
+    } as any);
+
+    const multiMealBatch: any = {
+      rawInput: 'Mora congelada y queso',
+      detectedMealType: 'meal_lunch',
+      isMultiMeal: true,
+      totalMacros: { calories: 393, protein: 26.4, carbs: 10.9, fats: 28.5 },
+      items: [
+        {
+          id: 'item-mora',
+          rawQuery: 'mora congelada',
+          food: mockMora,
+          quantity: 100,
+          selectedPortionName: 'g',
+          availablePortions: [
+            { id: 'p-mora-g', name: 'g', equivalent_weight_g: 1, base_food_id: 'sys-mora', source: 'system' }
+          ],
+          calculatedWeightGrams: 100,
+          macros: { calories: 43, protein: 1.4, carbs: 9.6, fats: 0.5 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-queso',
+          rawQuery: 'queso',
+          food: mockQueso,
+          quantity: 100,
+          selectedPortionName: 'g',
+          availablePortions: [
+            { id: 'p-queso-g', name: 'g', equivalent_weight_g: 1, base_food_id: 'sys-queso', source: 'system' }
+          ],
+          calculatedWeightGrams: 100,
+          macros: { calories: 350, protein: 25, carbs: 1.3, fats: 28 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        }
+      ]
+    };
+
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={multiMealBatch}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Notice should be visible initially
+    expect(screen.getByText(dictionaries.es.ai.multiMealDetectedNotice)).toBeDefined();
+
+    // Click global Cena (dinner) button to unify all items
+    const dinnerBtn = screen.getByRole('button', { name: new RegExp(dictionaries.es.dashboard.meals.dinner, 'i') });
+    fireEvent.click(dinnerBtn);
+
+    // Multi-meal notice should no longer be present
+    expect(screen.queryByText(dictionaries.es.ai.multiMealDetectedNotice)).toBeNull();
+
+    // Log items
+    const logButton = document.getElementById('btn-log-batch-ai');
+    fireEvent.click(logButton!);
+
+    await waitFor(() => {
+      expect(logBatchFoodItemsMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
+    expect(loggedItems[0].mealType).toBe('meal_dinner');
+    expect(loggedItems[1].mealType).toBe('meal_dinner');
   });
 });

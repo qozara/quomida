@@ -6,6 +6,7 @@ import type {
   FoodKind,
   RagCatalogCandidate
 } from '../types.js';
+import { singularizeWord } from '../recipes/RecipeManager.js';
 
 export interface ICatalogProvider {
   searchIngredients(query: string, limit?: number): Promise<BaseIngredient[]>;
@@ -33,6 +34,26 @@ export function normalizeFoodName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+}
+
+export function sanitizeFoodQuery(foodQuery: string): string {
+  if (!foodQuery || !foodQuery.trim()) return '';
+
+  const mealVerbsAndTimePhrases =
+    /(?<=^|[^\p{L}\p{N}])(?:en el desayuno|en el almuerzo|en la cena|en la merienda|para el desayuno|para el almuerzo|para la cena|para la merienda|para desayunar|para almorzar|para cenar|para merendar|for breakfast|for lunch|for dinner|for a snack|for snack|at breakfast|at lunch|at dinner|in the morning|in the afternoon|in the evening|at night|i ate|i had|i drank|i consumed|desayun[eéó]|desayuno|almorc[eé]|almuerzo|cen[eé]|cena|merend[eé]|merienda|com[ií]|tom[eé]|beb[ií]|ate|had|drank|eaten|breakfast|lunch|dinner|snack|ayer|hoy|yesterday|today)(?=[^\p{L}\p{N}]|$)/giu;
+
+  const leadingQuantitiesAndUnits =
+    /^\s*(?:\d+(?:[.,]\d+)?|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio|media|one|two|three|four|five|six|seven|eight|nine|ten|a|an|half|couple)\s*(?:(?:unidad(?:es)?|pieza(?:s)?|porci[oó]n(?:es)?|plato(?:s)?|taza(?:s)?|rebanada(?:s)?|rodaja(?:s)?|feta(?:s)?|vaso(?:s)?|cucharada(?:s)?|cucharadita(?:s)?|gramos?|g|ml|oz|unit(?:s)?|piece(?:s)?|portion(?:s)?|serving(?:s)?|plate(?:s)?|bowl(?:s)?|cup(?:s)?|slice(?:s)?|glass(?:es)?|tbsp|tsp|tablespoon(?:s)?|teaspoon(?:s)?|grams?)\s+(?:de\s+|of\s+)?)?/i;
+
+  const leadingPrepositions = /^\s*(?:de|of|for|in|at|en|para)\s+/i;
+  const trailingPrepositions = /\s+(?:de|of|for|in|at|en|para)\s*$/i;
+
+  let cleaned = foodQuery.trim();
+  cleaned = cleaned.replace(mealVerbsAndTimePhrases, ' ').replace(/\s+/g, ' ').trim();
+  cleaned = cleaned.replace(leadingQuantitiesAndUnits, '').trim();
+  cleaned = cleaned.replace(leadingPrepositions, '').replace(trailingPrepositions, '').trim();
+
+  return cleaned.length > 0 ? cleaned : foodQuery.trim();
 }
 
 export class CatalogSearchManager {
@@ -99,8 +120,15 @@ export class CatalogSearchManager {
     catalogProvider?: ICatalogProvider,
     customRecipes?: RecipeFoodItem[]
   ): Promise<FoodItem | null> {
-    const normQuery = normalizeFoodName(foodQuery);
+    const effectiveQuery = sanitizeFoodQuery(foodQuery);
+    const normQuery = normalizeFoodName(effectiveQuery);
     if (!normQuery) return null;
+
+    const singularQuery = effectiveQuery
+      .split(/\s+/)
+      .map(t => singularizeWord(t))
+      .join(' ');
+    const normSingularQuery = normalizeFoodName(singularQuery);
 
     // 1. Check custom recipes
     if (customRecipes && customRecipes.length > 0) {
@@ -108,8 +136,10 @@ export class CatalogSearchManager {
         const normName = normalizeFoodName(r.name);
         return (
           normName === normQuery ||
+          normName === normSingularQuery ||
           normName.includes(normQuery) ||
-          (normName.length >= 3 && normQuery.includes(normName))
+          normName.includes(normSingularQuery) ||
+          (normName.length >= 3 && (normQuery.includes(normName) || normSingularQuery.includes(normName)))
         );
       });
       if (recipeMatch) return recipeMatch;
@@ -120,8 +150,10 @@ export class CatalogSearchManager {
       const normName = normalizeFoodName(item.name);
       return (
         normName === normQuery ||
+        normName === normSingularQuery ||
         normName.includes(normQuery) ||
-        (normName.length >= 3 && normQuery.includes(normName))
+        normName.includes(normSingularQuery) ||
+        (normName.length >= 3 && (normQuery.includes(normName) || normSingularQuery.includes(normName)))
       );
     });
     if (customMatch) {
@@ -131,32 +163,76 @@ export class CatalogSearchManager {
     // 3. Query catalog provider
     if (catalogProvider) {
       try {
-        let catalogResults = await catalogProvider.searchIngredients(foodQuery.trim(), 10);
-        const queryTokens = normQuery.split(/\s+/).filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|al|a|para|por|of|with|and|the|in)$/i.test(t));
+        let catalogResults = await catalogProvider.searchIngredients(effectiveQuery, 10);
+        if (catalogResults.length === 0 && singularQuery !== effectiveQuery) {
+          catalogResults = await catalogProvider.searchIngredients(singularQuery, 10);
+        }
+        if (catalogResults.length === 0 && effectiveQuery.length >= 6) {
+          catalogResults = await catalogProvider.searchIngredients(effectiveQuery.slice(0, 5), 10);
+        }
+
+        const queryTokens = normQuery
+          .split(/\s+/)
+          .filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|e|al|a|para|por|of|with|and|the|in|for|at|on)$/i.test(t));
         const primaryToken = queryTokens[0] || normQuery;
 
         if (catalogResults.length === 0 && queryTokens.length > 1) {
           catalogResults = await catalogProvider.searchIngredients(primaryToken, 10);
+          if (catalogResults.length === 0) {
+            const singPrimary = singularizeWord(primaryToken);
+            if (singPrimary !== primaryToken) {
+              catalogResults = await catalogProvider.searchIngredients(singPrimary, 10);
+            }
+          }
+          if (catalogResults.length === 0 && primaryToken.length >= 6) {
+            catalogResults = await catalogProvider.searchIngredients(primaryToken.slice(0, 5), 10);
+          }
+        }
+
+        if (catalogResults.length === 0) {
+          for (const token of queryTokens) {
+            const singToken = singularizeWord(token);
+            if (singToken !== token) {
+              const singResults = await catalogProvider.searchIngredients(singToken, 10);
+              if (singResults.length > 0) {
+                catalogResults = singResults;
+                break;
+              }
+            }
+            if (token.length >= 6) {
+              const tokenResults = await catalogProvider.searchIngredients(token.slice(0, 5), 10);
+              if (tokenResults.length > 0) {
+                catalogResults = tokenResults;
+                break;
+              }
+            }
+          }
         }
 
         if (catalogResults.length > 0) {
-          const queryHasDough = /tapa|masa|disco|wrap/i.test(normQuery);
+          const queryHasDough = /tapa|masa|disco|wrap|dough|crust|shell|sheet/i.test(normQuery);
           const scored = catalogResults.map(item => {
             const normName = normalizeFoodName(item.name);
             let score = 0;
 
-            if (normName === normQuery) score += 100;
-            else if (normName.startsWith(normQuery)) score += 60;
-            else if (normName.includes(normQuery)) score += 40;
+            if (normName === normQuery || normName === normSingularQuery) score += 100;
+            else if (normName.startsWith(normQuery) || normName.startsWith(normSingularQuery)) score += 60;
+            else if (normName.includes(normQuery) || normName.includes(normSingularQuery)) score += 40;
 
             if (normName.startsWith(primaryToken)) score += 50;
+            else if (primaryToken.length >= 6 && normName.startsWith(primaryToken.slice(0, 5))) score += 30;
             else if (normName.includes(primaryToken)) score += 30;
 
             for (const token of queryTokens) {
-              if (normName.includes(token)) score += 15;
+              const singToken = singularizeWord(token);
+              if (normName.includes(token) || normName.includes(singToken)) {
+                score += 15;
+              } else if (token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
+                score += 25;
+              }
             }
 
-            if (!queryHasDough && /^(tapa|tapas|masa|masas|disco|discos)\b/i.test(normName)) {
+            if (!queryHasDough && /^(tapa|tapas|masa|masas|disco|discos|dough|crust|pie crust)\b/i.test(normName)) {
               score -= 50;
             }
 
@@ -233,14 +309,14 @@ export class CatalogSearchManager {
     if (!rawInput || !rawInput.trim()) return [];
 
     const mealVerbsAndTimeRegex =
-      /\b(?:desayuné|desayune|almorcé|almorce|cené|cene|merendé|merende|comí|comi|tomé|tome|desayuno|almuerzo|cena|merienda|hoy|ayer|ate|had|for|breakfast|lunch|dinner|snack)\b/gi;
+      /(?<=^|[^\p{L}\p{N}])(?:en el desayuno|en el almuerzo|en la cena|en la merienda|for breakfast|for lunch|for dinner|for a snack|for snack|in the morning|in the afternoon|in the evening|at night|i ate|i had|i drank|desayun[eéó]|desayuno|almorc[eé]|almuerzo|cen[eé]|cena|merend[eé]|merienda|com[ií]|tom[eé]|beb[ií]|hoy|ayer|ate|had|drank|eaten|for|breakfast|lunch|dinner|snack|today|yesterday)(?=[^\p{L}\p{N}]|$)/giu;
 
     const numbersAndQuantitiesRegex =
-      /\b(?:\d+|un|una|dos|tres|cuatro|cinco|medio|media)\b/gi;
+      /(?<=^|[^\p{L}\p{N}])(?:\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio|media|one|two|three|four|five|six|seven|eight|nine|ten|a|an|half|couple|porci[oó]n(?:es)?|unidad(?:es)?|pieza(?:s)?|rebanada(?:s)?|rodaja(?:s)?|feta(?:s)?|taza(?:s)?|plato(?:s)?|vaso(?:s)?|gramos?|portion(?:s)?|serving(?:s)?|unit(?:s)?|piece(?:s)?|slice(?:s)?|cup(?:s)?|plate(?:s)?|bowl(?:s)?|glass(?:es)?|grams?)(?=[^\p{L}\p{N}]|$)/giu;
 
-    const dishConnectorSplitRegex = /\b(?:con|y|with|and)\b|,/gi;
+    const dishConnectorSplitRegex = /\b(?:con|y|e|with|and)\b|,/gi;
 
-    const stripConnectorsRegex = /\b(?:con|y|de|del|en|la|el|al|los|las|the|of|in|to|with|and)\b/gi;
+    const stripConnectorsRegex = /\b(?:con|y|e|de|del|en|la|el|al|los|las|para|por|the|of|in|to|with|and|for|on|at)\b/gi;
 
     const queries: string[] = [];
     const seenQueries = new Set<string>();
@@ -260,6 +336,7 @@ export class CatalogSearchManager {
       const phrase = seg
         .replace(mealVerbsAndTimeRegex, ' ')
         .replace(numbersAndQuantitiesRegex, ' ')
+        .replace(/^(?:de|of)\s+/i, ' ')
         .replace(/[^\w\sáéíóúÁÉÍÓÚñÑüÜ]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -284,10 +361,9 @@ export class CatalogSearchManager {
     for (const token of tokens) {
       addQuery(token);
       if (token.length > 3) {
-        if (/[bcdfghjklmnñpqrstvwxyz]es$/i.test(token)) {
-          addQuery(token.slice(0, -2));
-        } else if (/[aeiou]s$/i.test(token)) {
-          addQuery(token.slice(0, -1));
+        const sing = singularizeWord(token);
+        if (sing !== token) {
+          addQuery(sing);
         }
       }
     }
@@ -365,19 +441,36 @@ export class CatalogSearchManager {
 
     // 3. Search catalogProvider for queries
     if (catalogProvider && candidates.length < maxCandidates) {
-      const providerSearches = queries.map(q =>
-        catalogProvider.searchIngredients(q, 10).catch(() => [])
-      );
+      const providerSearches = queries.map(async q => {
+        let items = await catalogProvider.searchIngredients(q, 10).catch(() => []);
+        if (items.length === 0 && q.length >= 6) {
+          items = await catalogProvider.searchIngredients(q.slice(0, 5), 10).catch(() => []);
+        }
+        return items;
+      });
       const results = await Promise.allSettled(providerSearches);
 
+      const resultArrays: BaseIngredient[][] = [];
       for (const res of results) {
-        if (candidates.length >= maxCandidates) break;
-        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-          for (const item of res.value) {
-            addCandidate(toIngredientCandidate(item));
-            if (candidates.length >= maxCandidates) break;
+        if (res.status === 'fulfilled' && Array.isArray(res.value) && res.value.length > 0) {
+          resultArrays.push(res.value);
+        }
+      }
+
+      // Round-robin interleaving across fulfilled query results
+      let maxLen = 0;
+      for (const arr of resultArrays) {
+        if (arr.length > maxLen) maxLen = arr.length;
+      }
+
+      for (let i = 0; i < maxLen; i++) {
+        for (const arr of resultArrays) {
+          if (candidates.length >= maxCandidates) break;
+          if (i < arr.length) {
+            addCandidate(toIngredientCandidate(arr[i]));
           }
         }
+        if (candidates.length >= maxCandidates) break;
       }
     }
 

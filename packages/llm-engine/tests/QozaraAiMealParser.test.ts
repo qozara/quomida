@@ -398,4 +398,249 @@ describe('QozaraAiMealParser', () => {
     expect(result.items[0].candidateId).toBe('ing-arroz-1');
     expect(result.items[1].candidateId).toBe('ing-pollo-1');
   });
+
+  describe('Clause Splitting, Multi-Meal Verbs, Comma Lists, and Per-Segment Quantities', () => {
+    it('Issue 1: parses "comi un puré de papas con una hamburguesa" with composite dish recognition', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          composite_dish_name: 'Puré de papas con hamburguesa',
+          food_items: [
+            { food_name: 'puré de papas', quantity: 1, unit: 'portion' },
+            { food_name: 'hamburguesa', quantity: 1, unit: 'unit' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('comi un puré de papas con una hamburguesa');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('puré de papas');
+      expect(result.items[1].foodQuery).toBe('hamburguesa');
+      expect(result.compositeDishName).toBe('Puré de papas con hamburguesa');
+      expect(result.isCompositeDish).toBe(true);
+    });
+
+    it('Issue 2: parses multi-meal "almorcé mora congelada y cené queso" and marks meal_type on items', async () => {
+      // Simulate LLM returning multi-meal extraction
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          food_items: [
+            { food_name: 'mora congelada', quantity: 1, unit: 'unit', meal_type: 'lunch' },
+            { food_name: 'queso', quantity: 1, unit: 'unit', meal_type: 'dinner' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('almorcé mora congelada y cené queso');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('mora congelada');
+      expect(result.items[0].mealType).toBe('lunch');
+      expect(result.items[1].foodQuery).toBe('queso');
+      expect(result.items[1].mealType).toBe('dinner');
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Issue 2: merges missing second meal item when LLM partially extracted only the first meal item', async () => {
+      // LLM only returned mora congelada, missed cené queso
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          meal_type: 'lunch',
+          food_items: [
+            { food_name: 'mora congelada', quantity: 1, unit: 'unit', meal_type: 'lunch' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('almorcé mora congelada y cené queso');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('mora congelada');
+      expect(result.items[0].mealType).toBe('lunch');
+      expect(result.items[1].foodQuery).toBe('queso');
+      expect(result.items[1].mealType).toBe('dinner');
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Issue 3: parses comma-separated food list "comí queso, pan, hamburquesa y mora congelada en la cena"', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          meal_type: 'dinner',
+          food_items: [
+            { food_name: 'queso', quantity: 1, unit: 'unit' },
+            { food_name: 'pan', quantity: 1, unit: 'unit' },
+            { food_name: 'hamburquesa', quantity: 1, unit: 'unit' },
+            { food_name: 'mora congelada', quantity: 1, unit: 'unit' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('comí queso, pan, hamburquesa y mora congelada en la cena');
+
+      expect(result.items).toHaveLength(4);
+      expect(result.items.map(i => i.foodQuery)).toEqual(['queso', 'pan', 'hamburquesa', 'mora congelada']);
+      expect(result.detectedMealType).toBe('dinner');
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Issue 3: plain text / zero-item fallback splits comma lists cleanly and assigns dinner mealType', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'text',
+        content: 'He registrado tu comida:\n- comí queso, pan, hamburquesa y mora congelada en la cena'
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('comí queso, pan, hamburquesa y mora congelada en la cena');
+
+      expect(result.items).toHaveLength(4);
+      expect(result.items[0].foodQuery).toBe('queso');
+      expect(result.items[1].foodQuery).toBe('pan');
+      expect(result.items[2].foodQuery).toBe('hamburquesa');
+      expect(result.items[3].foodQuery).toBe('mora congelada');
+      for (const item of result.items) {
+        expect(item.mealType).toBe('dinner');
+      }
+    });
+
+    it('Issue 4: correctly associates distinct quantities and units for "caracolitos sabor asado y 2 porciones de pizza"', async () => {
+      // Suppose LLM returned food_name with embedded quantity or returned combined string
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          food_items: [
+            { food_name: 'caracolitos sabor asado', quantity: 1, unit: 'unit' },
+            { food_name: '2 porciones de pizza', quantity: 1, unit: 'unit' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('caracolitos sabor asado y 2 porciones de pizza');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('caracolitos sabor asado');
+      expect(result.items[0].quantity).toBe(1);
+
+      // Embedded quantity 2 and unit porciones in item 2 should be cleaned and extracted
+      expect(result.items[1].foodQuery).toBe('pizza');
+      expect(result.items[1].quantity).toBe(2);
+      expect(['portion', 'porción', 'porciones']).toContain(result.items[1].unit);
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Issue 4 (Reconciliation): recovers explicit clause quantity (2) when LLM hallucinated quantity 1 on item 2', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          food_items: [
+            { food_name: 'caracolitos sabor asado', quantity: 1, unit: 'portion' },
+            { food_name: 'pizza', quantity: 1, unit: 'portion' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('caracolitos sabor asado y 2 porciones de pizza');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('caracolitos sabor asado');
+      expect(result.items[0].quantity).toBe(1);
+      expect(result.items[1].foodQuery).toBe('pizza');
+      expect(result.items[1].quantity).toBe(2);
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Multilingual (EN) Issue 1: parses "I ate mashed potatoes with a burger" as a composite dish', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'text',
+        content: 'I have logged:\n- I ate mashed potatoes with a burger'
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('I ate mashed potatoes with a burger');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('mashed potatoes');
+      expect(result.items[1].foodQuery).toBe('burger');
+      expect(result.isCompositeDish).toBe(true);
+    });
+
+    it('Multilingual (EN) Issue 2: parses "I had frozen blackberries for lunch and ate cheese for dinner" with per-item mealType', async () => {
+      // Simulate LLM only extracting the first item without meal_type
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          food_items: [
+            { food_name: 'frozen blackberries', quantity: 1, unit: 'portion' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('I had frozen blackberries for lunch and ate cheese for dinner');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('frozen blackberries');
+      expect(result.items[0].mealType).toBe('lunch');
+      expect(result.items[1].foodQuery).toBe('cheese');
+      expect(result.items[1].mealType).toBe('dinner');
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Multilingual (EN) Issue 3: parses comma list "I ate cheese, bread, burger and frozen blackberries for dinner"', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'text',
+        content: 'Here are your items:\n- I ate cheese, bread, burger and frozen blackberries for dinner'
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('I ate cheese, bread, burger and frozen blackberries for dinner');
+
+      expect(result.items).toHaveLength(4);
+      expect(result.items.map(i => i.foodQuery)).toEqual(['cheese', 'bread', 'burger', 'frozen blackberries']);
+      for (const item of result.items) {
+        expect(item.mealType).toBe('dinner');
+      }
+      expect(result.isCompositeDish).toBe(false);
+    });
+
+    it('Multilingual (EN) Issue 4: parses "barbecue snacks and 2 slices of pizza" with exact quantities and units', async () => {
+      mockChat.mockResolvedValueOnce({
+        type: 'tool_call',
+        tool: 'log_meal',
+        arguments: {
+          food_items: [
+            { food_name: 'barbecue snacks and 2 slices of pizza', quantity: 1, unit: 'portion' }
+          ]
+        }
+      });
+
+      const parser = new QozaraAiMealParser({ proxyUrl: 'https://test-proxy.local' });
+      const result = await parser.parse('barbecue snacks and 2 slices of pizza');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].foodQuery).toBe('barbecue snacks');
+      expect(result.items[0].quantity).toBe(1);
+      expect(result.items[1].foodQuery).toBe('pizza');
+      expect(result.items[1].quantity).toBe(2);
+      expect(result.items[1].unit).toBe('slice');
+      expect(result.isCompositeDish).toBe(false);
+    });
+  });
 });
+

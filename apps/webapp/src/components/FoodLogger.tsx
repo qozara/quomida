@@ -14,7 +14,7 @@ interface FoodLoggerProps {
 }
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, recipes = [], recipeFoods = [], t, setIsSettingsOpen, userSettings, db } = useApp();
+  const { ingredients, recipes = [], recipeFoods = [], t, locale, setIsSettingsOpen, userSettings, db } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -128,7 +128,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         customRecipes: recipeFoods,
         existingRecipes: recipes,
         customPortions,
-        catalogProvider: remoteService
+        catalogProvider: remoteService,
+        locale
       } as any);
 
       setIsParsing(false);

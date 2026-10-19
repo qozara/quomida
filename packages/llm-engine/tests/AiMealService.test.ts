@@ -336,4 +336,224 @@ describe('AiMealService - Headless Natural Language Meal Orchestrator', () => {
       })
     );
   });
+
+  describe('Comprehensive End-to-End Scenarios (Issues 1-4)', () => {
+    const mockDbIngredients: BaseIngredient[] = [
+      {
+        id: 'ing-pure',
+        name: 'Puré de papas',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 85,
+        protein_100g: 2,
+        carbs_100g: 15,
+        fats_100g: 1.5,
+      },
+      {
+        id: 'ing-burger',
+        name: 'Hamburguesa',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 240,
+        protein_100g: 18,
+        carbs_100g: 0,
+        fats_100g: 16,
+      },
+      {
+        id: 'ing-mora',
+        name: 'Mora congelada',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 45,
+        protein_100g: 1,
+        carbs_100g: 10,
+        fats_100g: 0.5,
+      },
+      {
+        id: 'ing-queso',
+        name: 'Queso',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 350,
+        protein_100g: 25,
+        carbs_100g: 2,
+        fats_100g: 28,
+      },
+      {
+        id: 'ing-pan',
+        name: 'Pan',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 260,
+        protein_100g: 9,
+        carbs_100g: 50,
+        fats_100g: 3,
+      },
+      {
+        id: 'ing-pizza',
+        name: 'Pizza',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 270,
+        protein_100g: 12,
+        carbs_100g: 33,
+        fats_100g: 10,
+      },
+      {
+        id: 'ing-caracolitos',
+        name: 'Caracolitos sabor asado',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 350,
+        protein_100g: 11,
+        carbs_100g: 72,
+        fats_100g: 2,
+      },
+    ];
+
+    const scenarioCatalogProvider: ICatalogProvider = {
+      searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+        const q = query.toLowerCase();
+        if (q === 'hamburquesa') return []; // simulate typo returning 0
+        if (q === 'hambu' || q.includes('hambur')) {
+          return [mockDbIngredients.find(i => i.id === 'ing-burger')!];
+        }
+        return mockDbIngredients.filter(i => i.name.toLowerCase().includes(q));
+      }),
+      getPortionsForIngredient: vi.fn().mockImplementation(async (baseFoodId: string) => {
+        if (baseFoodId === 'ing-pizza') {
+          return [
+            {
+              id: 'p-pizza-porcion',
+              base_food_id: 'ing-pizza',
+              name: '1 porción',
+              equivalent_weight_g: 120,
+              source: 'system',
+              tag: 'Standard',
+            }
+          ];
+        }
+        return [];
+      }),
+    };
+
+    it('Scenario 1: "comi un puré de papas con una hamburguesa" -> 2 items, defaultLoggingMode: recipe, synthesizedRecipe defined', async () => {
+      const mockProvider: LLMProvider = {
+        parse: vi.fn().mockResolvedValue({
+          rawInput: 'comi un puré de papas con una hamburguesa',
+          items: [
+            { foodQuery: 'puré de papas', quantity: 1, unit: 'portion' },
+            { foodQuery: 'hamburguesa', quantity: 1, unit: 'unit' },
+          ],
+          compositeDishName: 'Puré de papas con hamburguesa',
+          isCompositeDish: true,
+        }),
+      };
+
+      const service = new AiMealService({ provider: mockProvider });
+      const result = await service.processMeal({
+        input: 'comi un puré de papas con una hamburguesa',
+        catalogProvider: scenarioCatalogProvider,
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].food?.id).toBe('ing-pure');
+      expect(result.items[1].food?.id).toBe('ing-burger');
+      expect(result.isMultiMeal).toBe(false);
+      expect(result.defaultLoggingMode).toBe('recipe');
+      expect(result.synthesizedRecipe).toBeDefined();
+    });
+
+    it('Scenario 2: "almorcé mora congelada y cené queso" -> 2 items with distinct mealTypes, isMultiMeal: true, defaultLoggingMode: batch, synthesizedRecipe: undefined', async () => {
+      const mockProvider: LLMProvider = {
+        parse: vi.fn().mockResolvedValue({
+          rawInput: 'almorcé mora congelada y cené queso',
+          items: [
+            { foodQuery: 'mora congelada', quantity: 1, unit: 'unit', mealType: 'lunch' },
+            { foodQuery: 'queso', quantity: 1, unit: 'unit', mealType: 'dinner' },
+          ],
+          isCompositeDish: false,
+        }),
+      };
+
+      const service = new AiMealService({ provider: mockProvider });
+      const result = await service.processMeal({
+        input: 'almorcé mora congelada y cené queso',
+        catalogProvider: scenarioCatalogProvider,
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].food?.id).toBe('ing-mora');
+      expect(result.items[0].mealType).toBe('meal_lunch');
+      expect(result.items[1].food?.id).toBe('ing-queso');
+      expect(result.items[1].mealType).toBe('meal_dinner');
+      expect(result.isMultiMeal).toBe(true);
+      expect(result.defaultLoggingMode).toBe('batch');
+      expect(result.synthesizedRecipe).toBeUndefined();
+    });
+
+    it('Scenario 3: "comí queso, pan, hamburquesa y mora congelada en la cena" -> 4 items with typo tolerance, all dinner, defaultLoggingMode: batch', async () => {
+      const mockProvider: LLMProvider = {
+        parse: vi.fn().mockResolvedValue({
+          rawInput: 'comí queso, pan, hamburquesa y mora congelada en la cena',
+          items: [
+            { foodQuery: 'queso', quantity: 1, unit: 'unit', mealType: 'dinner' },
+            { foodQuery: 'pan', quantity: 1, unit: 'unit', mealType: 'dinner' },
+            { foodQuery: 'hamburquesa', quantity: 1, unit: 'unit', mealType: 'dinner' }, // Typo!
+            { foodQuery: 'mora congelada', quantity: 1, unit: 'unit', mealType: 'dinner' },
+          ],
+          detectedMealType: 'dinner',
+          isCompositeDish: false,
+        }),
+      };
+
+      const service = new AiMealService({ provider: mockProvider });
+      const result = await service.processMeal({
+        input: 'comí queso, pan, hamburquesa y mora congelada en la cena',
+        catalogProvider: scenarioCatalogProvider,
+      });
+
+      expect(result.items).toHaveLength(4);
+      expect(result.items[0].food?.id).toBe('ing-queso');
+      expect(result.items[1].food?.id).toBe('ing-pan');
+      // Hamburger matched through prefix stem fallback for typo "hamburquesa"
+      expect(result.items[2].food?.id).toBe('ing-burger');
+      expect(result.items[3].food?.id).toBe('ing-mora');
+      for (const item of result.items) {
+        expect(item.mealType).toBe('meal_dinner');
+      }
+      expect(result.isMultiMeal).toBe(false);
+      expect(result.defaultLoggingMode).toBe('batch');
+    });
+
+    it('Scenario 4: "caracolitos sabor asado y 2 porciones de pizza" -> 2 items with quantities and portion matching, defaultLoggingMode: batch', async () => {
+      const mockProvider: LLMProvider = {
+        parse: vi.fn().mockResolvedValue({
+          rawInput: 'caracolitos sabor asado y 2 porciones de pizza',
+          items: [
+            { foodQuery: 'caracolitos sabor asado', quantity: 1, unit: 'unit' },
+            { foodQuery: 'pizza', quantity: 2, unit: 'portion' },
+          ],
+          isCompositeDish: false,
+        }),
+      };
+
+      const service = new AiMealService({ provider: mockProvider });
+      const result = await service.processMeal({
+        input: 'caracolitos sabor asado y 2 porciones de pizza',
+        catalogProvider: scenarioCatalogProvider,
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].food?.id).toBe('ing-caracolitos');
+      expect(result.items[0].quantity).toBe(1);
+
+      expect(result.items[1].food?.id).toBe('ing-pizza');
+      expect(result.items[1].quantity).toBe(2);
+      expect(result.items[1].selectedPortionName).toBe('1 porción');
+      expect(result.items[1].calculatedWeightGrams).toBe(240); // 2 * 120g
+      expect(result.isMultiMeal).toBe(false);
+      expect(result.defaultLoggingMode).toBe('batch');
+    });
+  });
 });

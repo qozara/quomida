@@ -22,6 +22,7 @@ export interface ProcessAiMealOptions {
   currentHour?: number;
   explicitMealType?: MealType | string;
   existingRecipes?: Recipe[];
+  locale?: string;
 }
 
 export interface AiMealServiceConfig {
@@ -98,7 +99,8 @@ export class AiMealService {
       catalogProvider,
       currentHour,
       explicitMealType,
-      existingRecipes
+      existingRecipes,
+      locale
     } = options;
 
     let ragCandidates: RagCatalogCandidate[] = [];
@@ -113,10 +115,15 @@ export class AiMealService {
       ragCandidates = [];
     }
 
-    const parsed = await this.parseNaturalLanguage(
-      input,
-      ragCandidates.length > 0 ? { candidates: ragCandidates } : undefined
-    );
+    const parseContext: LLMParseContext | undefined =
+      ragCandidates.length > 0 || locale
+        ? {
+            ...(ragCandidates.length > 0 ? { candidates: ragCandidates } : {}),
+            ...(locale ? { locale } : {})
+          }
+        : undefined;
+
+    const parsed = await this.parseNaturalLanguage(input, parseContext);
 
     try {
       const resolved = await this.batchResolver.resolveBatch({
@@ -129,7 +136,9 @@ export class AiMealService {
         currentHour,
         detectedMealType: explicitMealType || parsed.detectedMealType,
         compositeDishName: parsed.compositeDishName,
-        existingRecipes
+        existingRecipes,
+        isCompositeDish: parsed.isCompositeDish,
+        locale
       });
 
       return resolved;

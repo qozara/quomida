@@ -5,6 +5,7 @@ export interface ParsedMealItem {
   quantity: number;
   unit: string;
   candidateId?: string;
+  mealType?: string;
 }
 
 export interface ParsedNaturalLanguageMeal {
@@ -12,10 +13,12 @@ export interface ParsedNaturalLanguageMeal {
   items: ParsedMealItem[];
   detectedMealType?: string;
   compositeDishName?: string;
+  isCompositeDish?: boolean;
 }
 
 export interface LLMParseContext {
   candidates?: RagCatalogCandidate[];
+  locale?: string;
 }
 
 export interface LLMProvider {

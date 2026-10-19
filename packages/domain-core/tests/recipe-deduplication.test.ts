@@ -43,6 +43,21 @@ describe('Recipe Deduplication & Nutritional Equivalence Engine (ADR 0022)', () 
       expect(manager.extractCanonicalTokens('limones')).toEqual(['limon']);
     });
 
+    it('singularizes English plurals (consonant+s, -ies, -oes, -ches/-shes, silent-e+s)', () => {
+      expect(manager.extractCanonicalTokens('eggs')).toEqual(['egg']);
+      expect(manager.extractCanonicalTokens('burgers')).toEqual(['burger']);
+      expect(manager.extractCanonicalTokens('carrots')).toEqual(['carrot']);
+      expect(manager.extractCanonicalTokens('apples')).toEqual(['apple']);
+      expect(manager.extractCanonicalTokens('oranges')).toEqual(['orange']);
+      expect(manager.extractCanonicalTokens('cheeses')).toEqual(['cheese']);
+      expect(manager.extractCanonicalTokens('blackberries')).toEqual(['blackberry']);
+      expect(manager.extractCanonicalTokens('strawberries')).toEqual(['strawberry']);
+      expect(manager.extractCanonicalTokens('potatoes')).toEqual(['potato']);
+      expect(manager.extractCanonicalTokens('tomatoes')).toEqual(['tomato']);
+      expect(manager.extractCanonicalTokens('sandwiches')).toEqual(['sandwich']);
+      expect(manager.extractCanonicalTokens('cookies')).toEqual(['cookie']);
+    });
+
     it('handles empty, null, or punctuation-only strings gracefully', () => {
       expect(manager.extractCanonicalTokens('')).toEqual([]);
       expect(manager.extractCanonicalTokens('   ')).toEqual([]);

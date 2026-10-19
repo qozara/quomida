@@ -66,6 +66,7 @@ interface AppContextType {
       quantity: number;
       portionName: string;
       availablePortions?: Portion[];
+      mealType?: MealType;
     }>,
     mealType: MealType
   ) => Promise<void>;
@@ -576,6 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quantity: number;
       portionName: string;
       availablePortions?: Portion[];
+      mealType?: MealType;
     }>,
     mealType: MealType
   ) => {
@@ -614,7 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       await dbService.logFood({
         date: selectedDate,
-        meal_type: mealType,
+        meal_type: item.mealType || mealType,
         food_reference_id: food.id,
         food_name: food.name,
         quantity,

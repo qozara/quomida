@@ -43,19 +43,53 @@ export interface RecipeEquivalenceOptions {
 
 const CULINARY_STOP_WORDS = new Set([
   'de', 'del', 'con', 'en', 'la', 'el', 'los', 'las', 'al',
-  'un', 'una', 'unos', 'unas', 'y', 'a', 'para', 'por',
-  'with', 'and', 'the', 'of', 'in', 'to'
+  'un', 'una', 'unos', 'unas', 'y', 'e', 'a', 'para', 'por', 'sin',
+  'with', 'without', 'and', 'the', 'of', 'in', 'to', 'an', 'some', 'for', 'on', 'at', 'by', 'from'
 ]);
 
-function singularizeWord(token: string): string {
-  if (token.length > 3) {
-    if (/[bcdfghjklmnñpqrstvwxyz]es$/i.test(token)) {
-      return token.slice(0, -2);
-    }
-    if (/[aeiou]s$/i.test(token)) {
-      return token.slice(0, -1);
-    }
+export function singularizeWord(token: string): string {
+  const lower = token.toLowerCase();
+  if (lower.length <= 3) return token;
+
+  // Invariant singular culinary words ending in 's'
+  if (/^(?:hummus|couscous|asparagus|molasses|an[ií]s|anan[aá]s|gas)$/i.test(lower)) {
+    return token;
   }
+
+  // English words ending in -ies (except -ie+s like cookie, brownie, smoothie, veggie, pie, calorie)
+  if (/[^aeiou]ies$/i.test(lower) && !/(?:cookie|brownie|smoothie|veggie|calorie|pie)s$/i.test(lower)) {
+    return token.slice(0, -3) + 'y';
+  }
+
+  // English -oes plurals (potatoes, tomatoes)
+  if (/(?:potat|tomat|her|torped|vet)oes$/i.test(lower)) {
+    return token.slice(0, -2);
+  }
+
+  // English -(ch|sh|x|ss|zz)es plurals (sandwiches, dishes, peaches, boxes, glasses)
+  if (/(?:ch|sh|x|ss|zz)es$/i.test(lower)) {
+    return token.slice(0, -2);
+  }
+
+  // Spanish -ces -> -z (nueces -> nuez, arroces -> arroz), excluding English -ce+s (slices, pieces, sauces, juices, spices, rices, ices, lettuces)
+  if (/ces$/i.test(lower) && !/(?:slice|piece|sauce|juice|spice|rice|ice|lettuce)s$/i.test(lower)) {
+    return token.slice(0, -3) + 'z';
+  }
+
+  // Spanish consonant + -es plurals (panes, limones, frijoles, porciones, unidades, alfajores, tallarines)
+  // Excluding English silent-e + s words (apples, oranges, cheeses, cakes, pancakes, grapes, olives, noodles, vegetables, sardines, tangerines, nectarines, prunes)
+  if (
+    /(?:[rndlj]es)$/i.test(lower) &&
+    !/(?:apple|orange|cheese|cake|grape|olive|noodle|vegetable|pickle|waffle|truffle|sardine|tangerine|nectarine|prune|pine|wine|bone|cone|scone|date|plate|bite|casserole|guacamole|mole)s$/i.test(lower)
+  ) {
+    return token.slice(0, -2);
+  }
+
+  // General English & Spanish -s plurals (eggs -> egg, burgers -> burger, papas -> papa, apples -> apple, cheeses -> cheese)
+  if (/[^su]s$/i.test(lower)) {
+    return token.slice(0, -1);
+  }
+
   return token;
 }
 

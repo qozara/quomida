@@ -20,6 +20,7 @@ export interface RawParsedAiItem {
   candidateId?: string;
   canonicalName?: string;
   name?: string;
+  mealType?: MealType | string;
 }
 
 export interface SynthesizedCompositeRecipe {
@@ -38,6 +39,7 @@ export interface ResolvedAiMealItem {
   calculatedWeightGrams: number;
   macros: MacroSnapshot;
   unmatched: boolean;
+  mealType?: MealType;
 }
 
 export interface ResolvedAiBatchMeal {
@@ -47,6 +49,8 @@ export interface ResolvedAiBatchMeal {
   totalMacros: MacroSnapshot;
   compositeDishName?: string;
   synthesizedRecipe?: SynthesizedCompositeRecipe;
+  defaultLoggingMode?: 'recipe' | 'batch';
+  isMultiMeal?: boolean;
 }
 
 export interface BatchAiMealOptions {
@@ -60,6 +64,8 @@ export interface BatchAiMealOptions {
   detectedMealType?: MealType | string;
   compositeDishName?: string;
   existingRecipes?: Recipe[];
+  isCompositeDish?: boolean;
+  locale?: string;
 }
 
 export type ResolveBatchOptions = BatchAiMealOptions;
@@ -213,6 +219,7 @@ export class BatchAiMealResolver {
       rawItems.map(async (item, idx) => {
         const itemId = `ai-item-${Date.now()}-${idx}`;
         const query = (item.foodQuery || '').trim();
+        const itemMealType: MealType = normalizeMealType(item.mealType as string) || detectedMealType;
 
         if (!query) {
           return {
@@ -224,7 +231,8 @@ export class BatchAiMealResolver {
             availablePortions: [],
             calculatedWeightGrams: 0,
             macros: { calories: 0, protein: 0, carbs: 0, fats: 0 },
-            unmatched: true
+            unmatched: true,
+            mealType: itemMealType
           };
         }
 
@@ -276,7 +284,8 @@ export class BatchAiMealResolver {
             availablePortions: [],
             calculatedWeightGrams: 0,
             macros: { calories: 0, protein: 0, carbs: 0, fats: 0 },
-            unmatched: true
+            unmatched: true,
+            mealType: itemMealType
           };
         }
 
@@ -335,12 +344,19 @@ export class BatchAiMealResolver {
           availablePortions,
           calculatedWeightGrams,
           macros,
-          unmatched: false
+          unmatched: false,
+          mealType: itemMealType
         };
       })
     );
 
     const totalMacros = this.computeTotalMacros(resolvedItems);
+
+    const isMultiMeal = new Set(resolvedItems.map(i => i.mealType)).size > 1;
+
+    const validItems = resolvedItems.filter(
+      it => it.food !== null && !it.unmatched && it.calculatedWeightGrams > 0
+    );
 
     const allExistingRecipes: Recipe[] =
       existingRecipes && existingRecipes.length > 0
@@ -353,11 +369,41 @@ export class BatchAiMealResolver {
             updatedAt: r.updatedAt
           });
 
-    const synthesizedRecipe = this.computeSynthesizedRecipe(
-      resolvedItems,
-      compositeDishName,
-      allExistingRecipes
-    );
+    let synthesizedRecipe: SynthesizedCompositeRecipe | undefined;
+    let defaultLoggingMode: 'recipe' | 'batch' = 'batch';
+
+    if (isMultiMeal) {
+      synthesizedRecipe = undefined;
+      defaultLoggingMode = 'batch';
+    } else if (validItems.length >= 2) {
+      const effectiveLocale =
+        options.locale ||
+        (/\b(?:with|and|ate|had|for|breakfast|lunch|dinner|snack)\b/i.test(rawInput) ? 'en' : undefined);
+      synthesizedRecipe = this.computeSynthesizedRecipe(
+        resolvedItems,
+        compositeDishName,
+        allExistingRecipes,
+        effectiveLocale
+      );
+
+      if (options.isCompositeDish !== undefined) {
+        defaultLoggingMode = options.isCompositeDish ? 'recipe' : 'batch';
+      } else if (compositeDishName && compositeDishName.trim().length > 0) {
+        defaultLoggingMode = 'recipe';
+      } else {
+        const hasConWith = /\b(?:con|with)\b/i.test(rawInput);
+        const hasSeparators = /,|\b(?:y|e|and|\+)\b/i.test(rawInput);
+        const mealVerbsCount = (rawInput.match(/(?<=^|[^\p{L}\p{N}])(?:desayun[eéó]|desayuno|almorc[eé]|almuerzo|cen[eé]|cena|merend[eé]|merienda|breakfast|lunch|dinner|snack)(?=[^\p{L}\p{N}]|$)/giu) || []).length;
+        if (hasConWith && !hasSeparators && mealVerbsCount <= 1) {
+          defaultLoggingMode = 'recipe';
+        } else {
+          defaultLoggingMode = 'batch';
+        }
+      }
+    } else {
+      synthesizedRecipe = undefined;
+      defaultLoggingMode = 'batch';
+    }
 
     return {
       rawInput,
@@ -365,7 +411,9 @@ export class BatchAiMealResolver {
       items: resolvedItems,
       totalMacros,
       compositeDishName,
-      synthesizedRecipe
+      synthesizedRecipe,
+      defaultLoggingMode,
+      isMultiMeal
     };
   }
 
@@ -376,7 +424,8 @@ export class BatchAiMealResolver {
   computeSynthesizedRecipe(
     items: ResolvedAiMealItem[],
     compositeDishName?: string,
-    existingRecipes: Recipe[] = []
+    existingRecipes: Recipe[] = [],
+    locale?: string
   ): SynthesizedCompositeRecipe | undefined {
     const validItems = items.filter(
       it => it.food !== null && !it.unmatched && it.calculatedWeightGrams > 0
@@ -386,17 +435,23 @@ export class BatchAiMealResolver {
       return undefined;
     }
 
+    const isEn =
+      (locale && locale.toLowerCase().startsWith('en')) ||
+      (!locale && validItems.every(it => (it.food as any)?.lang === 'en'));
+
     let dishName = '';
     if (compositeDishName && compositeDishName.trim()) {
       const trimmed = compositeDishName.trim();
       dishName = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
     } else {
       const foodNames = validItems.map(it => it.food!.name);
+      const pairConnector = isEn ? ' with ' : ' con ';
+      const listConnector = isEn ? ' and ' : ' y ';
       if (foodNames.length === 2) {
-        dishName = `${foodNames[0]} con ${foodNames[1]}`;
+        dishName = `${foodNames[0]}${pairConnector}${foodNames[1]}`;
       } else {
         const allButLast = foodNames.slice(0, -1).join(', ');
-        dishName = `${allButLast} y ${foodNames[foodNames.length - 1]}`;
+        dishName = `${allButLast}${listConnector}${foodNames[foodNames.length - 1]}`;
       }
       dishName = dishName.charAt(0).toUpperCase() + dishName.slice(1);
     }
@@ -484,11 +539,13 @@ export class BatchAiMealResolver {
           });
 
     const compositeDishName = options?.compositeDishName ?? meal.compositeDishName;
-    const synthesizedRecipe = this.computeSynthesizedRecipe(
-      updatedItems,
-      compositeDishName,
-      allExisting
-    );
+    const synthesizedRecipe = meal.isMultiMeal
+      ? undefined
+      : this.computeSynthesizedRecipe(
+          updatedItems,
+          compositeDishName,
+          allExisting
+        );
 
     return {
       ...meal,
@@ -561,11 +618,13 @@ export class BatchAiMealResolver {
           });
 
     const compositeDishName = options?.compositeDishName ?? meal.compositeDishName;
-    const synthesizedRecipe = this.computeSynthesizedRecipe(
-      updatedItems,
-      compositeDishName,
-      allExisting
-    );
+    const synthesizedRecipe = meal.isMultiMeal
+      ? undefined
+      : this.computeSynthesizedRecipe(
+          updatedItems,
+          compositeDishName,
+          allExisting
+        );
 
     return {
       ...meal,

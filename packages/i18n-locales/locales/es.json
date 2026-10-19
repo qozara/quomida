@@ -297,6 +297,11 @@
     "changeItem": "Cambiar alimento",
     "selectMeal": "Momento del día",
     "autoSavedRecipeBadge": "Se guardará en Mis Recetas y se registrará como un único plato",
-    "existingRecipeMatchedBadge": "Coincide con una receta existente en tu biblioteca"
+    "existingRecipeMatchedBadge": "Coincide con una receta existente en tu biblioteca",
+    "saveAndLogRecipeAction": "Guardar Receta y Registrar Plato",
+    "logRecipeDishAction": "Registrar Plato en Diario",
+    "modeCombineRecipe": "Combinar en 1 Plato (Receta)",
+    "modeSeparateItems": "Registrar por Separado ({count})",
+    "multiMealDetectedNotice": "Múltiples comidas detectadas — cada alimento se registrará en su momento asignado"
   }
 }

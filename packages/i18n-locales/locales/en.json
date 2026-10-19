@@ -297,6 +297,11 @@
     "changeItem": "Change food match",
     "selectMeal": "Meal Time",
     "autoSavedRecipeBadge": "Will be saved to My Recipes and logged as a single dish",
-    "existingRecipeMatchedBadge": "Matched existing recipe in your library"
+    "existingRecipeMatchedBadge": "Matched existing recipe in your library",
+    "saveAndLogRecipeAction": "Save Recipe & Log Dish",
+    "logRecipeDishAction": "Log Dish to Diary",
+    "modeCombineRecipe": "Combine as 1 Dish (Recipe)",
+    "modeSeparateItems": "Log Separate Items ({count})",
+    "multiMealDetectedNotice": "Multiple meal times detected — each food will be logged to its assigned meal"
   }
 }
