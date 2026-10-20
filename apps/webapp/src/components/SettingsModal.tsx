@@ -305,6 +305,7 @@ export const SettingsModal: React.FC = () => {
         },
         adaptive_state: {
           estimated_tdee: baselinePreview.seed_tdee,
+          prior_tdee: baselinePreview.seed_tdee,
           calibration_status: 'collecting_data',
           last_calibrated_date: selectedDate
         },

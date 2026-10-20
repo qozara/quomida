@@ -1,5 +1,6 @@
-import { type QuomidaDatabase, prepareQuery } from './rxdb.js';
+import { type QuomidaDatabase, prepareQuery, runAdaptiveCalibrationOnDatabase } from './rxdb.js';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
+import { recalculateEWMAWeightTrend, type WeightLog } from '@quomida/domain-core';
 
 export const SYNCABLE_COLLECTIONS = new Set([
   'daily_logs',
@@ -16,6 +17,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
   try {
     const payloads = await adapter.pull();
     const payloadMap = new Map(payloads.map(p => [p.collection, p]));
+    const collectionsWithRemoteChanges = new Set<string>();
 
     for (const [collectionName, collection] of Object.entries(db.collections)) {
       if (!SYNCABLE_COLLECTIONS.has(collectionName)) {
@@ -85,10 +87,12 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
             // Remote is newer, local needs update
             if (remoteDoc._deleted) {
               await collection.findOne(remoteDoc.id).remove().catch(() => {});
+              collectionsWithRemoteChanges.add(collectionName);
             } else {
               const cleanRemote = { ...remoteDoc };
               delete cleanRemote._deleted;
               upserts.push(cleanRemote);
+              collectionsWithRemoteChanges.add(collectionName);
             }
           } else if (localTime > remoteTime) {
             // Local is newer, remote needs update
@@ -99,6 +103,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
               if (remoteDoc._deleted) {
                 // Remote is deleted, local is active -> delete local
                 await collection.findOne(remoteDoc.id).remove().catch(() => {});
+                collectionsWithRemoteChanges.add(collectionName);
               } else {
                 // Local is deleted, remote is active -> push local tombstone to remote
                 pushBacks.push(localDoc);
@@ -114,6 +119,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
             const cleanRemote = { ...remoteDoc };
             delete cleanRemote._deleted;
             upserts.push(cleanRemote);
+            collectionsWithRemoteChanges.add(collectionName);
           }
         }
         
@@ -140,6 +146,69 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
         await adapter.push({
           collection: collectionName,
           documents: pushBacks
+        });
+      }
+    }
+
+    // Step A: EWMA Trend Healing after weight_logs Sync
+    if (db.collections.weight_logs) {
+      const weightDocs = await db.collections.weight_logs.find().exec();
+      const allWeightLogs: WeightLog[] = weightDocs
+        .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+        .sort((a: WeightLog, b: WeightLog) => {
+          const cmp = a.date.localeCompare(b.date);
+          if (cmp !== 0) return cmp;
+          return (a.timestamp || '').localeCompare(b.timestamp || '');
+        });
+
+      if (allWeightLogs.length > 0) {
+        const recalculated = recalculateEWMAWeightTrend(allWeightLogs);
+        const healedLogs: WeightLog[] = [];
+        const now = Date.now();
+
+        for (let i = 0; i < allWeightLogs.length; i++) {
+          const orig = allWeightLogs[i];
+          const rec = recalculated[i];
+          const origTrend = orig.trend_weight_kg;
+          const recTrend = rec.trend_weight_kg;
+          const needsHealing =
+            origTrend === undefined ||
+            origTrend === null ||
+            (origTrend === 0 && orig.weight_kg > 0) ||
+            Math.abs(origTrend - recTrend) > 1e-4;
+
+          if (needsHealing) {
+            healedLogs.push({
+              ...orig,
+              trend_weight_kg: recTrend,
+              updatedAt: now
+            });
+          }
+        }
+
+        if (healedLogs.length > 0) {
+          await db.collections.weight_logs.bulkUpsert(healedLogs);
+          await adapter.push({
+            collection: 'weight_logs',
+            documents: healedLogs
+          });
+          collectionsWithRemoteChanges.add('weight_logs');
+        }
+      }
+    }
+
+    // Step B: Adaptive Target Recalculation after Sync
+    const shouldRecalibrate =
+      collectionsWithRemoteChanges.has('weight_logs') ||
+      collectionsWithRemoteChanges.has('daily_logs') ||
+      collectionsWithRemoteChanges.has('user_settings');
+
+    if (shouldRecalibrate && db.collections.user_settings) {
+      const updatedSettings = await runAdaptiveCalibrationOnDatabase(db, undefined, true);
+      if (updatedSettings) {
+        await adapter.push({
+          collection: 'user_settings',
+          documents: [updatedSettings]
         });
       }
     }

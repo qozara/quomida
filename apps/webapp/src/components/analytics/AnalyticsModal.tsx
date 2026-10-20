@@ -27,37 +27,89 @@ export const AnalyticsModal: React.FC = () => {
     setIsAnalyticsOpen,
     setIsWeightModalOpen,
     selectedDate,
+    dailyLogs,
     weightLogs,
     deleteWeightLog,
     userSettings,
     dbService,
+    lastSyncedTime,
     t
   } = useApp();
 
   const [rangeDays, setRangeDays] = useState<14 | 30 | 90>(30);
   const [fourteenDayLogs, setFourteenDayLogs] = useState<DailyLog[]>([]);
+  const [latestFoodDate, setLatestFoodDate] = useState<string | null>(null);
 
-  // Load 14-day logs for calibration calculations
+  // Effective anchor date: evaluates full active horizon even when viewing a past date in daily food diary
+  const effectiveToday = useMemo(() => {
+    const maxWeightDate = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].date : undefined;
+    const candidates = [
+      selectedDate,
+      maxWeightDate,
+      latestFoodDate,
+      userSettings.adaptive_state?.last_calibrated_date
+    ].filter(Boolean) as string[];
+    return candidates.reduce((max, d) => (d > max ? d : max), selectedDate);
+  }, [selectedDate, weightLogs, latestFoodDate, userSettings.adaptive_state?.last_calibrated_date]);
+
+  // Retrieve latest logged food date to ensure backfilled / past-date navigation includes all logs
+  // Observes daily logs reactively across dates to immediately update upon local or cloud sync changes
   useEffect(() => {
-    if (!isAnalyticsOpen) return;
-    const windowStart = addDaysToDate(selectedDate, -13);
-    if (dbService?.getDailyLogsInRange) {
-      dbService
-        .getDailyLogsInRange(windowStart, selectedDate)
-        .then((logs) => setFourteenDayLogs(logs))
-        .catch((err) => console.warn('[AnalyticsModal] Failed to load 14-day logs:', err));
+    if (!isAnalyticsOpen || !dbService) return;
+
+    if (dbService.observeAllDailyLogs) {
+      const sub = dbService.observeAllDailyLogs().subscribe((allLogs: DailyLog[]) => {
+        let maxDate = '';
+        for (const log of allLogs) {
+          if (log.date && log.date > maxDate) maxDate = log.date;
+        }
+        setLatestFoodDate(maxDate || null);
+
+        const effDate = [
+          selectedDate,
+          weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].date : undefined,
+          maxDate,
+          userSettings.adaptive_state?.last_calibrated_date
+        ].filter(Boolean).reduce((max, d) => (d! > max! ? d : max), selectedDate)!;
+
+        const windowStart = addDaysToDate(effDate, -13);
+        const filtered = allLogs
+          .filter((l) => l.date >= windowStart && l.date <= effDate)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setFourteenDayLogs(filtered);
+      });
+
+      return () => {
+        sub.unsubscribe();
+      };
+    } else {
+      if (dbService.getLatestDailyLogDate) {
+        dbService
+          .getLatestDailyLogDate()
+          .then((d) => {
+            if (d) setLatestFoodDate(d);
+          })
+          .catch((err) => console.warn('[AnalyticsModal] Failed to get latest daily log date:', err));
+      }
+      const windowStart = addDaysToDate(effectiveToday, -13);
+      if (dbService?.getDailyLogsInRange) {
+        dbService
+          .getDailyLogsInRange(windowStart, effectiveToday)
+          .then((logs) => setFourteenDayLogs(logs))
+          .catch((err) => console.warn('[AnalyticsModal] Failed to load 14-day logs:', err));
+      }
     }
-  }, [isAnalyticsOpen, selectedDate, dbService]);
+  }, [isAnalyticsOpen, dbService, weightLogs, userSettings, lastSyncedTime, selectedDate, effectiveToday]);
 
   // Compute analytics using domain-core engine
   const analytics = useMemo(() => {
     return computeWeightTrendAnalytics({
-      today: selectedDate,
+      today: effectiveToday,
       weightLogs,
       dailyLogs: fourteenDayLogs,
       userSettings
     });
-  }, [selectedDate, weightLogs, fourteenDayLogs, userSettings]);
+  }, [effectiveToday, weightLogs, fourteenDayLogs, userSettings]);
 
   // Estimated TDEE resolution: adaptive state > baseline seed > rolling intake > fallback
   const displayedTdee = useMemo(() => {
@@ -70,7 +122,7 @@ export const AnalyticsModal: React.FC = () => {
         biometrics: userSettings.biometrics,
         goalConfig: userSettings.goal_config,
         currentWeightKg: currentWeight,
-        referenceDate: selectedDate
+        referenceDate: effectiveToday
       });
       return seed.seed_tdee;
     }
@@ -78,13 +130,13 @@ export const AnalyticsModal: React.FC = () => {
       return analytics.rolling_14d_intake_avg;
     }
     return userSettings.daily_calorie_target || null;
-  }, [userSettings, analytics, selectedDate]);
+  }, [userSettings, analytics, effectiveToday]);
 
   // Filter weight logs for chart according to selected range
   const chartData = useMemo<WeightChartDataPoint[]>(() => {
-    const rangeStartDate = addDaysToDate(selectedDate, -(rangeDays - 1));
+    const rangeStartDate = addDaysToDate(effectiveToday, -(rangeDays - 1));
     return weightLogs
-      .filter((w) => w.date >= rangeStartDate && w.date <= selectedDate)
+      .filter((w) => w.date >= rangeStartDate && w.date <= effectiveToday)
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((w) => ({
         date: w.date,
@@ -92,7 +144,7 @@ export const AnalyticsModal: React.FC = () => {
         trendWeightKg: w.trend_weight_kg,
         note: w.note
       }));
-  }, [weightLogs, rangeDays, selectedDate]);
+  }, [weightLogs, rangeDays, effectiveToday]);
 
   // Recent 10 weigh-ins
   const recentWeighIns = useMemo(() => {

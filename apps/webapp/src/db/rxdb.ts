@@ -18,6 +18,7 @@ import {
   daysBetween,
   addDaysToDate,
   calculateBaselineSeed,
+  calculateTargetsFromTdee,
   type BaseIngredient,
   type Recipe,
   type Portion,
@@ -362,6 +363,14 @@ export class LocalDBService {
   async saveSettings(settings: Partial<UserSettings>): Promise<void> {
     if (!this.db) await this.init();
     const current = await this.getSettings();
+    let hasChanges = false;
+    for (const [key, val] of Object.entries(settings)) {
+      if (JSON.stringify((current as any)[key]) !== JSON.stringify(val)) {
+        hasChanges = true;
+        break;
+      }
+    }
+    if (!hasChanges) return;
     const updated: UserSettings = {
       ...current,
       ...settings,
@@ -498,6 +507,18 @@ export class LocalDBService {
       throw new Error('Database not initialized. Call init() before observeLogsByDate()');
     }
     return this.db.daily_logs.find({ selector: { date } }).$;
+  }
+
+  observeAllDailyLogs(): Observable<DailyLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.daily_logs) {
+      return of([]);
+    }
+    return db.daily_logs.find().$.pipe(
+      map((docs: any[]) =>
+        docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      )
+    );
   }
 
   observeIngredients(): Observable<BaseIngredient[]> {
@@ -655,66 +676,232 @@ export class LocalDBService {
       .sort((a: DailyLog, b: DailyLog) => a.date.localeCompare(b.date));
   }
 
+  async getLatestDailyLogDate(): Promise<string | null> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.daily_logs.find().exec();
+    if (!docs || docs.length === 0) return null;
+    let maxDate = '';
+    for (const doc of docs) {
+      if (doc.date && doc.date > maxDate) {
+        maxDate = doc.date;
+      }
+    }
+    return maxDate || null;
+  }
+
   async runAdaptiveCalibrationIfNeeded(today?: string, force?: boolean): Promise<UserSettings> {
     if (!this.db) await this.init();
-    const todayDate = today || new Date().toISOString().slice(0, 10);
-    const settings = await this.getSettings();
+    const result = await runAdaptiveCalibrationOnDatabase(this.db!, today, force);
+    return result || (await this.getSettings());
+  }
+}
 
-    if (settings.target_mode !== 'adaptive' || !settings.biometrics || !settings.goal_config) {
-      return settings;
+export async function runAdaptiveCalibrationOnDatabase(
+  db: QuomidaDatabase,
+  today?: string,
+  force?: boolean
+): Promise<UserSettings | null> {
+  if (!db || !db.collections.user_settings) return null;
+
+  const settingsDoc = await db.collections.user_settings.findOne('global_settings').exec();
+  if (!settingsDoc) return null;
+  const settings: UserSettings = settingsDoc.toJSON ? settingsDoc.toJSON() : settingsDoc;
+
+  if (settings.target_mode !== 'adaptive' && settings.target_mode !== 'deterministic_seed') {
+    return settings;
+  }
+
+  if (!settings.biometrics || !settings.goal_config) {
+    return settings;
+  }
+
+  let weightLogs: WeightLog[] = [];
+  if (db.collections.weight_logs) {
+    const weightDocs = await db.collections.weight_logs.find().exec();
+    weightLogs = weightDocs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+      .sort((a: WeightLog, b: WeightLog) => {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.timestamp || '').localeCompare(b.timestamp || '');
+      });
+  }
+
+  let latestDailyLogDate: string | null = null;
+  if (db.collections.daily_logs) {
+    const dailyDocs = await db.collections.daily_logs.find().exec();
+    let maxDate = '';
+    for (const doc of dailyDocs) {
+      if (doc.date && doc.date > maxDate) maxDate = doc.date;
     }
+    latestDailyLogDate = maxDate || null;
+  }
 
-    const isCalibrated = settings.adaptive_state?.calibration_status === 'ready';
-    const lastCalibrated = settings.adaptive_state?.last_calibrated_date;
-    const isDue = !isCalibrated || !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
+  const maxWeightDate = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].date : undefined;
+  const baseDate = today || new Date().toISOString().slice(0, 10);
+  const candidates = [
+    baseDate,
+    maxWeightDate,
+    latestDailyLogDate,
+    settings.adaptive_state?.last_calibrated_date
+  ].filter((d): d is string => typeof d === 'string' && d.length > 0);
+  const todayDate: string = candidates.reduce((max, d) => (d > max ? d : max), baseDate);
 
-    if (!isDue && !force) {
-      return settings;
-    }
+  const now = Date.now();
 
-    const windowStart = addDaysToDate(todayDate, -13);
-    const weightLogs = await this.getWeightLogs();
-    const dailyLogs = await this.getDailyLogsInRange(windowStart, todayDate);
-
-    let previousEstimatedTdee = settings.adaptive_state?.estimated_tdee;
-    if (!previousEstimatedTdee) {
-      if (weightLogs.length > 0) {
-        const latestWeight = weightLogs[weightLogs.length - 1];
-        const seed = calculateBaselineSeed({
-          biometrics: settings.biometrics,
-          goalConfig: settings.goal_config,
-          currentWeightKg: latestWeight.weight_kg,
-          referenceDate: todayDate
-        });
-        previousEstimatedTdee = seed.seed_tdee;
-      } else {
-        previousEstimatedTdee = settings.daily_calorie_target || 2000;
+  // Handle deterministic_seed mode: update targets based on latest weight if available
+  if (settings.target_mode === 'deterministic_seed') {
+    if (weightLogs.length > 0) {
+      const latestWeight = weightLogs[weightLogs.length - 1];
+      const seed = calculateBaselineSeed({
+        biometrics: settings.biometrics,
+        goalConfig: settings.goal_config,
+        currentWeightKg: latestWeight.weight_kg,
+        referenceDate: todayDate
+      });
+      const updates: Partial<UserSettings> = {
+        daily_calorie_target: seed.daily_calorie_target,
+        custom_macros: seed.custom_macros
+      };
+      if (settings.adaptive_state) {
+        updates.adaptive_state = {
+          ...settings.adaptive_state,
+          estimated_tdee: seed.seed_tdee,
+          prior_tdee: seed.seed_tdee
+        };
       }
+      const hasCalTargetChanged = updates.daily_calorie_target !== settings.daily_calorie_target;
+      const hasMacroChanged = JSON.stringify(updates.custom_macros) !== JSON.stringify(settings.custom_macros);
+      const hasTdeeChanged = settings.adaptive_state?.estimated_tdee !== seed.seed_tdee;
+      if (!hasCalTargetChanged && !hasMacroChanged && !hasTdeeChanged) {
+        return settings;
+      }
+      const updated: UserSettings = {
+        ...settings,
+        ...updates,
+        updatedAt: now
+      };
+      await db.collections.user_settings.upsert(updated);
+      return updated;
     }
+    return settings;
+  }
 
-    const result = solveAdaptiveTdee({
-      today: todayDate,
-      previousEstimatedTdee,
-      sex: settings.biometrics.sex,
+  const isCalibrated = settings.adaptive_state?.calibration_status === 'ready';
+  const lastCalibrated = settings.adaptive_state?.last_calibrated_date;
+  const isDue = !isCalibrated || !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
+
+  if (!isDue && !force) {
+    return settings;
+  }
+
+  const windowStart = addDaysToDate(todayDate, -13);
+  let dailyLogs: DailyLog[] = [];
+  if (db.collections.daily_logs) {
+    const rangeDocs = await db.collections.daily_logs.find({
+      selector: {
+        date: {
+          $gte: windowStart,
+          $lte: todayDate
+        }
+      }
+    }).exec();
+    dailyLogs = rangeDocs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      .sort((a: DailyLog, b: DailyLog) => a.date.localeCompare(b.date));
+  }
+
+  let anchorTdee: number;
+  const isSameCycle = isCalibrated && !!lastCalibrated && daysBetween(lastCalibrated, todayDate) < 7;
+
+  if (isSameCycle && settings.adaptive_state?.prior_tdee) {
+    anchorTdee = settings.adaptive_state.prior_tdee;
+  } else if (isCalibrated && settings.adaptive_state?.estimated_tdee) {
+    anchorTdee = settings.adaptive_state.estimated_tdee;
+  } else if (settings.adaptive_state?.prior_tdee) {
+    anchorTdee = settings.adaptive_state.prior_tdee;
+  } else if (settings.adaptive_state?.estimated_tdee) {
+    anchorTdee = settings.adaptive_state.estimated_tdee;
+  } else if (weightLogs.length > 0) {
+    const latestWeight = weightLogs[weightLogs.length - 1];
+    const seed = calculateBaselineSeed({
+      biometrics: settings.biometrics,
       goalConfig: settings.goal_config,
-      weightLogs,
-      dailyLogs
+      currentWeightKg: latestWeight.weight_kg,
+      referenceDate: todayDate
     });
+    anchorTdee = seed.seed_tdee;
+  } else {
+    anchorTdee = settings.daily_calorie_target || 2000;
+  }
 
-    const updates: Partial<UserSettings> = {
-      adaptive_state: {
-        estimated_tdee: result.estimated_tdee,
-        last_calibrated_date: result.status === 'ready' ? todayDate : (lastCalibrated || todayDate),
-        calibration_status: result.status
-      }
+  const result = solveAdaptiveTdee({
+    today: todayDate,
+    previousEstimatedTdee: anchorTdee,
+    sex: settings.biometrics.sex,
+    goalConfig: settings.goal_config,
+    weightLogs,
+    dailyLogs
+  });
+
+  const updates: Partial<UserSettings> = {};
+
+  if (result.status === 'ready') {
+    const effectiveCalibratedDate = isSameCycle && lastCalibrated ? lastCalibrated : todayDate;
+    updates.adaptive_state = {
+      estimated_tdee: result.estimated_tdee,
+      prior_tdee: anchorTdee,
+      last_calibrated_date: effectiveCalibratedDate,
+      calibration_status: 'ready'
     };
-
     if (result.recommended_targets) {
       updates.daily_calorie_target = result.recommended_targets.daily_calorie_target;
       updates.custom_macros = result.recommended_targets.custom_macros;
     }
-
-    await this.saveSettings(updates);
-    return await this.getSettings();
+  } else {
+    updates.adaptive_state = {
+      estimated_tdee: anchorTdee,
+      prior_tdee: anchorTdee,
+      last_calibrated_date: lastCalibrated,
+      calibration_status: result.status
+    };
+    const latestTrendWeight = weightLogs.length > 0
+      ? weightLogs[weightLogs.length - 1].trend_weight_kg
+      : 75;
+    const fallbackTargets = calculateTargetsFromTdee({
+      tdee: anchorTdee,
+      weightKg: latestTrendWeight,
+      sex: settings.biometrics.sex,
+      goalConfig: settings.goal_config
+    });
+    updates.daily_calorie_target = fallbackTargets.daily_calorie_target;
+    updates.custom_macros = fallbackTargets.custom_macros;
   }
+
+  const hasTargetChanged =
+    updates.daily_calorie_target !== undefined &&
+    updates.daily_calorie_target !== settings.daily_calorie_target;
+  const hasStatusChanged =
+    updates.adaptive_state?.calibration_status !== settings.adaptive_state?.calibration_status;
+  const hasTdeeChanged =
+    updates.adaptive_state?.estimated_tdee !== settings.adaptive_state?.estimated_tdee;
+  const hasCalDateChanged =
+    updates.adaptive_state?.last_calibrated_date !== settings.adaptive_state?.last_calibrated_date;
+  const hasMacrosChanged =
+    JSON.stringify(updates.custom_macros) !== JSON.stringify(settings.custom_macros);
+
+  const hasChanged =
+    hasTargetChanged || hasStatusChanged || hasTdeeChanged || hasCalDateChanged || hasMacrosChanged;
+
+  if (!hasChanged) {
+    return settings;
+  }
+
+  const updated: UserSettings = {
+    ...settings,
+    ...updates,
+    updatedAt: now
+  };
+  await db.collections.user_settings.upsert(updated);
+  return updated;
 }

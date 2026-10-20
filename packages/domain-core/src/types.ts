@@ -139,6 +139,7 @@ export interface UserGoalConfig {
 
 export interface UserAdaptiveState {
   estimated_tdee: number;
+  prior_tdee?: number;
   last_calibrated_date?: string;
   calibration_status?: CalibrationStatus;
 }

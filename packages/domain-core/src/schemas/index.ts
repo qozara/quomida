@@ -180,6 +180,7 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
       type: 'object',
       properties: {
         estimated_tdee: { type: 'number', minimum: 500 },
+        prior_tdee: { type: 'number', minimum: 500 },
         last_calibrated_date: { type: 'string', maxLength: 10 },
         calibration_status: { type: 'string', enum: ['collecting_data', 'ready', 'insufficient_logs'] }
       },

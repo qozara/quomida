@@ -46,6 +46,10 @@ We implement an **Adaptive Expenditure & Weight Tracking Engine** consisting of 
    - Smoothing & Safety Clamp:
      $$\text{TDEE}_{\text{blended}} = 0.30 \times \text{TDEE}_{\text{obs}} + 0.70 \times \text{TDEE}_{\text{prev}}$$
      $$\text{TDEE}_{\text{new}} = \text{clamp}(\text{round}(\text{TDEE}_{\text{blended}}), \text{TDEE}_{\text{prev}} - 150, \text{TDEE}_{\text{prev}} + 150)$$
+   - **Idempotent Weekly Anchor (`prior_tdee`) & Mutation Recalculation**:
+     - To allow immediate target recalculation when users edit, add, or delete past food or weight logs without compounding distortion or recursive 30/70 drift, `adaptive_state` stores `prior_tdee` (the pre-calibration baseline anchor for the current 7-day cycle).
+     - Re-evaluations occurring within the same 7-day calibration cycle anchor against `prior_tdee`, guaranteeing deterministic and idempotent target resolution on repeated edits. Advancing to a new weekly cycle ($\ge 7\text{ days}$) shifts `prior_tdee` to the previous cycle's `estimated_tdee`.
+     - If deletions cause data sufficiency to drop below gate thresholds ($\text{status} \ne \text{'ready'}$), targets cleanly revert to the safe baseline anchor rather than retaining stale targets from deleted logs.
    - New targets are recalculated using $\text{TDEE}_{\text{new}}$ and the latest trend weight $\hat{W}_{\text{end}}$.
 
 4. **Schema Evolution (Fresh v0 Baseline)**:
@@ -57,6 +61,13 @@ We implement an **Adaptive Expenditure & Weight Tracking Engine** consisting of 
 
 6. **Pluggable Lightweight SVG Visualizations**:
    - Pure React/SVG charting component (`WeightTrendChart`) rendering raw scale points, EWMA trend curves, and goal reference lines with zero external charting library bundle overhead.
+
+7. **Multi-Device Cloud Sync Cascade Recalculation & EWMA Trend Healing**:
+   - When remote `weight_logs`, `daily_logs`, or `user_settings` modifications arrive via cloud sync (`syncDatabaseWithRemote` / `forceSync`), the sync pipeline automatically:
+     - Recomputes chronological EWMA tendency across the merged local + remote weight history. Any healed or updated `trend_weight_kg` values are saved locally and pushed back to the remote adapter (e.g. Google Sheets `weight_logs` tab).
+     - Re-evaluates adaptive expenditure and macro targets against the newly merged data state. If targets change, `user_settings` is updated locally and pushed to the remote adapter (e.g. Google Drive AppData `settings.json`).
+     - Reactively streams `user_settings` changes via RxDB observable (`db.user_settings.findOne('global_settings').$`) to all active presentation components (`<MacroRings />`, `<SettingsModal />`, `<AnalyticsModal />`) without requiring a manual page refresh.
+     - Automatically refreshes the 14-day compliance pane and horizon metrics in `<AnalyticsModal />` whenever daily logs are pulled or modified across any past date.
 
 ## Consequences
 
