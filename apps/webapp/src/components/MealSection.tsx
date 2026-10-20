@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { MealType, BaseIngredient, FoodItem } from '@quomida/domain-core';
-import { ChevronDown, ChevronUp, Trash2, Coffee, Utensils, Moon, Apple } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Coffee, Utensils, Moon, Apple, Plus } from 'lucide-react';
 
 interface MealSectionProps {
   mealType: MealType;
   title: string;
   onOpenPortionModal: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
+  onOpenAddModal?: (mealType: MealType) => void;
 }
 
 const mealIcons: Record<MealType, React.ReactNode> = {
@@ -16,7 +17,12 @@ const mealIcons: Record<MealType, React.ReactNode> = {
   meal_snack: <Apple className="w-4 h-4 text-rose-400" />
 };
 
-export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpenPortionModal }) => {
+export const MealSection: React.FC<MealSectionProps> = ({
+  mealType,
+  title,
+  onOpenPortionModal: _onOpenPortionModal,
+  onOpenAddModal
+}) => {
   const { dailyLogs, ingredients, deleteLogItem, t } = useApp();
   const [isOpen, setIsOpen] = useState(true);
 
@@ -32,11 +38,13 @@ export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpe
     <div className="w-full glass-card rounded-2xl overflow-hidden border border-slate-800/80 shadow-md transition-all duration-200">
       
       {/* Header Bar */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-slate-900/60 hover:bg-slate-800/60 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="w-full flex items-center justify-between p-3 sm:p-4 bg-slate-900/60 hover:bg-slate-800/40 transition-colors">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          className="flex-1 flex items-center gap-3 text-left min-h-[44px]"
+        >
           <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/50 shadow-inner">
             {mealIcons[mealType]}
           </div>
@@ -46,19 +54,42 @@ export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpe
               {logs.length} {logs.length === 1 ? 'item' : 'items'}
             </p>
           </div>
-        </div>
+        </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-800/40">
             {Math.round(totalCalories)} kcal
           </span>
-          {isOpen ? (
-            <ChevronUp className="w-5 h-5 text-slate-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-slate-400" />
+
+          {/* Dedicated Contextual Add Button */}
+          {onOpenAddModal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenAddModal(mealType);
+              }}
+              aria-label={`Add food to ${title}`}
+              className="min-w-[44px] min-h-[44px] p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center transition-all duration-150 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-label={isOpen ? 'Collapse section' : 'Expand section'}
+            className="min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-slate-200 flex items-center justify-center"
+          >
+            {isOpen ? (
+              <ChevronUp className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Accordion Content */}
       {isOpen && (
@@ -89,7 +120,7 @@ export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpe
                   <button
                     onClick={() => deleteLogItem(log.id)}
                     aria-label="Delete entry"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                    className="min-w-[44px] min-h-[44px] p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors flex items-center justify-center"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -99,7 +130,6 @@ export const MealSection: React.FC<MealSectionProps> = ({ mealType, title, onOpe
           )}
         </div>
       )}
-
     </div>
   );
 };
