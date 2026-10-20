@@ -14,12 +14,17 @@ import {
 } from 'lucide-react';
 import {
   computeWeightTrendAnalytics,
+  computeEnergyTrendSeries,
   addDaysToDate,
   calculateBaselineSeed,
   type DailyLog,
   type WeightLog
 } from '@quomida/domain-core';
-import { WeightTrendChart, type WeightChartDataPoint } from './WeightTrendChart.js';
+import {
+  WeightTrendChart,
+  type WeightChartDataPoint,
+  type TrendChartPoint
+} from './WeightTrendChart.js';
 
 export const AnalyticsModal: React.FC = () => {
   const {
@@ -36,8 +41,9 @@ export const AnalyticsModal: React.FC = () => {
     t
   } = useApp();
 
+  const [activeChartTab, setActiveChartTab] = useState<'weight' | 'energy'>('weight');
   const [rangeDays, setRangeDays] = useState<14 | 30 | 90>(30);
-  const [fourteenDayLogs, setFourteenDayLogs] = useState<DailyLog[]>([]);
+  const [historyDailyLogs, setHistoryDailyLogs] = useState<DailyLog[]>([]);
   const [latestFoodDate, setLatestFoodDate] = useState<string | null>(null);
 
   // Effective anchor date: evaluates full active horizon even when viewing a past date in daily food diary
@@ -52,7 +58,7 @@ export const AnalyticsModal: React.FC = () => {
     return candidates.reduce((max, d) => (d > max ? d : max), selectedDate);
   }, [selectedDate, weightLogs, latestFoodDate, userSettings.adaptive_state?.last_calibrated_date]);
 
-  // Retrieve latest logged food date to ensure backfilled / past-date navigation includes all logs
+  // Retrieve up to 105 days of daily logs (90-day horizon + 14-day warm-up window)
   // Observes daily logs reactively across dates to immediately update upon local or cloud sync changes
   useEffect(() => {
     if (!isAnalyticsOpen || !dbService) return;
@@ -72,11 +78,11 @@ export const AnalyticsModal: React.FC = () => {
           userSettings.adaptive_state?.last_calibrated_date
         ].filter(Boolean).reduce((max, d) => (d! > max! ? d : max), selectedDate)!;
 
-        const windowStart = addDaysToDate(effDate, -13);
+        const windowStart = addDaysToDate(effDate, -105);
         const filtered = allLogs
           .filter((l) => l.date >= windowStart && l.date <= effDate)
           .sort((a, b) => a.date.localeCompare(b.date));
-        setFourteenDayLogs(filtered);
+        setHistoryDailyLogs(filtered);
       });
 
       return () => {
@@ -91,25 +97,33 @@ export const AnalyticsModal: React.FC = () => {
           })
           .catch((err) => console.warn('[AnalyticsModal] Failed to get latest daily log date:', err));
       }
-      const windowStart = addDaysToDate(effectiveToday, -13);
+      const windowStart = addDaysToDate(effectiveToday, -105);
       if (dbService?.getDailyLogsInRange) {
         dbService
           .getDailyLogsInRange(windowStart, effectiveToday)
-          .then((logs) => setFourteenDayLogs(logs))
-          .catch((err) => console.warn('[AnalyticsModal] Failed to load 14-day logs:', err));
+          .then((logs) => setHistoryDailyLogs(logs && logs.length > 0 ? logs : (Array.isArray(dailyLogs) ? dailyLogs : [])))
+          .catch((err) => console.warn('[AnalyticsModal] Failed to load history logs:', err));
+      } else {
+        setHistoryDailyLogs(Array.isArray(dailyLogs) ? dailyLogs : []);
       }
     }
-  }, [isAnalyticsOpen, dbService, weightLogs, userSettings, lastSyncedTime, selectedDate, effectiveToday]);
+  }, [isAnalyticsOpen, dbService, weightLogs, userSettings, lastSyncedTime, selectedDate, effectiveToday, dailyLogs]);
+
+  // Effective daily logs (combines loaded range logs with current context logs if needed)
+  const effectiveDailyLogs = useMemo(() => {
+    if (historyDailyLogs.length > 0) return historyDailyLogs;
+    return Array.isArray(dailyLogs) ? dailyLogs : [];
+  }, [historyDailyLogs, dailyLogs]);
 
   // Compute analytics using domain-core engine
   const analytics = useMemo(() => {
     return computeWeightTrendAnalytics({
       today: effectiveToday,
       weightLogs,
-      dailyLogs: fourteenDayLogs,
+      dailyLogs: effectiveDailyLogs,
       userSettings
     });
-  }, [effectiveToday, weightLogs, fourteenDayLogs, userSettings]);
+  }, [effectiveToday, weightLogs, effectiveDailyLogs, userSettings]);
 
   // Estimated TDEE resolution: adaptive state > baseline seed > rolling intake > fallback
   const displayedTdee = useMemo(() => {
@@ -146,12 +160,49 @@ export const AnalyticsModal: React.FC = () => {
       }));
   }, [weightLogs, rangeDays, effectiveToday]);
 
+  // Reconstruct Unified Energy Balance series on the fly for 14d, 30d, or 90d
+  const energySeries = useMemo(() => {
+    return computeEnergyTrendSeries({
+      today: effectiveToday,
+      rangeDays,
+      weightLogs,
+      dailyLogs: effectiveDailyLogs,
+      userSettings
+    });
+  }, [effectiveToday, rangeDays, weightLogs, effectiveDailyLogs, userSettings]);
+
+  // Map energy series into generalized TrendChartPoint[] for SVG renderer
+  const energyChartPoints = useMemo<TrendChartPoint[]>(() => {
+    // Only return points if at least one day has food intake logged
+    const hasAnyIntake = energySeries.some((p) => p.intakeKcal !== undefined);
+    if (!hasAnyIntake) return [];
+    return energySeries.map((p) => ({
+      date: p.date,
+      rawValue: p.intakeKcal,
+      isPartial: p.intakeKcal !== undefined && !p.isQualifyingIntake,
+      trendValue: p.expenditureKcal,
+      secondaryTrendValue: p.intakeTrendKcal,
+      note:
+        p.intakeKcal !== undefined && !p.isQualifyingIntake
+          ? t.analytics.partialIntakeNotice
+          : undefined
+    }));
+  }, [energySeries, t.analytics.partialIntakeNotice]);
+
   // Recent 10 weigh-ins
   const recentWeighIns = useMemo(() => {
     return [...weightLogs]
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 10);
   }, [weightLogs]);
+
+  // Recent 10 daily energy logs (days with logged intake)
+  const recentEnergyDays = useMemo(() => {
+    return [...energySeries]
+      .filter((p) => p.intakeKcal !== undefined)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 10);
+  }, [energySeries]);
 
   if (!isAnalyticsOpen) return null;
 
@@ -290,75 +341,185 @@ export const AnalyticsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Dual-Layer Weight Trend Chart */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-bold text-slate-200">{t.analytics.chartTitle}</h3>
-          <WeightTrendChart
-            data={chartData}
-            rangeDays={rangeDays}
-            onRangeChange={setRangeDays}
-            unitLabel={t.weight.unitKg}
-            emptyStateMessage={t.analytics.emptyChart}
-            rawLegendLabel={t.analytics.rawWeightLegend}
-            trendLegendLabel={t.analytics.trendWeightLegend}
-          />
-        </div>
-
-        {/* Recent Weigh-Ins List */}
-        <div className="space-y-3 pt-2 border-t border-slate-800">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-200">{t.analytics.recentEntries}</h3>
+        {/* Tabbed Trend Chart Section (Weight Trend vs Energy Balance Trend) */}
+        <div className="space-y-3">
+          {/* Segmented Tab Switcher */}
+          <div
+            role="tablist"
+            aria-label={t.analytics.title}
+            className="grid grid-cols-2 gap-1.5 p-1 bg-slate-800/70 border border-slate-700/60 rounded-2xl"
+          >
             <button
               type="button"
-              onClick={() => {
-                setIsAnalyticsOpen(false);
-                setIsWeightModalOpen(true);
-              }}
-              className="min-h-[44px] px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              role="tab"
+              id="tab-analytics-weight"
+              data-testid="tab-analytics-weight"
+              aria-selected={activeChartTab === 'weight'}
+              onClick={() => setActiveChartTab('weight')}
+              className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                activeChartTab === 'weight'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t.weight.logWeightCta}</span>
+              <Activity className="w-4 h-4 shrink-0" />
+              <span>{t.analytics.tabWeightTrend}</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              id="tab-analytics-energy"
+              data-testid="tab-analytics-energy"
+              aria-selected={activeChartTab === 'energy'}
+              onClick={() => setActiveChartTab('energy')}
+              className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                activeChartTab === 'energy'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
+            >
+              <Flame className="w-4 h-4 shrink-0" />
+              <span>{t.analytics.tabEnergyTrend}</span>
             </button>
           </div>
 
-          {recentWeighIns.length === 0 ? (
-            <p className="text-xs text-slate-500 py-3 text-center">{t.analytics.emptyChart}</p>
+          {activeChartTab === 'weight' ? (
+            <WeightTrendChart
+              data={chartData}
+              rangeDays={rangeDays}
+              onRangeChange={setRangeDays}
+              unitLabel={t.weight.unitKg}
+              valuePrecision={1}
+              accentTheme="emerald"
+              emptyStateMessage={t.analytics.emptyChart}
+              rawLegendLabel={t.analytics.rawWeightLegend}
+              trendLegendLabel={t.analytics.trendWeightLegend}
+            />
           ) : (
-            <div className="divide-y divide-slate-800/60 max-h-48 overflow-y-auto rounded-xl bg-slate-900/60 border border-slate-800">
-              {recentWeighIns.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between px-3.5 py-2.5 text-xs text-slate-300 hover:bg-slate-800/40"
-                >
-                  <div className="flex flex-col min-w-0 pr-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono font-semibold text-slate-100">{entry.date}</span>
-                      <span className="font-bold text-white font-mono">
-                        {entry.weight_kg} {t.weight.unitKg}
-                      </span>
-                      <span className="text-[11px] text-emerald-400 font-mono">
-                        ({t.weight.trendLabel}: {entry.trend_weight_kg})
-                      </span>
-                    </div>
-                    {entry.note && (
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{entry.note}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    data-testid={`btn-delete-entry-${entry.date}`}
-                    onClick={() => deleteWeightLog(entry.id)}
-                    aria-label="Delete entry"
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <WeightTrendChart
+              data={[]}
+              genericData={energyChartPoints}
+              rangeDays={rangeDays}
+              onRangeChange={setRangeDays}
+              unitLabel={t.analytics.unitKcal}
+              valuePrecision={0}
+              accentTheme="amber"
+              emptyStateMessage={t.analytics.emptyEnergyChart}
+              rawLegendLabel={t.analytics.energyIntakeLegend}
+              trendLegendLabel={t.analytics.energyExpenditureLegend}
+              secondaryTrendLegendLabel={t.analytics.energyIntakeTrendLegend}
+            />
           )}
         </div>
+
+        {/* Contextual Bottom List (Recent Weigh-Ins vs Recent Daily Energy Logs) */}
+        {activeChartTab === 'weight' ? (
+          <div className="space-y-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-200">{t.analytics.recentEntries}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAnalyticsOpen(false);
+                  setIsWeightModalOpen(true);
+                }}
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t.weight.logWeightCta}</span>
+              </button>
+            </div>
+
+            {recentWeighIns.length === 0 ? (
+              <p className="text-xs text-slate-500 py-3 text-center">{t.analytics.emptyChart}</p>
+            ) : (
+              <div className="divide-y divide-slate-800/60 max-h-48 overflow-y-auto rounded-xl bg-slate-900/60 border border-slate-800">
+                {recentWeighIns.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between px-3.5 py-2.5 text-xs text-slate-300 hover:bg-slate-800/40"
+                  >
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono font-semibold text-slate-100">{entry.date}</span>
+                        <span className="font-bold text-white font-mono">
+                          {entry.weight_kg} {t.weight.unitKg}
+                        </span>
+                        <span className="text-[11px] text-emerald-400 font-mono">
+                          ({t.weight.trendLabel}: {entry.trend_weight_kg})
+                        </span>
+                      </div>
+                      {entry.note && (
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{entry.note}</p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      data-testid={`btn-delete-entry-${entry.date}`}
+                      onClick={() => deleteWeightLog(entry.id)}
+                      aria-label="Delete entry"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-200">{t.analytics.recentEnergyEntries}</h3>
+            </div>
+
+            {recentEnergyDays.length === 0 ? (
+              <p className="text-xs text-slate-500 py-3 text-center">
+                {t.analytics.emptyEnergyChart}
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-800/60 max-h-48 overflow-y-auto rounded-xl bg-slate-900/60 border border-slate-800">
+                {recentEnergyDays.map((day) => (
+                  <div
+                    key={day.date}
+                    className="flex items-center justify-between px-3.5 py-2.5 text-xs text-slate-300 hover:bg-slate-800/40"
+                  >
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <div className="flex items-baseline flex-wrap gap-2">
+                        <span className="font-mono font-semibold text-slate-100">{day.date}</span>
+                        <span className="font-bold text-white font-mono">
+                          {day.intakeKcal} {t.analytics.unitKcal}
+                        </span>
+                        <span className="text-[11px] text-amber-400 font-mono">
+                          (TDEE: {day.expenditureKcal} {t.analytics.unitKcal})
+                        </span>
+                      </div>
+                      {day.macros && (
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          P: {day.macros.protein}g · C: {day.macros.carbs}g · F: {day.macros.fats}g
+                        </p>
+                      )}
+                    </div>
+
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${
+                        day.isQualifyingIntake
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      {day.isQualifyingIntake
+                        ? t.analytics.qualifyingDayBadge
+                        : t.analytics.partialDayBadge}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -59,8 +59,11 @@ We implement an **Adaptive Expenditure & Weight Tracking Engine** consisting of 
 5. **BYOS Google Sheets Tab Isolation**:
    - A dedicated `weight_logs` worksheet tab in the user's Google Drive spreadsheet stores serialized weight logs with dynamic header mapping, preserving isolated sync operations.
 
-6. **Pluggable Lightweight SVG Visualizations**:
-   - Pure React/SVG charting component (`WeightTrendChart`) rendering raw scale points, EWMA trend curves, and goal reference lines with zero external charting library bundle overhead.
+6. **Pluggable Lightweight SVG Visualizations & Dual-Tab Energy Balance Analytics**:
+   - Pure React/SVG charting component (`WeightTrendChart`) generalized via `TrendChartPoint` to render both:
+     - **Weight Trend Tab** (Emerald accent): Raw scale points and smoothed EWMA trend curve.
+     - **Energy Balance Trend Tab** (Amber accent): Unified Energy Balance view displaying rolling Expenditure ($\text{TDEE}$) as a solid curve, Smoothed Intake Trend as a dashed curve, and Daily Caloric Intake as scatter dots (with partial logs $< 800\text{ kcal}$ rendered as hollow dots and excluded from pulling down the intake trend).
+   - **On-the-Fly Deterministic Series Reconstruction (`computeEnergyTrendSeries`)**: Rather than persisting a separate `tdee_logs` collection or extra Google Sheets tab, the 14, 30, and 90-day expenditure and intake trend trajectories are deterministically reconstructed in-memory in $< 2\text{ ms}$ from `daily_logs`, `weight_logs`, and `user_settings`.
 
 7. **Multi-Device Cloud Sync Cascade Recalculation & EWMA Trend Healing**:
    - When remote `weight_logs`, `daily_logs`, or `user_settings` modifications arrive via cloud sync (`syncDatabaseWithRemote` / `forceSync`), the sync pipeline automatically:

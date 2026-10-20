@@ -95,6 +95,27 @@ export interface WeightTrendAnalytics {
   target_weekly_rate_kg?: number;
 }
 
+export interface EnergyTrendDataPoint {
+  date: string;
+  intakeKcal?: number;
+  isQualifyingIntake: boolean;
+  intakeTrendKcal?: number;
+  expenditureKcal: number;
+  macros?: {
+    protein: number;
+    carbs: number;
+    fats: number;
+  };
+}
+
+export interface ComputeEnergyTrendSeriesInput {
+  today: string;
+  rangeDays: 14 | 30 | 90;
+  weightLogs: WeightLog[];
+  dailyLogs: DailyLog[];
+  userSettings: UserSettings;
+}
+
 /**
  * Calculates completed years of age from an ISO birth date string (YYYY-MM-DD).
  * Timezone-safe date arithmetic.
@@ -565,4 +586,217 @@ export function computeWeightTrendAnalytics({
     goal_type,
     target_weekly_rate_kg
   };
+}
+
+/**
+ * Reconstructs the Unified Energy Balance series (Expenditure / TDEE trend curve + Daily Intake dots + Smoothed Intake Trend)
+ * deterministically over a 14, 30, or 90-day horizon without requiring extra database tables.
+ *
+ * - Daily Intake >= 800 kcal is marked `isQualifyingIntake: true` and updates the gap-aware EWMA intake trend.
+ * - Partial logs (< 800 kcal) are preserved for visual scatter rendering (`isQualifyingIntake: false`) without pulling down the trend curve.
+ * - Expenditure (`expenditureKcal`) dynamically evaluates the 14-day rolling adaptive energy balance on each day (or falls back to Mifflin-St Jeor baseline / user target).
+ */
+export function computeEnergyTrendSeries({
+  today,
+  rangeDays,
+  weightLogs,
+  dailyLogs,
+  userSettings
+}: ComputeEnergyTrendSeriesInput): EnergyTrendDataPoint[] {
+  const activeWeights = weightLogs
+    .filter((w) => !(w as any)._deleted && w.date <= today)
+    .sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.timestamp || '').localeCompare(b.timestamp || '');
+    });
+
+  const activeFoodLogs = dailyLogs.filter((l) => !(l as any)._deleted && l.date <= today);
+
+  if (activeWeights.length === 0 && activeFoodLogs.length === 0) {
+    return [];
+  }
+
+  // Group daily food logs by date
+  const dailySummaryMap = new Map<
+    string,
+    { calories: number; protein: number; carbs: number; fats: number }
+  >();
+
+  for (const log of activeFoodLogs) {
+    const existing = dailySummaryMap.get(log.date) || {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fats: 0
+    };
+    existing.calories += log.macros?.calories || 0;
+    existing.protein += log.macros?.protein || 0;
+    existing.carbs += log.macros?.carbs || 0;
+    existing.fats += log.macros?.fats || 0;
+    dailySummaryMap.set(log.date, existing);
+  }
+
+  const rangeStartDate = addDaysToDate(today, -(rangeDays - 1));
+
+  // Find earliest relevant date in range so we don't plot empty leading days before user started logging
+  let earliestDataDate = today;
+  if (activeWeights.length > 0 && activeWeights[0].date < earliestDataDate) {
+    earliestDataDate = activeWeights[0].date;
+  }
+  for (const d of dailySummaryMap.keys()) {
+    if (d < earliestDataDate) {
+      earliestDataDate = d;
+    }
+  }
+
+  // Start simulation 14 days prior to rangeStartDate so EWMA intake trend and rolling TDEE are warmed up
+  const simStartDate =
+    earliestDataDate > rangeStartDate ? earliestDataDate : addDaysToDate(rangeStartDate, -14);
+  const effectivePlotStart = earliestDataDate > rangeStartDate ? earliestDataDate : rangeStartDate;
+
+  // Determine initial baseline TDEE
+  const initialWeightKg = activeWeights.length > 0 ? activeWeights[0].trend_weight_kg : 75;
+  let runningEstimatedTdee = userSettings.daily_calorie_target || 2000;
+  if (userSettings.biometrics && userSettings.goal_config) {
+    const seed = calculateBaselineSeed({
+      biometrics: userSettings.biometrics,
+      goalConfig: userSettings.goal_config,
+      currentWeightKg: initialWeightKg,
+      referenceDate: simStartDate
+    });
+    runningEstimatedTdee = seed.seed_tdee;
+  } else if (userSettings.adaptive_state?.prior_tdee) {
+    runningEstimatedTdee = userSettings.adaptive_state.prior_tdee;
+  } else if (userSettings.adaptive_state?.estimated_tdee) {
+    runningEstimatedTdee = userSettings.adaptive_state.estimated_tdee;
+  }
+
+  let runningIntakeTrend: number | undefined = undefined;
+  let lastQualifyingIntakeDate: string | undefined = undefined;
+  let lastTrendWeight = initialWeightKg;
+  let weightIdx = 0;
+
+  const totalSimDays = Math.max(0, daysBetween(simStartDate, today));
+  const series: EnergyTrendDataPoint[] = [];
+
+  for (let offset = 0; offset <= totalSimDays; offset++) {
+    const currentDate = addDaysToDate(simStartDate, offset);
+
+    // Advance weight pointer up to currentDate
+    while (weightIdx < activeWeights.length && activeWeights[weightIdx].date <= currentDate) {
+      lastTrendWeight = activeWeights[weightIdx].trend_weight_kg;
+      weightIdx++;
+    }
+
+    const dayFood = dailySummaryMap.get(currentDate);
+    const intakeKcal = dayFood ? Math.round(dayFood.calories) : undefined;
+    const isQualifyingIntake = intakeKcal !== undefined && intakeKcal >= 800;
+
+    // Update gap-aware EWMA intake trend only on qualifying intake days (>= 800 kcal)
+    if (isQualifyingIntake && intakeKcal !== undefined) {
+      if (runningIntakeTrend === undefined || lastQualifyingIntakeDate === undefined) {
+        runningIntakeTrend = intakeKcal;
+      } else {
+        const elapsed = Math.max(1, daysBetween(lastQualifyingIntakeDate, currentDate));
+        const alphaEff = 1 - Math.pow(1 - 0.15, elapsed);
+        runningIntakeTrend = Math.round(
+          runningIntakeTrend + alphaEff * (intakeKcal - runningIntakeTrend)
+        );
+      }
+      lastQualifyingIntakeDate = currentDate;
+    }
+
+    // Evaluate expenditure for currentDate
+    let dayExpenditure = runningEstimatedTdee;
+    if (userSettings.biometrics && userSettings.goal_config) {
+      const seedForDay = calculateBaselineSeed({
+        biometrics: userSettings.biometrics,
+        goalConfig: userSettings.goal_config,
+        currentWeightKg: lastTrendWeight,
+        referenceDate: currentDate
+      });
+
+      if (userSettings.target_mode === 'deterministic_seed') {
+        dayExpenditure = seedForDay.seed_tdee;
+        runningEstimatedTdee = dayExpenditure;
+      } else {
+        // Attempt 14-day adaptive solve on currentDate
+        const wStart = addDaysToDate(currentDate, -13);
+        const pEnd = addDaysToDate(currentDate, -7);
+        const rStart = addDaysToDate(currentDate, -6);
+
+        let rCount = 0;
+        let pCount = 0;
+        let firstW: WeightLog | undefined;
+        let lastW: WeightLog | undefined;
+
+        for (let i = 0; i < weightIdx; i++) {
+          const wl = activeWeights[i];
+          if (wl.date >= wStart && wl.date <= currentDate) {
+            if (!firstW) firstW = wl;
+            lastW = wl;
+            if (wl.date >= rStart) rCount++;
+            else if (wl.date <= pEnd) pCount++;
+          }
+        }
+
+        let qualDays = 0;
+        let qualSum = 0;
+        for (let d = 0; d < 14; d++) {
+          const checkD = addDaysToDate(wStart, d);
+          const f = dailySummaryMap.get(checkD);
+          if (f && f.calories >= 800) {
+            qualDays++;
+            qualSum += f.calories;
+          }
+        }
+
+        if (rCount >= 4 && pCount >= 1 && qualDays >= 10 && firstW && lastW) {
+          const avgIntake = qualSum / qualDays;
+          const elapsedW = Math.max(1, daysBetween(firstW.date, lastW.date));
+          const dailyWeightDelta = (lastW.trend_weight_kg - firstW.trend_weight_kg) / elapsedW;
+          const observedTdee = Math.round(avgIntake - dailyWeightDelta * 7700);
+          // Smooth daily trajectory toward observed TDEE
+          const blended = Math.round(0.25 * observedTdee + 0.75 * runningEstimatedTdee);
+          const clamped = Math.max(
+            runningEstimatedTdee - 150,
+            Math.min(runningEstimatedTdee + 150, blended)
+          );
+          runningEstimatedTdee = clamped;
+          dayExpenditure = clamped;
+        } else {
+          // Warm-up / insufficient window: track physiological BMR*activity baseline from trend weight
+          dayExpenditure = seedForDay.seed_tdee;
+          runningEstimatedTdee = dayExpenditure;
+        }
+      }
+    } else if (runningIntakeTrend !== undefined && !userSettings.adaptive_state?.estimated_tdee) {
+      dayExpenditure = runningIntakeTrend;
+    }
+
+    // If on the final day ('today') the user has an explicit calibrated TDEE in adaptive_state, anchor to it
+    if (currentDate === today && userSettings.adaptive_state?.estimated_tdee) {
+      dayExpenditure = userSettings.adaptive_state.estimated_tdee;
+    }
+
+    if (currentDate >= effectivePlotStart) {
+      series.push({
+        date: currentDate,
+        intakeKcal,
+        isQualifyingIntake,
+        intakeTrendKcal: runningIntakeTrend,
+        expenditureKcal: Math.round(dayExpenditure),
+        macros: dayFood
+          ? {
+              protein: Math.round(dayFood.protein),
+              carbs: Math.round(dayFood.carbs),
+              fats: Math.round(dayFood.fats)
+            }
+          : undefined
+      });
+    }
+  }
+
+  return series;
 }

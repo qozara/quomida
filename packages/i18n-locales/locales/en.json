@@ -362,12 +362,23 @@
     "compliancePriorWeight": "Baseline weigh-in (prior 7d): {{count}}/1",
     "complianceFoodDays": "Food days (≥800 kcal): {{count}}/10",
     "chartTitle": "Weight Trend",
+    "tabWeightTrend": "Weight Trend",
+    "tabEnergyTrend": "Energy Trend",
     "rawWeightLegend": "Scale Weight",
     "trendWeightLegend": "EWMA Trend",
+    "energyExpenditureLegend": "Expenditure (TDEE)",
+    "energyIntakeLegend": "Daily Intake",
+    "energyIntakeTrendLegend": "Intake Trend",
+    "partialIntakeNotice": "Partial log (<800 kcal)",
+    "unitKcal": "kcal",
     "range14d": "14d",
     "range30d": "30d",
     "range90d": "90d",
     "emptyChart": "Log your weight to start tracking your smoothed trend curve.",
-    "recentEntries": "Recent Weigh-Ins"
+    "emptyEnergyChart": "Log your daily meals to visualize your caloric intake and energy expenditure trend.",
+    "recentEntries": "Recent Weigh-Ins",
+    "recentEnergyEntries": "Recent Daily Energy Logs",
+    "qualifyingDayBadge": "Complete",
+    "partialDayBadge": "Partial (<800 kcal)"
   }
 }

@@ -362,12 +362,23 @@
     "compliancePriorWeight": "Pesaje previo (7d ant.): {{count}}/1",
     "complianceFoodDays": "Días registrados (≥800 kcal): {{count}}/10",
     "chartTitle": "Tendencia de Peso",
+    "tabWeightTrend": "Tendencia de Peso",
+    "tabEnergyTrend": "Balance Energético",
     "rawWeightLegend": "Peso Balanza",
     "trendWeightLegend": "Tendencia EWMA",
+    "energyExpenditureLegend": "Gasto (TDEE)",
+    "energyIntakeLegend": "Ingesta Diaria",
+    "energyIntakeTrendLegend": "Tendencia Ingesta",
+    "partialIntakeNotice": "Registro parcial (<800 kcal)",
+    "unitKcal": "kcal",
     "range14d": "14d",
     "range30d": "30d",
     "range90d": "90d",
     "emptyChart": "Registra tu peso para comenzar a visualizar tu curva de tendencia suavizada.",
-    "recentEntries": "Pesajes Recientes"
+    "emptyEnergyChart": "Registra tus comidas diarias para visualizar tu ingesta calórica y tendencia de gasto energético.",
+    "recentEntries": "Pesajes Recientes",
+    "recentEnergyEntries": "Registros Energéticos Recientes",
+    "qualifyingDayBadge": "Completo",
+    "partialDayBadge": "Parcial (<800 kcal)"
   }
 }

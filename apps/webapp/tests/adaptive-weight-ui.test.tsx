@@ -316,6 +316,95 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       fireEvent.click(closeBtn);
       expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(false);
     });
+
+    it('switches between Weight Trend and Energy Trend tabs with contextual chart and bottom list', async () => {
+      const mockDailyLogs = [
+        {
+          id: 'log_1',
+          date: '2026-10-19',
+          timestamp: '2026-10-19T12:00:00Z',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'f1',
+          food_name: 'Oats',
+          quantity: 1,
+          portion_name: 'bowl',
+          macros: { calories: 450, protein: 20, carbs: 70, fats: 10 },
+          updatedAt: 1000
+        },
+        {
+          id: 'log_2',
+          date: '2026-10-20',
+          timestamp: '2026-10-20T12:00:00Z',
+          meal_type: 'meal_lunch',
+          food_reference_id: 'f2',
+          food_name: 'Chicken & Rice',
+          quantity: 1,
+          portion_name: 'plate',
+          macros: { calories: 2150, protein: 165, carbs: 230, fats: 62 },
+          updatedAt: 2000
+        }
+      ];
+
+      mockGetDailyLogsInRange.mockResolvedValueOnce(mockDailyLogs);
+
+      setupMockContext({
+        isAnalyticsOpen: true,
+        dailyLogs: mockDailyLogs,
+        userSettings: {
+          ...defaultMockUserSettings,
+          target_mode: 'adaptive',
+          biometrics: {
+            sex: 'male',
+            birth_date: '1995-05-10',
+            height_cm: 180,
+            activity_multiplier: 1.5
+          },
+          goal_config: {
+            goal_type: 'lose',
+            weekly_rate_pct: -0.5,
+            protein_g_per_kg: 2.0,
+            fat_calorie_pct: 0.25
+          },
+          adaptive_state: {
+            estimated_tdee: 2450,
+            calibration_status: 'ready'
+          }
+        }
+      });
+
+      render(<AnalyticsModal />);
+
+      // Verify both tab buttons exist and meet 44x44 touch target requirements
+      const weightTab = screen.getByTestId('tab-analytics-weight');
+      const energyTab = screen.getByTestId('tab-analytics-energy');
+
+      expect(weightTab.getAttribute('aria-selected')).toBe('true');
+      expect(energyTab.getAttribute('aria-selected')).toBe('false');
+      expect(weightTab.className).toMatch(/min-h-\[44px\]/);
+      expect(energyTab.className).toMatch(/min-h-\[44px\]/);
+
+      // Default tab is Weight Trend: shows Recent Weigh-Ins list
+      expect(screen.getByText(en.analytics.recentEntries)).toBeDefined();
+      expect(screen.getByText('Morning weigh-in')).toBeDefined();
+
+      // Switch to Energy Trend tab
+      fireEvent.click(energyTab);
+
+      await waitFor(() => {
+        expect(energyTab.getAttribute('aria-selected')).toBe('true');
+        expect(weightTab.getAttribute('aria-selected')).toBe('false');
+      });
+
+      // Verify Energy Trend chart legends appear
+      expect(screen.getByText(en.analytics.energyExpenditureLegend)).toBeDefined();
+      expect(screen.getByText(en.analytics.energyIntakeLegend)).toBeDefined();
+      expect(screen.getByText(en.analytics.energyIntakeTrendLegend)).toBeDefined();
+
+      // Verify contextual bottom list switched to Recent Daily Energy Logs
+      expect(screen.getByText(en.analytics.recentEnergyEntries)).toBeDefined();
+      expect(screen.getAllByText(/2150 kcal/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(en.analytics.partialDayBadge)).toBeDefined();
+    });
   });
 
   describe('5. Header Analytics Button', () => {
