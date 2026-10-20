@@ -5,7 +5,8 @@ import {
   portionsSchema,
   dailyLogsSchema,
   userSettingsSchema,
-  systemMetadataSchema
+  systemMetadataSchema,
+  weightLogsSchema
 } from '../src/index.js';
 
 describe('RxDB Schema Specs', () => {
@@ -59,6 +60,10 @@ describe('RxDB Schema Specs', () => {
     expect(userSettingsSchema.title).toBe('user_settings');
     expect(userSettingsSchema.version).toBe(0);
     expect(userSettingsSchema.primaryKey).toBe('id');
+    expect(userSettingsSchema.properties.target_mode).toBeDefined();
+    expect(userSettingsSchema.properties.biometrics).toBeDefined();
+    expect(userSettingsSchema.properties.goal_config).toBeDefined();
+    expect(userSettingsSchema.properties.adaptive_state).toBeDefined();
   });
 
   it('defines system_metadata schema with primary key key and version 0', () => {
@@ -68,5 +73,18 @@ describe('RxDB Schema Specs', () => {
     expect(systemMetadataSchema.required).toContain('key');
     expect(systemMetadataSchema.required).toContain('value');
     expect(systemMetadataSchema.required).toContain('updatedAt');
+  });
+
+  it('defines weight_logs schema with primary key id and version 0', () => {
+    expect(weightLogsSchema.title).toBe('weight_logs');
+    expect(weightLogsSchema.version).toBe(0);
+    expect(weightLogsSchema.primaryKey).toBe('id');
+    expect(weightLogsSchema.required).toContain('id');
+    expect(weightLogsSchema.required).toContain('date');
+    expect(weightLogsSchema.required).toContain('timestamp');
+    expect(weightLogsSchema.required).toContain('weight_kg');
+    expect(weightLogsSchema.required).toContain('trend_weight_kg');
+    expect(weightLogsSchema.properties.weight_kg.minimum).toBe(20);
+    expect(weightLogsSchema.properties.weight_kg.maximum).toBe(500);
   });
 });

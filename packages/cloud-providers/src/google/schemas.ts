@@ -23,6 +23,19 @@ export const QuomidaDailyLogsSpreadsheetSchema: SchemaDefinition = {
         { name: 'updatedAt', type: 'number' },
         { name: '_deleted', type: 'boolean' }
       ]
+    },
+    {
+      name: 'weight_logs',
+      columns: [
+        { name: 'id', type: 'string', required: true },
+        { name: 'date', type: 'string', required: true },
+        { name: 'timestamp', type: 'string', required: true },
+        { name: 'weight_kg', type: 'number', required: true },
+        { name: 'trend_weight_kg', type: 'number', required: true },
+        { name: 'note', type: 'string' },
+        { name: 'updatedAt', type: 'number', required: true },
+        { name: '_deleted', type: 'boolean' }
+      ]
     }
   ]
 };

@@ -12,6 +12,7 @@ import {
   type DailyLog,
   type UserSettings,
   type MealType,
+  type WeightLog,
   RecipeManager,
   calculateItemMacros,
   convertPortionToGrams,
@@ -43,6 +44,9 @@ interface AppContextType {
   recipes: Recipe[];
   recipeFoods: RecipeFoodItem[];
   dailyLogs: DailyLog[];
+  weightLogs: WeightLog[];
+  logWeight: (date: string, weightKg: number, note?: string) => Promise<void>;
+  deleteWeightLog: (idOrDate: string) => Promise<void>;
   syncStatus: SyncStatus;
   uxSyncState: UXSyncState;
   activeProvider: CloudSyncProvider | null;
@@ -81,6 +85,10 @@ interface AppContextType {
   setIsCatalogOpen: (open: boolean) => void;
   isStorageSettingsOpen: boolean;
   setIsStorageSettingsOpen: (open: boolean) => void;
+  isAnalyticsOpen: boolean;
+  setIsAnalyticsOpen: (open: boolean) => void;
+  isWeightModalOpen: boolean;
+  setIsWeightModalOpen: (open: boolean) => void;
   dbInitError: QuomidaDBError | null;
   dbVersion: number;
   clearLocalDatabase: () => Promise<void>;
@@ -97,7 +105,8 @@ const defaultSettings: UserSettings = {
   locale: 'es-AR',
   theme: 'dark',
   daily_calorie_target: 2000,
-  custom_macros: { protein: 150, carbs: 200, fats: 65 }
+  custom_macros: { protein: 150, carbs: 200, fats: 65 },
+  target_mode: 'manual'
 };
 
 export async function runWithSyncLock<T>(
@@ -145,12 +154,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return recipes.map(r => recipeManager.toFoodItem(r));
   }, [recipes, recipeManager]);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(new Date().toLocaleTimeString());
   const [itemCounts, setItemCounts] = useState<{ logs: number; customFoods: number }>({ logs: 0, customFoods: 0 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
@@ -260,6 +272,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let subLogs: any = null;
     let subIngs: any = null;
     let subRecipes: any = null;
+    let subWeightLogs: any = null;
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
@@ -276,6 +289,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserSettings(settings);
       if (settings.locale?.startsWith('en')) setLocaleState('en');
       if (settings.theme) setThemeState(settings.theme as any);
+
+      // Adaptive calibration check on boot
+      dbService.runAdaptiveCalibrationIfNeeded().then((calibratedSettings) => {
+        if (calibratedSettings) {
+          setUserSettings(calibratedSettings);
+        }
+      }).catch((err) => {
+        console.warn('[AppContext] Boot adaptive calibration notice:', err);
+      });
 
       // Check if we need to auto-connect
       const activeProviderSettings = settings.active_cloud_provider;
@@ -320,6 +342,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDailyLogs(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
       });
 
+      // Subscribe to Weight Logs
+      subWeightLogs = dbService.observeWeightLogs().subscribe((docs: WeightLog[]) => {
+        setWeightLogs(docs);
+      });
+
       // Background asynchronous catalog hydration on boot [APP-207]
       dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
         if (v) setCatalogVersion(v);
@@ -349,8 +376,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subLogs?.unsubscribe();
       subIngs?.unsubscribe();
       subRecipes?.unsubscribe();
+      subWeightLogs?.unsubscribe();
     };
   }, [selectedDate, dbService]);
+
+  // Recalibrate adaptive targets when opening analytics modal
+  useEffect(() => {
+    if (isAnalyticsOpen && db) {
+      dbService.runAdaptiveCalibrationIfNeeded().then((calibratedSettings) => {
+        if (calibratedSettings) {
+          setUserSettings(calibratedSettings);
+        }
+      }).catch((err) => {
+        console.warn('[AppContext] Analytics open adaptive calibration notice:', err);
+      });
+    }
+  }, [isAnalyticsOpen, db, dbService]);
 
   // Update item counts for storage settings panel
   const updateItemCounts = useCallback(async () => {
@@ -633,6 +674,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     forceSync().catch(console.error);
   };
 
+  const logWeight = async (date: string, weightKg: number, note?: string) => {
+    await dbService.saveWeightLog({ date, weight_kg: weightKg, note });
+    forceSync().catch(console.error);
+  };
+
+  const deleteWeightLog = async (idOrDate: string) => {
+    await dbService.deleteWeightLog(idOrDate);
+    forceSync().catch(console.error);
+  };
+
   const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => {
     await dbService.saveCustomFood(ingData, portions);
     forceSync().catch(console.error);
@@ -686,6 +737,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recipes,
         recipeFoods,
         dailyLogs,
+        weightLogs,
+        logWeight,
+        deleteWeightLog,
         syncStatus,
         uxSyncState,
         activeProvider,
@@ -711,6 +765,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsCatalogOpen,
         isStorageSettingsOpen,
         setIsStorageSettingsOpen,
+        isAnalyticsOpen,
+        setIsAnalyticsOpen,
+        isWeightModalOpen,
+        setIsWeightModalOpen,
         dbInitError,
         dbVersion: dailyLogsSchema.version,
         clearLocalDatabase: clearDatabase,

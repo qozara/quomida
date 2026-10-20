@@ -6,7 +6,8 @@ export const SYNCABLE_COLLECTIONS = new Set([
   'base_ingredients',
   'recipes',
   'portions',
-  'user_settings'
+  'user_settings',
+  'weight_logs'
 ]);
 
 export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: CloudSyncProvider) {

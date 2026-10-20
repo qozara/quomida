@@ -12,15 +12,22 @@ import {
   dailyLogsSchema,
   userSettingsSchema,
   systemMetadataSchema,
+  weightLogsSchema,
+  recalculateEWMAWeightTrend,
+  solveAdaptiveTdee,
+  daysBetween,
+  addDaysToDate,
+  calculateBaselineSeed,
   type BaseIngredient,
   type Recipe,
   type Portion,
   type DailyLog,
   type UserSettings,
-  type SystemMetadata
+  type SystemMetadata,
+  type WeightLog
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
-import { Observable, of } from 'rxjs';
+import { Observable, of, map } from 'rxjs';
 
 export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
 
@@ -98,6 +105,7 @@ export type QuomidaDatabaseCollections = {
   daily_logs: any;
   user_settings: any;
   system_metadata: any;
+  weight_logs: any;
 };
 
 export type QuomidaDatabase = RxDatabase<QuomidaDatabaseCollections>;
@@ -212,7 +220,8 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       },
       daily_logs: { schema: dailyLogsSchema },
       user_settings: { schema: userSettingsSchema },
-      system_metadata: { schema: systemMetadataSchema }
+      system_metadata: { schema: systemMetadataSchema },
+      weight_logs: { schema: weightLogsSchema }
     });
   } catch (err: any) {
     try {
@@ -269,6 +278,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
         carbs: 200,
         fats: 65
       },
+      target_mode: 'manual',
       updatedAt: now
     });
   }
@@ -342,6 +352,7 @@ export class LocalDBService {
       theme: 'dark',
       daily_calorie_target: 2000,
       custom_macros: { protein: 150, carbs: 200, fats: 65 },
+      target_mode: 'manual',
       updatedAt: Date.now()
     };
     await this.db!.user_settings.insert(fallback);
@@ -509,5 +520,200 @@ export class LocalDBService {
       value,
       updatedAt: Date.now()
     });
+  }
+
+  async saveWeightLog(entry: { date: string; weight_kg: number; note?: string }): Promise<WeightLog> {
+    if (!this.db) await this.init();
+    const id = `weight_${entry.date}`;
+    const now = Date.now();
+    const existingDoc = await this.db!.weight_logs.findOne(id).exec();
+    const timestamp = existingDoc?.timestamp || new Date().toISOString();
+
+    const currentDocs = await this.db!.weight_logs.find().exec();
+    const existingMap = new Map<string, WeightLog>();
+    const otherLogs: WeightLog[] = [];
+
+    for (const d of currentDocs) {
+      const json = d.toJSON() as WeightLog;
+      existingMap.set(json.id, json);
+      if (json.id !== id) {
+        otherLogs.push(json);
+      }
+    }
+
+    const pendingLog: WeightLog = {
+      id,
+      date: entry.date,
+      timestamp,
+      weight_kg: entry.weight_kg,
+      trend_weight_kg: entry.weight_kg,
+      ...(entry.note !== undefined ? { note: entry.note } : (existingDoc?.note ? { note: existingDoc.note } : {})),
+      updatedAt: now
+    };
+
+    const recomputedLogs = recalculateEWMAWeightTrend([...otherLogs, pendingLog]);
+    const savedLog = recomputedLogs.find((l) => l.id === id)!;
+
+    const toUpsert: WeightLog[] = [];
+    for (const log of recomputedLogs) {
+      if (log.id === id) {
+        toUpsert.push(log);
+      } else {
+        const prev = existingMap.get(log.id);
+        if (!prev || prev.trend_weight_kg !== log.trend_weight_kg) {
+          toUpsert.push({
+            ...log,
+            updatedAt: now
+          });
+        }
+      }
+    }
+
+    if (toUpsert.length > 0) {
+      await this.db!.weight_logs.bulkUpsert(toUpsert);
+    }
+
+    return savedLog;
+  }
+
+  async deleteWeightLog(idOrDate: string): Promise<void> {
+    if (!this.db) await this.init();
+    const id = idOrDate.startsWith('weight_') ? idOrDate : `weight_${idOrDate}`;
+    const doc = await this.db!.weight_logs.findOne(id).exec();
+    const now = Date.now();
+
+    if (doc) {
+      const patchedDoc = await doc.patch({ updatedAt: now });
+      await patchedDoc.remove();
+    }
+
+    const remainingDocs = await this.db!.weight_logs.find().exec();
+    const remainingLogs: WeightLog[] = remainingDocs.map((d: any) => d.toJSON() as WeightLog);
+    if (remainingLogs.length > 0) {
+      const recomputed = recalculateEWMAWeightTrend(remainingLogs);
+      const existingMap = new Map<string, WeightLog>(remainingDocs.map((d: any) => [d.id, d.toJSON() as WeightLog]));
+      const toUpsert: WeightLog[] = [];
+
+      for (const log of recomputed) {
+        const prev = existingMap.get(log.id);
+        if (!prev || prev.trend_weight_kg !== log.trend_weight_kg) {
+          toUpsert.push({
+            ...log,
+            updatedAt: now
+          });
+        }
+      }
+
+      if (toUpsert.length > 0) {
+        await this.db!.weight_logs.bulkUpsert(toUpsert);
+      }
+    }
+  }
+
+  async getWeightLogs(): Promise<WeightLog[]> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.weight_logs.find().exec();
+    return docs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+      .sort((a: WeightLog, b: WeightLog) => {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.timestamp || '').localeCompare(b.timestamp || '');
+      });
+  }
+
+  observeWeightLogs(): Observable<WeightLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.weight_logs) {
+      return of([]);
+    }
+    return db.weight_logs.find().$.pipe(
+      map((docs: any[]) =>
+        docs
+          .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+          .sort((a: WeightLog, b: WeightLog) => {
+            const cmp = a.date.localeCompare(b.date);
+            if (cmp !== 0) return cmp;
+            return (a.timestamp || '').localeCompare(b.timestamp || '');
+          })
+      )
+    );
+  }
+
+  async getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.daily_logs.find({
+      selector: {
+        date: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      }
+    }).exec();
+    return docs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      .sort((a: DailyLog, b: DailyLog) => a.date.localeCompare(b.date));
+  }
+
+  async runAdaptiveCalibrationIfNeeded(today?: string, force?: boolean): Promise<UserSettings> {
+    if (!this.db) await this.init();
+    const todayDate = today || new Date().toISOString().slice(0, 10);
+    const settings = await this.getSettings();
+
+    if (settings.target_mode !== 'adaptive' || !settings.biometrics || !settings.goal_config) {
+      return settings;
+    }
+
+    const lastCalibrated = settings.adaptive_state?.last_calibrated_date;
+    const isDue = !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
+
+    if (!isDue && !force) {
+      return settings;
+    }
+
+    const windowStart = addDaysToDate(todayDate, -13);
+    const weightLogs = await this.getWeightLogs();
+    const dailyLogs = await this.getDailyLogsInRange(windowStart, todayDate);
+
+    let previousEstimatedTdee = settings.adaptive_state?.estimated_tdee;
+    if (!previousEstimatedTdee) {
+      if (weightLogs.length > 0) {
+        const latestWeight = weightLogs[weightLogs.length - 1];
+        const seed = calculateBaselineSeed({
+          biometrics: settings.biometrics,
+          goalConfig: settings.goal_config,
+          currentWeightKg: latestWeight.weight_kg,
+          referenceDate: todayDate
+        });
+        previousEstimatedTdee = seed.seed_tdee;
+      } else {
+        previousEstimatedTdee = settings.daily_calorie_target || 2000;
+      }
+    }
+
+    const result = solveAdaptiveTdee({
+      today: todayDate,
+      previousEstimatedTdee,
+      sex: settings.biometrics.sex,
+      goalConfig: settings.goal_config,
+      weightLogs,
+      dailyLogs
+    });
+
+    const updates: Partial<UserSettings> = {
+      adaptive_state: {
+        estimated_tdee: result.estimated_tdee,
+        last_calibrated_date: todayDate,
+        calibration_status: result.status
+      }
+    };
+
+    if (result.recommended_targets) {
+      updates.daily_calorie_target = result.recommended_targets.daily_calorie_target;
+      updates.custom_macros = result.recommended_targets.custom_macros;
+    }
+
+    await this.saveSettings(updates);
+    return await this.getSettings();
   }
 }

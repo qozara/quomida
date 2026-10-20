@@ -5,7 +5,8 @@ import {
   portionsSchema,
   dailyLogsSchema,
   userSettingsSchema,
-  systemMetadataSchema
+  systemMetadataSchema,
+  weightLogsSchema
 } from '../src/index.js';
 
 /**
@@ -60,6 +61,10 @@ const V0_BASELINE: Record<string, { version: number; properties: string[]; requi
       'custom_macros',
       'active_cloud_provider',
       'ai_settings',
+      'target_mode',
+      'biometrics',
+      'goal_config',
+      'adaptive_state',
       'updatedAt'
     ],
     required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']
@@ -68,6 +73,19 @@ const V0_BASELINE: Record<string, { version: number; properties: string[]; requi
     version: 0,
     properties: ['key', 'value', 'updatedAt'],
     required: ['key', 'value', 'updatedAt']
+  },
+  weight_logs: {
+    version: 0,
+    properties: [
+      'id',
+      'date',
+      'timestamp',
+      'weight_kg',
+      'trend_weight_kg',
+      'note',
+      'updatedAt'
+    ],
+    required: ['id', 'date', 'timestamp', 'weight_kg', 'trend_weight_kg', 'updatedAt']
   }
 };
 
@@ -78,7 +96,8 @@ describe('Schema Version & Evolution Guard (Prevents Un-bumped Schema Mutations 
     portionsSchema,
     dailyLogsSchema,
     userSettingsSchema,
-    systemMetadataSchema
+    systemMetadataSchema,
+    weightLogsSchema
   ];
 
   it('verifies all schemas have a valid non-negative integer version', () => {

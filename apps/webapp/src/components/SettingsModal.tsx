@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
@@ -24,12 +24,20 @@ import {
   Trash2,
   Sparkles,
   Key,
-  Cpu
+  Cpu,
+  Activity,
+  Flame,
+  Zap
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 import { AiKeyEncryptionService } from '@quomida/llm-engine';
 import { AI_CONFIG } from '../config/ai.js';
-import type { AiProviderType } from '@quomida/domain-core';
+import {
+  calculateBaselineSeed,
+  type AiProviderType,
+  type UserSex,
+  type GoalType
+} from '@quomida/domain-core';
 
 const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || 'support@qozara.org';
 const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@qozara.org';
@@ -44,6 +52,9 @@ const licenseUrl = `${appWebsiteUrl}/LICENSE`;
 
 export const SettingsModal: React.FC = () => {
   const {
+    selectedDate,
+    weightLogs,
+    logWeight,
     locale,
     setLocale,
     theme,
@@ -82,12 +93,98 @@ export const SettingsModal: React.FC = () => {
 
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
 
-
   const [calorieTarget, setCalorieTarget] = useState(userSettings.daily_calorie_target || 2000);
   const [proteinTarget, setProteinTarget] = useState(userSettings.custom_macros?.protein || 150);
   const [carbsTarget, setCarbsTarget] = useState(userSettings.custom_macros?.carbs || 200);
   const [fatsTarget, setFatsTarget] = useState(userSettings.custom_macros?.fats || 65);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Smart / Adaptive Goals State
+  const [targetMode, setTargetMode] = useState<'manual' | 'smart'>(
+    userSettings.target_mode === 'manual' ? 'manual' : 'smart'
+  );
+  const [isAdaptive, setIsAdaptive] = useState<boolean>(
+    userSettings.target_mode === 'adaptive'
+  );
+  const [sex, setSex] = useState<UserSex>(userSettings.biometrics?.sex || 'male');
+  const [birthDate, setBirthDate] = useState<string>(
+    userSettings.biometrics?.birth_date || '1990-01-01'
+  );
+  const [heightCm, setHeightCm] = useState<number>(
+    userSettings.biometrics?.height_cm || 170
+  );
+  const initialWeight = useMemo(() => {
+    if (weightLogs && weightLogs.length > 0) {
+      return weightLogs[weightLogs.length - 1].weight_kg;
+    }
+    return 75.0;
+  }, [weightLogs]);
+  const [currentWeightKg, setCurrentWeightKg] = useState<number>(initialWeight);
+  const [activityMultiplier, setActivityMultiplier] = useState<number>(
+    userSettings.biometrics?.activity_multiplier || 1.375
+  );
+
+  const [goalType, setGoalType] = useState<GoalType>(
+    userSettings.goal_config?.goal_type || 'lose'
+  );
+  const [weeklyRatePct, setWeeklyRatePct] = useState<number>(
+    userSettings.goal_config?.weekly_rate_pct !== undefined
+      ? userSettings.goal_config.weekly_rate_pct
+      : -0.5
+  );
+  const [proteinGPerKg, setProteinGPerKg] = useState<number>(
+    userSettings.goal_config?.protein_g_per_kg || 2.2
+  );
+  const [fatCaloriePct, setFatCaloriePct] = useState<number>(
+    userSettings.goal_config?.fat_calorie_pct || 0.25
+  );
+
+  const handleGoalTypeChange = (newGoal: GoalType) => {
+    setGoalType(newGoal);
+    if (newGoal === 'lose') {
+      setWeeklyRatePct(-0.5);
+      setProteinGPerKg(2.2);
+      setFatCaloriePct(0.25);
+    } else if (newGoal === 'maintain') {
+      setWeeklyRatePct(0);
+      setProteinGPerKg(1.8);
+      setFatCaloriePct(0.25);
+    } else if (newGoal === 'gain') {
+      setWeeklyRatePct(0.25);
+      setProteinGPerKg(2.0);
+      setFatCaloriePct(0.25);
+    }
+  };
+
+  const baselinePreview = useMemo(() => {
+    return calculateBaselineSeed({
+      biometrics: {
+        sex,
+        birth_date: birthDate,
+        height_cm: heightCm,
+        activity_multiplier: activityMultiplier
+      },
+      goalConfig: {
+        goal_type: goalType,
+        weekly_rate_pct: weeklyRatePct,
+        protein_g_per_kg: proteinGPerKg,
+        fat_calorie_pct: fatCaloriePct
+      },
+      currentWeightKg,
+      referenceDate: selectedDate
+    });
+  }, [
+    sex,
+    birthDate,
+    heightCm,
+    activityMultiplier,
+    goalType,
+    weeklyRatePct,
+    proteinGPerKg,
+    fatCaloriePct,
+    currentWeightKg,
+    selectedDate
+  ]);
 
   const [isChecking, setIsChecking] = useState(false);
 
@@ -173,14 +270,48 @@ export const SettingsModal: React.FC = () => {
 
   const handleSaveGoals = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateUserSettings({
-      daily_calorie_target: calorieTarget,
-      custom_macros: {
-        protein: proteinTarget,
-        carbs: carbsTarget,
-        fats: fatsTarget
+    if (targetMode === 'manual') {
+      await updateUserSettings({
+        target_mode: 'manual',
+        daily_calorie_target: calorieTarget,
+        custom_macros: {
+          protein: proteinTarget,
+          carbs: carbsTarget,
+          fats: fatsTarget
+        }
+      });
+    } else {
+      // Smart / Adaptive targets
+      // If no weight logs exist yet or no log for selectedDate, record initial W0 weight
+      const existingLog = weightLogs.find((w) => w.date === selectedDate);
+      if (!existingLog || weightLogs.length === 0) {
+        await logWeight(selectedDate, currentWeightKg);
       }
-    });
+
+      const mode = isAdaptive ? 'adaptive' : 'deterministic_seed';
+      await updateUserSettings({
+        target_mode: mode,
+        biometrics: {
+          sex,
+          birth_date: birthDate,
+          height_cm: heightCm,
+          activity_multiplier: activityMultiplier
+        },
+        goal_config: {
+          goal_type: goalType,
+          weekly_rate_pct: weeklyRatePct,
+          protein_g_per_kg: proteinGPerKg,
+          fat_calorie_pct: fatCaloriePct
+        },
+        adaptive_state: {
+          estimated_tdee: baselinePreview.seed_tdee,
+          calibration_status: 'collecting_data',
+          last_calibrated_date: selectedDate
+        },
+        daily_calorie_target: baselinePreview.daily_calorie_target,
+        custom_macros: baselinePreview.custom_macros
+      });
+    }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
@@ -285,49 +416,303 @@ export const SettingsModal: React.FC = () => {
             <span>Nutritional Targets</span>
           </div>
 
-          <div>
-            <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.dailyTarget}</label>
-            <input
-              type="number"
-              value={calorieTarget}
-              onChange={(e) => setCalorieTarget(parseInt(e.target.value) || 0)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
-            />
+          {/* Segmented Control */}
+          <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+            <button
+              type="button"
+              id="btn-target-mode-manual"
+              data-testid="btn-target-mode-manual"
+              onClick={() => setTargetMode('manual')}
+              className={`flex-1 min-h-[44px] py-2 text-xs font-semibold rounded-lg transition-all ${
+                targetMode === 'manual'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.settings.targetModeManual}
+            </button>
+            <button
+              type="button"
+              id="btn-target-mode-smart"
+              data-testid="btn-target-mode-smart"
+              onClick={() => setTargetMode('smart')}
+              className={`flex-1 min-h-[44px] py-2 text-xs font-semibold rounded-lg transition-all ${
+                targetMode === 'smart'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.settings.targetModeSmart}
+            </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-rose-400 block mb-1 font-medium">Protein (g)</label>
-              <input
-                type="number"
-                value={proteinTarget}
-                onChange={(e) => setProteinTarget(parseInt(e.target.value) || 0)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-rose-500"
-              />
+          {targetMode === 'manual' ? (
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.dailyTarget}</label>
+                <input
+                  type="number"
+                  value={calorieTarget}
+                  onChange={(e) => setCalorieTarget(parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-rose-400 block mb-1 font-medium">Protein (g)</label>
+                  <input
+                    type="number"
+                    value={proteinTarget}
+                    onChange={(e) => setProteinTarget(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-amber-400 block mb-1 font-medium">Carbs (g)</label>
+                  <input
+                    type="number"
+                    value={carbsTarget}
+                    onChange={(e) => setCarbsTarget(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-cyan-400 block mb-1 font-medium">Fats (g)</label>
+                  <input
+                    type="number"
+                    value={fatsTarget}
+                    onChange={(e) => setFatsTarget(parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-amber-400 block mb-1 font-medium">Carbs (g)</label>
-              <input
-                type="number"
-                value={carbsTarget}
-                onChange={(e) => setCarbsTarget(parseInt(e.target.value) || 0)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
-              />
+          ) : (
+            <div className="space-y-4">
+              {/* Biometrics Card */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t.settings.biometricsTitle}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Sex */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.sexLabel}</label>
+                    <select
+                      data-testid="select-biometrics-sex"
+                      value={sex}
+                      onChange={(e) => setSex(e.target.value as UserSex)}
+                      className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="male">{t.settings.sexMale}</option>
+                      <option value="female">{t.settings.sexFemale}</option>
+                    </select>
+                  </div>
+
+                  {/* Birth Date */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.birthDateLabel}</label>
+                    <input
+                      data-testid="input-biometrics-birthdate"
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Height */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.heightCmLabel}</label>
+                    <input
+                      data-testid="input-biometrics-height"
+                      type="number"
+                      min={50}
+                      max={260}
+                      value={heightCm}
+                      onChange={(e) => setHeightCm(parseInt(e.target.value) || 170)}
+                      className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Current Weight */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.currentWeightKgLabel}</label>
+                    <input
+                      data-testid="input-biometrics-weight"
+                      type="number"
+                      step="0.1"
+                      min={20}
+                      max={500}
+                      value={currentWeightKg}
+                      onChange={(e) => setCurrentWeightKg(parseFloat(e.target.value) || 75)}
+                      className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Activity Multiplier */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">{t.settings.activityLevelLabel}</label>
+                  <select
+                    data-testid="select-biometrics-activity"
+                    value={activityMultiplier}
+                    onChange={(e) => setActivityMultiplier(parseFloat(e.target.value) || 1.375)}
+                    className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value={1.2}>{t.settings.activitySedentary}</option>
+                    <option value={1.375}>{t.settings.activityLight}</option>
+                    <option value={1.55}>{t.settings.activityModerate}</option>
+                    <option value={1.725}>{t.settings.activityVery}</option>
+                    <option value={1.9}>{t.settings.activityExtreme}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Goal Selector Card */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Target className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t.settings.goalSelectorTitle}</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    data-testid="btn-goal-lose"
+                    onClick={() => handleGoalTypeChange('lose')}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      goalType === 'lose'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {t.settings.goalLose}
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="btn-goal-maintain"
+                    onClick={() => handleGoalTypeChange('maintain')}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      goalType === 'maintain'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {t.settings.goalMaintain}
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="btn-goal-gain"
+                    onClick={() => handleGoalTypeChange('gain')}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      goalType === 'gain'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {t.settings.goalGain}
+                  </button>
+                </div>
+
+                {/* Sliders for Lose or Gain */}
+                {goalType === 'lose' && (
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400 mb-1">
+                      <span>{t.settings.weeklyRateLabel}</span>
+                      <span className="font-bold text-emerald-400">{weeklyRatePct}% / wk</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-1.0"
+                      max="-0.25"
+                      step="0.05"
+                      value={weeklyRatePct}
+                      onChange={(e) => setWeeklyRatePct(parseFloat(e.target.value))}
+                      className="w-full accent-emerald-500"
+                    />
+                  </div>
+                )}
+
+                {goalType === 'gain' && (
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400 mb-1">
+                      <span>{t.settings.weeklyRateLabel}</span>
+                      <span className="font-bold text-emerald-400">+{weeklyRatePct}% / wk</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.20"
+                      max="0.50"
+                      step="0.05"
+                      value={weeklyRatePct}
+                      onChange={(e) => setWeeklyRatePct(parseFloat(e.target.value))}
+                      className="w-full accent-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Adaptive Toggle */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                <label className="min-h-[44px] flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAdaptive}
+                    onChange={(e) => setIsAdaptive(e.target.checked)}
+                    className="w-5 h-5 rounded accent-emerald-500 bg-slate-800 border-slate-700"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-slate-200">{t.settings.adaptiveToggleLabel}</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5">{t.settings.adaptiveToggleHint}</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Calculated Output Preview */}
+              <div
+                data-testid="preview-seed-tdee"
+                className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2 text-xs"
+              >
+                <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                  <Flame className="w-4 h-4" />
+                  <span>{t.settings.previewTitle}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-300">
+                  <div>
+                    <span className="text-slate-400 block">{t.settings.previewBmr}:</span>
+                    <span className="font-mono font-bold text-white">{baselinePreview.bmr} kcal</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">{t.settings.previewTdee}:</span>
+                    <span className="font-mono font-bold text-white">{baselinePreview.seed_tdee} kcal</span>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-emerald-500/20 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-slate-400 block">{t.settings.previewTargetKcal}:</span>
+                      <span className="font-mono text-base font-black text-emerald-300">{baselinePreview.daily_calorie_target} kcal</span>
+                    </div>
+                    <div className="text-right font-mono text-[11px] text-slate-300">
+                      P: <span className="font-bold text-rose-300">{baselinePreview.custom_macros.protein}g</span> |{' '}
+                      C: <span className="font-bold text-amber-300">{baselinePreview.custom_macros.carbs}g</span> |{' '}
+                      F: <span className="font-bold text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-cyan-400 block mb-1 font-medium">Fats (g)</label>
-              <input
-                type="number"
-                value={fatsTarget}
-                onChange={(e) => setFatsTarget(parseInt(e.target.value) || 0)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-          </div>
+          )}
 
           <button
             type="submit"
-            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+            id="btn-save-nutritional-targets"
+            data-testid="btn-save-nutritional-targets"
+            className="w-full min-h-[44px] py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
           >
             <Save className="w-4 h-4" />
             <span>{isSaved ? 'Goals Saved!' : 'Save Targets'}</span>

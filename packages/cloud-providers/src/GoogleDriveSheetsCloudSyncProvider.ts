@@ -40,6 +40,12 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
         documentTitle: 'Quomida Daily Logs', 
         tabName: 'daily_logs' 
       },
+      weight_logs: {
+        target: 'tabular',
+        documentKey: 'quomida_daily_logs',
+        documentTitle: 'Quomida Daily Logs',
+        tabName: 'weight_logs'
+      },
       base_ingredients: { 
         target: 'tabular', 
         documentKey: 'quomida_food_catalog', 

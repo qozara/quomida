@@ -30,7 +30,14 @@ const V0_BASELINE = {
   user_settings: {
     version: 0,
     properties: [
-      'id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros', 'active_cloud_provider', 'ai_settings', 'updatedAt'
+      'id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros', 'active_cloud_provider', 'ai_settings',
+      'target_mode', 'biometrics', 'goal_config', 'adaptive_state', 'updatedAt'
+    ]
+  },
+  weight_logs: {
+    version: 0,
+    properties: [
+      'id', 'date', 'timestamp', 'weight_kg', 'trend_weight_kg', 'note', 'updatedAt'
     ]
   }
 };
@@ -40,7 +47,8 @@ const allSchemas = [
   schemas.recipesSchema,
   schemas.portionsSchema,
   schemas.dailyLogsSchema,
-  schemas.userSettingsSchema
+  schemas.userSettingsSchema,
+  schemas.weightLogsSchema
 ];
 
 console.log('[Schema Validation] Starting build-time schema checks...');

@@ -5,7 +5,8 @@ import type {
   Portion,
   DailyLog,
   UserSettings,
-  SystemMetadata
+  SystemMetadata,
+  WeightLog
 } from '../types.js';
 
 export const baseIngredientsSchema: RxJsonSchema<BaseIngredient> = {
@@ -151,9 +152,60 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
       },
       required: ['provider']
     },
+    target_mode: {
+      type: 'string',
+      enum: ['manual', 'deterministic_seed', 'adaptive']
+    },
+    biometrics: {
+      type: 'object',
+      properties: {
+        sex: { type: 'string', enum: ['male', 'female'] },
+        birth_date: { type: 'string', maxLength: 10 },
+        height_cm: { type: 'number', minimum: 50, maximum: 260 },
+        activity_multiplier: { type: 'number', minimum: 1.2, maximum: 1.9 }
+      },
+      required: ['sex', 'birth_date', 'height_cm', 'activity_multiplier']
+    },
+    goal_config: {
+      type: 'object',
+      properties: {
+        goal_type: { type: 'string', enum: ['lose', 'maintain', 'gain'] },
+        weekly_rate_pct: { type: 'number' },
+        protein_g_per_kg: { type: 'number', minimum: 0 },
+        fat_calorie_pct: { type: 'number', minimum: 0, maximum: 1 }
+      },
+      required: ['goal_type', 'weekly_rate_pct', 'protein_g_per_kg', 'fat_calorie_pct']
+    },
+    adaptive_state: {
+      type: 'object',
+      properties: {
+        estimated_tdee: { type: 'number', minimum: 500 },
+        last_calibrated_date: { type: 'string', maxLength: 10 },
+        calibration_status: { type: 'string', enum: ['collecting_data', 'ready', 'insufficient_logs'] }
+      },
+      required: ['estimated_tdee']
+    },
     updatedAt: { type: 'number', minimum: 0 }
   },
   required: ['id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros']
+};
+
+export const weightLogsSchema: RxJsonSchema<WeightLog> = {
+  title: 'weight_logs',
+  version: 0,
+  description: 'Daily weight logs with EWMA trend weight tracking',
+  primaryKey: 'id',
+  type: 'object',
+  properties: {
+    id: { type: 'string', maxLength: 50 },
+    date: { type: 'string', maxLength: 10 },
+    timestamp: { type: 'string' },
+    weight_kg: { type: 'number', minimum: 20, maximum: 500 },
+    trend_weight_kg: { type: 'number', minimum: 20, maximum: 500 },
+    note: { type: 'string', maxLength: 250 },
+    updatedAt: { type: 'number', minimum: 0 }
+  },
+  required: ['id', 'date', 'timestamp', 'weight_kg', 'trend_weight_kg', 'updatedAt']
 };
 
 export const systemMetadataSchema: RxJsonSchema<SystemMetadata> = {

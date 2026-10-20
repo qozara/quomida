@@ -9,3 +9,4 @@ export * from './catalog/FoodCatalogManager.js';
 export * from './recipes/index.js';
 export * from './recipes/RecipeManager.js';
 export * from './logging/DailyLogManager.js';
+export * from './services/energyExpenditureEngine.js';
