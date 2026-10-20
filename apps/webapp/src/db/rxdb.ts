@@ -664,8 +664,9 @@ export class LocalDBService {
       return settings;
     }
 
+    const isCalibrated = settings.adaptive_state?.calibration_status === 'ready';
     const lastCalibrated = settings.adaptive_state?.last_calibrated_date;
-    const isDue = !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
+    const isDue = !isCalibrated || !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
 
     if (!isDue && !force) {
       return settings;
@@ -703,7 +704,7 @@ export class LocalDBService {
     const updates: Partial<UserSettings> = {
       adaptive_state: {
         estimated_tdee: result.estimated_tdee,
-        last_calibrated_date: todayDate,
+        last_calibrated_date: result.status === 'ready' ? todayDate : (lastCalibrated || todayDate),
         calibration_status: result.status
       }
     };

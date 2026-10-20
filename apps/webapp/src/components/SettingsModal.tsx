@@ -628,6 +628,7 @@ export const SettingsModal: React.FC = () => {
                       <span className="font-bold text-emerald-400">{weeklyRatePct}% / wk</span>
                     </div>
                     <input
+                      data-testid="slider-weekly-rate"
                       type="range"
                       min="-1.0"
                       max="-0.25"
@@ -646,6 +647,7 @@ export const SettingsModal: React.FC = () => {
                       <span className="font-bold text-emerald-400">+{weeklyRatePct}% / wk</span>
                     </div>
                     <input
+                      data-testid="slider-weekly-rate"
                       type="range"
                       min="0.20"
                       max="0.50"
@@ -662,6 +664,7 @@ export const SettingsModal: React.FC = () => {
               <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
                 <label className="min-h-[44px] flex items-center gap-3 cursor-pointer select-none">
                   <input
+                    data-testid="checkbox-adaptive-toggle"
                     type="checkbox"
                     checked={isAdaptive}
                     onChange={(e) => setIsAdaptive(e.target.checked)}
@@ -686,21 +689,21 @@ export const SettingsModal: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2 text-slate-300">
                   <div>
                     <span className="text-slate-400 block">{t.settings.previewBmr}:</span>
-                    <span className="font-mono font-bold text-white">{baselinePreview.bmr} kcal</span>
+                    <span data-testid="preview-bmr-value" className="font-mono font-bold text-white">{baselinePreview.bmr} kcal</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block">{t.settings.previewTdee}:</span>
-                    <span className="font-mono font-bold text-white">{baselinePreview.seed_tdee} kcal</span>
+                    <span data-testid="preview-tdee-value" className="font-mono font-bold text-white">{baselinePreview.seed_tdee} kcal</span>
                   </div>
                   <div className="col-span-2 pt-1 border-t border-emerald-500/20 flex items-baseline justify-between">
                     <div>
                       <span className="text-slate-400 block">{t.settings.previewTargetKcal}:</span>
-                      <span className="font-mono text-base font-black text-emerald-300">{baselinePreview.daily_calorie_target} kcal</span>
+                      <span data-testid="preview-target-kcal-value" className="font-mono text-base font-black text-emerald-300">{baselinePreview.daily_calorie_target} kcal</span>
                     </div>
                     <div className="text-right font-mono text-[11px] text-slate-300">
-                      P: <span className="font-bold text-rose-300">{baselinePreview.custom_macros.protein}g</span> |{' '}
-                      C: <span className="font-bold text-amber-300">{baselinePreview.custom_macros.carbs}g</span> |{' '}
-                      F: <span className="font-bold text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
+                      P: <span data-testid="preview-protein-value" className="font-bold text-rose-300">{baselinePreview.custom_macros.protein}g</span> |{' '}
+                      C: <span data-testid="preview-carbs-value" className="font-bold text-amber-300">{baselinePreview.custom_macros.carbs}g</span> |{' '}
+                      F: <span data-testid="preview-fats-value" className="font-bold text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
                     </div>
                   </div>
                 </div>

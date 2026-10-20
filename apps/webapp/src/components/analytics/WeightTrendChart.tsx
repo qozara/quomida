@@ -250,7 +250,7 @@ export const WeightTrendChart: React.FC<WeightTrendChartProps> = ({
                 strokeWidth="1.5"
               >
                 <title>
-                  {`${d.date}: ${d.rawWeightKg} ${unitLabel}${d.note ? ` - ${d.note}` : ''}`}
+                  {`${d.date}: ${d.rawWeightKg} ${unitLabel} (${trendLegendLabel}: ${d.trendWeightKg} ${unitLabel})${d.note ? ` - ${d.note}` : ''}`}
                 </title>
               </circle>
             );

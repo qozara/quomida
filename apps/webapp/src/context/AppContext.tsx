@@ -291,7 +291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Adaptive calibration check on boot
-      dbService.runAdaptiveCalibrationIfNeeded().then((calibratedSettings) => {
+      dbService.runAdaptiveCalibrationIfNeeded(selectedDate).then((calibratedSettings) => {
         if (calibratedSettings) {
           setUserSettings(calibratedSettings);
         }
@@ -383,7 +383,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Recalibrate adaptive targets when opening analytics modal
   useEffect(() => {
     if (isAnalyticsOpen && db) {
-      dbService.runAdaptiveCalibrationIfNeeded().then((calibratedSettings) => {
+      dbService.runAdaptiveCalibrationIfNeeded(selectedDate).then((calibratedSettings) => {
         if (calibratedSettings) {
           setUserSettings(calibratedSettings);
         }
@@ -391,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('[AppContext] Analytics open adaptive calibration notice:', err);
       });
     }
-  }, [isAnalyticsOpen, db, dbService]);
+  }, [isAnalyticsOpen, selectedDate, db, dbService]);
 
   // Update item counts for storage settings panel
   const updateItemCounts = useCallback(async () => {

@@ -265,9 +265,10 @@ export function previewNextTrendWeight(
  * Recalculates the EWMA trend weight for an entire array of weight logs in chronological order.
  */
 export function recalculateEWMAWeightTrend(logs: WeightLog[]): WeightLog[] {
-  if (logs.length === 0) return [];
+  const activeLogs = logs.filter((l) => !(l as any)._deleted);
+  if (activeLogs.length === 0) return [];
 
-  const sorted = [...logs].sort((a, b) => {
+  const sorted = [...activeLogs].sort((a, b) => {
     const cmp = a.date.localeCompare(b.date);
     if (cmp !== 0) return cmp;
     return (a.timestamp || '').localeCompare(b.timestamp || '');
@@ -322,8 +323,8 @@ export function solveAdaptiveTdee({
   const recentStart = addDaysToDate(today, -6);
 
   // 1. Weight Sufficiency
-  const recentWeights = weightLogs.filter((w) => w.date >= recentStart && w.date <= today);
-  const priorWeights = weightLogs.filter((w) => w.date >= windowStart && w.date <= priorEnd);
+  const recentWeights = weightLogs.filter((w) => !(w as any)._deleted && w.date >= recentStart && w.date <= today);
+  const priorWeights = weightLogs.filter((w) => !(w as any)._deleted && w.date >= windowStart && w.date <= priorEnd);
 
   const recent_weight_count = recentWeights.length;
   const prior_weight_count = priorWeights.length;
@@ -332,7 +333,7 @@ export function solveAdaptiveTdee({
   // 2. Intake Sufficiency
   const dailyCaloriesByDate = new Map<string, number>();
   for (const log of dailyLogs) {
-    if (log.date >= windowStart && log.date <= today) {
+    if (!(log as any)._deleted && log.date >= windowStart && log.date <= today) {
       const current = dailyCaloriesByDate.get(log.date) || 0;
       dailyCaloriesByDate.set(log.date, current + (log.macros?.calories || 0));
     }
@@ -359,8 +360,11 @@ export function solveAdaptiveTdee({
   // Check if gated
   if (!weight_sufficient || !intake_sufficient) {
     // If user has very few total logs, status is 'collecting_data'; if they have enough history but missed the window, 'insufficient_logs'
-    const totalWeights = weightLogs.length;
-    const isEarlyCollecting = totalWeights < 5 || dailyCaloriesByDate.size < 10;
+    const totalWeights = weightLogs.filter((w) => !(w as any)._deleted && w.date <= today).length;
+    const totalFoodDays = new Set(
+      dailyLogs.filter((l) => !(l as any)._deleted && l.date <= today).map((l) => l.date)
+    ).size;
+    const isEarlyCollecting = totalWeights < 5 || totalFoodDays < 10;
     const status: CalibrationStatus = isEarlyCollecting ? 'collecting_data' : 'insufficient_logs';
 
     return {
@@ -377,8 +381,12 @@ export function solveAdaptiveTdee({
 
   // Find start and end weight logs in W14
   const windowWeights = weightLogs
-    .filter((w) => w.date >= windowStart && w.date <= today)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .filter((w) => !(w as any)._deleted && w.date >= windowStart && w.date <= today)
+    .sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.timestamp || '').localeCompare(b.timestamp || '');
+    });
 
   const startWeightLog = windowWeights[0];
   const endWeightLog = windowWeights[windowWeights.length - 1];
@@ -442,8 +450,12 @@ export function computeWeightTrendAnalytics({
   userSettings: UserSettings;
 }): WeightTrendAnalytics {
   const eligibleWeights = weightLogs
-    .filter((w) => w.date <= today)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .filter((w) => !(w as any)._deleted && w.date <= today)
+    .sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.timestamp || '').localeCompare(b.timestamp || '');
+    });
 
   const currentLog = eligibleWeights.length > 0 ? eligibleWeights[eligibleWeights.length - 1] : undefined;
   const current_raw_weight_kg = currentLog?.weight_kg;
@@ -478,15 +490,15 @@ export function computeWeightTrendAnalytics({
   const recentStart = addDaysToDate(today, -6);
 
   const recent_weight_count_7d = weightLogs.filter(
-    (w) => w.date >= recentStart && w.date <= today
+    (w) => !(w as any)._deleted && w.date >= recentStart && w.date <= today
   ).length;
   const prior_weight_count_7d = weightLogs.filter(
-    (w) => w.date >= windowStart && w.date <= priorEnd
+    (w) => !(w as any)._deleted && w.date >= windowStart && w.date <= priorEnd
   ).length;
 
   const dailyCaloriesByDate = new Map<string, number>();
   for (const log of dailyLogs) {
-    if (log.date >= windowStart && log.date <= today) {
+    if (!(log as any)._deleted && log.date >= windowStart && log.date <= today) {
       const current = dailyCaloriesByDate.get(log.date) || 0;
       dailyCaloriesByDate.set(log.date, current + (log.macros?.calories || 0));
     }
@@ -516,7 +528,11 @@ export function computeWeightTrendAnalytics({
     calibration_status = 'ready';
     days_until_next_calibration = 0;
   } else {
-    const isEarly = weightLogs.length < 5 || dailyCaloriesByDate.size < 10;
+    const totalWeights = eligibleWeights.length;
+    const totalFoodDays = new Set(
+      dailyLogs.filter((l) => !(l as any)._deleted && l.date <= today).map((l) => l.date)
+    ).size;
+    const isEarly = totalWeights < 5 || totalFoodDays < 10;
     calibration_status = isEarly ? 'collecting_data' : 'insufficient_logs';
     const remainingIntake = Math.max(0, 10 - qualifying_intake_days_14d);
     const remainingRecentWeight = Math.max(0, 4 - recent_weight_count_7d);

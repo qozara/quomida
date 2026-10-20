@@ -295,6 +295,7 @@ export const AnalyticsModal: React.FC = () => {
 
                   <button
                     type="button"
+                    data-testid={`btn-delete-entry-${entry.date}`}
                     onClick={() => deleteWeightLog(entry.id)}
                     aria-label="Delete entry"
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
