@@ -52,6 +52,12 @@ export const DEFAULT_COLLECTION_ROUTES: Record<string, CollectionRoute> = {
     documentTitle: 'Quomida Daily Logs',
     tabName: 'daily_logs'
   },
+  weight_logs: {
+    target: 'tabular',
+    documentKey: 'logs',
+    documentTitle: 'Quomida Daily Logs',
+    tabName: 'weight_logs'
+  },
   base_ingredients: {
     target: 'tabular',
     documentKey: 'catalog',

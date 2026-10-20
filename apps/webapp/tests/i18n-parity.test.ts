@@ -26,4 +26,76 @@ describe('i18n Key Parity (en vs es)', () => {
     expect(missingInEn, 'Keys present in ES but missing in EN').toEqual([]);
     expect(enKeys).toEqual(esKeys);
   });
+
+  it('contains all required weight, analytics, and adaptive settings keys', () => {
+    const requiredKeys = [
+      'nav.analytics',
+      'weight.pillLabel',
+      'weight.trendLabel',
+      'weight.logWeightCta',
+      'weight.quickLogTitle',
+      'weight.weightKgLabel',
+      'weight.trendPreviewLabel',
+      'weight.noteLabel',
+      'weight.notePlaceholder',
+      'weight.saveWeight',
+      'weight.deleteWeight',
+      'weight.unitKg',
+      'analytics.title',
+      'analytics.subtitle',
+      'analytics.estimatedTdee',
+      'analytics.kcalPerDay',
+      'analytics.sevenDayDelta',
+      'analytics.kgPerWeek',
+      'analytics.nextCheckIn',
+      'analytics.daysRemaining',
+      'analytics.readyNow',
+      'analytics.statusReady',
+      'analytics.statusCollecting',
+      'analytics.statusInsufficient',
+      'analytics.complianceTitle',
+      'analytics.complianceRecentWeight',
+      'analytics.compliancePriorWeight',
+      'analytics.complianceFoodDays',
+      'analytics.chartTitle',
+      'analytics.rawWeightLegend',
+      'analytics.trendWeightLegend',
+      'analytics.range14d',
+      'analytics.range30d',
+      'analytics.range90d',
+      'analytics.emptyChart',
+      'analytics.recentEntries',
+      'settings.targetModeManual',
+      'settings.targetModeSmart',
+      'settings.biometricsTitle',
+      'settings.sexLabel',
+      'settings.sexMale',
+      'settings.sexFemale',
+      'settings.birthDateLabel',
+      'settings.heightCmLabel',
+      'settings.currentWeightKgLabel',
+      'settings.activityLevelLabel',
+      'settings.activitySedentary',
+      'settings.activityLight',
+      'settings.activityModerate',
+      'settings.activityVery',
+      'settings.activityExtreme',
+      'settings.goalSelectorTitle',
+      'settings.goalLose',
+      'settings.goalMaintain',
+      'settings.goalGain',
+      'settings.weeklyRateLabel',
+      'settings.adaptiveToggleLabel',
+      'settings.adaptiveToggleHint',
+      'settings.previewTitle',
+      'settings.previewBmr',
+      'settings.previewTdee',
+      'settings.previewTargetKcal'
+    ];
+
+    const enKeys = getObjectKeyPaths(en);
+    for (const key of requiredKeys) {
+      expect(enKeys).toContain(key);
+    }
+  });
 });

@@ -12,15 +12,23 @@ import {
   dailyLogsSchema,
   userSettingsSchema,
   systemMetadataSchema,
+  weightLogsSchema,
+  recalculateEWMAWeightTrend,
+  solveAdaptiveTdee,
+  daysBetween,
+  addDaysToDate,
+  calculateBaselineSeed,
+  calculateTargetsFromTdee,
   type BaseIngredient,
   type Recipe,
   type Portion,
   type DailyLog,
   type UserSettings,
-  type SystemMetadata
+  type SystemMetadata,
+  type WeightLog
 } from '@quomida/domain-core';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
-import { Observable, of } from 'rxjs';
+import { Observable, of, map } from 'rxjs';
 
 export type DBErrorType = 'SCHEMA_MISMATCH' | 'MIGRATION_FAILED' | 'CORRUPTION' | 'UNKNOWN';
 
@@ -98,6 +106,7 @@ export type QuomidaDatabaseCollections = {
   daily_logs: any;
   user_settings: any;
   system_metadata: any;
+  weight_logs: any;
 };
 
 export type QuomidaDatabase = RxDatabase<QuomidaDatabaseCollections>;
@@ -212,7 +221,8 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
       },
       daily_logs: { schema: dailyLogsSchema },
       user_settings: { schema: userSettingsSchema },
-      system_metadata: { schema: systemMetadataSchema }
+      system_metadata: { schema: systemMetadataSchema },
+      weight_logs: { schema: weightLogsSchema }
     });
   } catch (err: any) {
     try {
@@ -269,6 +279,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
         carbs: 200,
         fats: 65
       },
+      target_mode: 'manual',
       updatedAt: now
     });
   }
@@ -342,6 +353,7 @@ export class LocalDBService {
       theme: 'dark',
       daily_calorie_target: 2000,
       custom_macros: { protein: 150, carbs: 200, fats: 65 },
+      target_mode: 'manual',
       updatedAt: Date.now()
     };
     await this.db!.user_settings.insert(fallback);
@@ -351,6 +363,14 @@ export class LocalDBService {
   async saveSettings(settings: Partial<UserSettings>): Promise<void> {
     if (!this.db) await this.init();
     const current = await this.getSettings();
+    let hasChanges = false;
+    for (const [key, val] of Object.entries(settings)) {
+      if (JSON.stringify((current as any)[key]) !== JSON.stringify(val)) {
+        hasChanges = true;
+        break;
+      }
+    }
+    if (!hasChanges) return;
     const updated: UserSettings = {
       ...current,
       ...settings,
@@ -489,6 +509,18 @@ export class LocalDBService {
     return this.db.daily_logs.find({ selector: { date } }).$;
   }
 
+  observeAllDailyLogs(): Observable<DailyLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.daily_logs) {
+      return of([]);
+    }
+    return db.daily_logs.find().$.pipe(
+      map((docs: any[]) =>
+        docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      )
+    );
+  }
+
   observeIngredients(): Observable<BaseIngredient[]> {
     if (!this.db) {
       throw new Error('Database not initialized.');
@@ -510,4 +542,366 @@ export class LocalDBService {
       updatedAt: Date.now()
     });
   }
+
+  async saveWeightLog(entry: { date: string; weight_kg: number; note?: string }): Promise<WeightLog> {
+    if (!this.db) await this.init();
+    const id = `weight_${entry.date}`;
+    const now = Date.now();
+    const existingDoc = await this.db!.weight_logs.findOne(id).exec();
+    const timestamp = existingDoc?.timestamp || new Date().toISOString();
+
+    const currentDocs = await this.db!.weight_logs.find().exec();
+    const existingMap = new Map<string, WeightLog>();
+    const otherLogs: WeightLog[] = [];
+
+    for (const d of currentDocs) {
+      const json = d.toJSON() as WeightLog;
+      existingMap.set(json.id, json);
+      if (json.id !== id) {
+        otherLogs.push(json);
+      }
+    }
+
+    const pendingLog: WeightLog = {
+      id,
+      date: entry.date,
+      timestamp,
+      weight_kg: entry.weight_kg,
+      trend_weight_kg: entry.weight_kg,
+      ...(entry.note !== undefined ? { note: entry.note } : (existingDoc?.note ? { note: existingDoc.note } : {})),
+      updatedAt: now
+    };
+
+    const recomputedLogs = recalculateEWMAWeightTrend([...otherLogs, pendingLog]);
+    const savedLog = recomputedLogs.find((l) => l.id === id)!;
+
+    const toUpsert: WeightLog[] = [];
+    for (const log of recomputedLogs) {
+      if (log.id === id) {
+        toUpsert.push(log);
+      } else {
+        const prev = existingMap.get(log.id);
+        if (!prev || prev.trend_weight_kg !== log.trend_weight_kg) {
+          toUpsert.push({
+            ...log,
+            updatedAt: now
+          });
+        }
+      }
+    }
+
+    if (toUpsert.length > 0) {
+      await this.db!.weight_logs.bulkUpsert(toUpsert);
+    }
+
+    return savedLog;
+  }
+
+  async deleteWeightLog(idOrDate: string): Promise<void> {
+    if (!this.db) await this.init();
+    const id = idOrDate.startsWith('weight_') ? idOrDate : `weight_${idOrDate}`;
+    const doc = await this.db!.weight_logs.findOne(id).exec();
+    const now = Date.now();
+
+    if (doc) {
+      const patchedDoc = await doc.patch({ updatedAt: now });
+      await patchedDoc.remove();
+    }
+
+    const remainingDocs = await this.db!.weight_logs.find().exec();
+    const remainingLogs: WeightLog[] = remainingDocs.map((d: any) => d.toJSON() as WeightLog);
+    if (remainingLogs.length > 0) {
+      const recomputed = recalculateEWMAWeightTrend(remainingLogs);
+      const existingMap = new Map<string, WeightLog>(remainingDocs.map((d: any) => [d.id, d.toJSON() as WeightLog]));
+      const toUpsert: WeightLog[] = [];
+
+      for (const log of recomputed) {
+        const prev = existingMap.get(log.id);
+        if (!prev || prev.trend_weight_kg !== log.trend_weight_kg) {
+          toUpsert.push({
+            ...log,
+            updatedAt: now
+          });
+        }
+      }
+
+      if (toUpsert.length > 0) {
+        await this.db!.weight_logs.bulkUpsert(toUpsert);
+      }
+    }
+  }
+
+  async getWeightLogs(): Promise<WeightLog[]> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.weight_logs.find().exec();
+    return docs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+      .sort((a: WeightLog, b: WeightLog) => {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.timestamp || '').localeCompare(b.timestamp || '');
+      });
+  }
+
+  observeWeightLogs(): Observable<WeightLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.weight_logs) {
+      return of([]);
+    }
+    return db.weight_logs.find().$.pipe(
+      map((docs: any[]) =>
+        docs
+          .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+          .sort((a: WeightLog, b: WeightLog) => {
+            const cmp = a.date.localeCompare(b.date);
+            if (cmp !== 0) return cmp;
+            return (a.timestamp || '').localeCompare(b.timestamp || '');
+          })
+      )
+    );
+  }
+
+  async getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.daily_logs.find({
+      selector: {
+        date: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      }
+    }).exec();
+    return docs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      .sort((a: DailyLog, b: DailyLog) => a.date.localeCompare(b.date));
+  }
+
+  async getLatestDailyLogDate(): Promise<string | null> {
+    if (!this.db) await this.init();
+    const docs = await this.db!.daily_logs.find().exec();
+    if (!docs || docs.length === 0) return null;
+    let maxDate = '';
+    for (const doc of docs) {
+      if (doc.date && doc.date > maxDate) {
+        maxDate = doc.date;
+      }
+    }
+    return maxDate || null;
+  }
+
+  async runAdaptiveCalibrationIfNeeded(today?: string, force?: boolean): Promise<UserSettings> {
+    if (!this.db) await this.init();
+    const result = await runAdaptiveCalibrationOnDatabase(this.db!, today, force);
+    return result || (await this.getSettings());
+  }
+}
+
+export async function runAdaptiveCalibrationOnDatabase(
+  db: QuomidaDatabase,
+  today?: string,
+  force?: boolean
+): Promise<UserSettings | null> {
+  if (!db || !db.collections.user_settings) return null;
+
+  const settingsDoc = await db.collections.user_settings.findOne('global_settings').exec();
+  if (!settingsDoc) return null;
+  const settings: UserSettings = settingsDoc.toJSON ? settingsDoc.toJSON() : settingsDoc;
+
+  if (settings.target_mode !== 'adaptive' && settings.target_mode !== 'deterministic_seed') {
+    return settings;
+  }
+
+  if (!settings.biometrics || !settings.goal_config) {
+    return settings;
+  }
+
+  let weightLogs: WeightLog[] = [];
+  if (db.collections.weight_logs) {
+    const weightDocs = await db.collections.weight_logs.find().exec();
+    weightLogs = weightDocs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as WeightLog)
+      .sort((a: WeightLog, b: WeightLog) => {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.timestamp || '').localeCompare(b.timestamp || '');
+      });
+  }
+
+  let latestDailyLogDate: string | null = null;
+  if (db.collections.daily_logs) {
+    const dailyDocs = await db.collections.daily_logs.find().exec();
+    let maxDate = '';
+    for (const doc of dailyDocs) {
+      if (doc.date && doc.date > maxDate) maxDate = doc.date;
+    }
+    latestDailyLogDate = maxDate || null;
+  }
+
+  const maxWeightDate = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].date : undefined;
+  const baseDate = today || new Date().toISOString().slice(0, 10);
+  const candidates = [
+    baseDate,
+    maxWeightDate,
+    latestDailyLogDate,
+    settings.adaptive_state?.last_calibrated_date
+  ].filter((d): d is string => typeof d === 'string' && d.length > 0);
+  const todayDate: string = candidates.reduce((max, d) => (d > max ? d : max), baseDate);
+
+  const now = Date.now();
+
+  // Handle deterministic_seed mode: update targets based on latest weight if available
+  if (settings.target_mode === 'deterministic_seed') {
+    if (weightLogs.length > 0) {
+      const latestWeight = weightLogs[weightLogs.length - 1];
+      const seed = calculateBaselineSeed({
+        biometrics: settings.biometrics,
+        goalConfig: settings.goal_config,
+        currentWeightKg: latestWeight.weight_kg,
+        referenceDate: todayDate
+      });
+      const updates: Partial<UserSettings> = {
+        daily_calorie_target: seed.daily_calorie_target,
+        custom_macros: seed.custom_macros
+      };
+      if (settings.adaptive_state) {
+        updates.adaptive_state = {
+          ...settings.adaptive_state,
+          estimated_tdee: seed.seed_tdee,
+          prior_tdee: seed.seed_tdee
+        };
+      }
+      const hasCalTargetChanged = updates.daily_calorie_target !== settings.daily_calorie_target;
+      const hasMacroChanged = JSON.stringify(updates.custom_macros) !== JSON.stringify(settings.custom_macros);
+      const hasTdeeChanged = settings.adaptive_state?.estimated_tdee !== seed.seed_tdee;
+      if (!hasCalTargetChanged && !hasMacroChanged && !hasTdeeChanged) {
+        return settings;
+      }
+      const updated: UserSettings = {
+        ...settings,
+        ...updates,
+        updatedAt: now
+      };
+      await db.collections.user_settings.upsert(updated);
+      return updated;
+    }
+    return settings;
+  }
+
+  const isCalibrated = settings.adaptive_state?.calibration_status === 'ready';
+  const lastCalibrated = settings.adaptive_state?.last_calibrated_date;
+  const isDue = !isCalibrated || !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
+
+  if (!isDue && !force) {
+    return settings;
+  }
+
+  const windowStart = addDaysToDate(todayDate, -13);
+  let dailyLogs: DailyLog[] = [];
+  if (db.collections.daily_logs) {
+    const rangeDocs = await db.collections.daily_logs.find({
+      selector: {
+        date: {
+          $gte: windowStart,
+          $lte: todayDate
+        }
+      }
+    }).exec();
+    dailyLogs = rangeDocs
+      .map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      .sort((a: DailyLog, b: DailyLog) => a.date.localeCompare(b.date));
+  }
+
+  let anchorTdee: number;
+  const isSameCycle = isCalibrated && !!lastCalibrated && daysBetween(lastCalibrated, todayDate) < 7;
+
+  if (isSameCycle && settings.adaptive_state?.prior_tdee) {
+    anchorTdee = settings.adaptive_state.prior_tdee;
+  } else if (isCalibrated && settings.adaptive_state?.estimated_tdee) {
+    anchorTdee = settings.adaptive_state.estimated_tdee;
+  } else if (settings.adaptive_state?.prior_tdee) {
+    anchorTdee = settings.adaptive_state.prior_tdee;
+  } else if (settings.adaptive_state?.estimated_tdee) {
+    anchorTdee = settings.adaptive_state.estimated_tdee;
+  } else if (weightLogs.length > 0) {
+    const latestWeight = weightLogs[weightLogs.length - 1];
+    const seed = calculateBaselineSeed({
+      biometrics: settings.biometrics,
+      goalConfig: settings.goal_config,
+      currentWeightKg: latestWeight.weight_kg,
+      referenceDate: todayDate
+    });
+    anchorTdee = seed.seed_tdee;
+  } else {
+    anchorTdee = settings.daily_calorie_target || 2000;
+  }
+
+  const result = solveAdaptiveTdee({
+    today: todayDate,
+    previousEstimatedTdee: anchorTdee,
+    sex: settings.biometrics.sex,
+    goalConfig: settings.goal_config,
+    weightLogs,
+    dailyLogs
+  });
+
+  const updates: Partial<UserSettings> = {};
+
+  if (result.status === 'ready') {
+    const effectiveCalibratedDate = isSameCycle && lastCalibrated ? lastCalibrated : todayDate;
+    updates.adaptive_state = {
+      estimated_tdee: result.estimated_tdee,
+      prior_tdee: anchorTdee,
+      last_calibrated_date: effectiveCalibratedDate,
+      calibration_status: 'ready'
+    };
+    if (result.recommended_targets) {
+      updates.daily_calorie_target = result.recommended_targets.daily_calorie_target;
+      updates.custom_macros = result.recommended_targets.custom_macros;
+    }
+  } else {
+    updates.adaptive_state = {
+      estimated_tdee: anchorTdee,
+      prior_tdee: anchorTdee,
+      last_calibrated_date: lastCalibrated,
+      calibration_status: result.status
+    };
+    const latestTrendWeight = weightLogs.length > 0
+      ? weightLogs[weightLogs.length - 1].trend_weight_kg
+      : 75;
+    const fallbackTargets = calculateTargetsFromTdee({
+      tdee: anchorTdee,
+      weightKg: latestTrendWeight,
+      sex: settings.biometrics.sex,
+      goalConfig: settings.goal_config
+    });
+    updates.daily_calorie_target = fallbackTargets.daily_calorie_target;
+    updates.custom_macros = fallbackTargets.custom_macros;
+  }
+
+  const hasTargetChanged =
+    updates.daily_calorie_target !== undefined &&
+    updates.daily_calorie_target !== settings.daily_calorie_target;
+  const hasStatusChanged =
+    updates.adaptive_state?.calibration_status !== settings.adaptive_state?.calibration_status;
+  const hasTdeeChanged =
+    updates.adaptive_state?.estimated_tdee !== settings.adaptive_state?.estimated_tdee;
+  const hasCalDateChanged =
+    updates.adaptive_state?.last_calibrated_date !== settings.adaptive_state?.last_calibrated_date;
+  const hasMacrosChanged =
+    JSON.stringify(updates.custom_macros) !== JSON.stringify(settings.custom_macros);
+
+  const hasChanged =
+    hasTargetChanged || hasStatusChanged || hasTdeeChanged || hasCalDateChanged || hasMacrosChanged;
+
+  if (!hasChanged) {
+    return settings;
+  }
+
+  const updated: UserSettings = {
+    ...settings,
+    ...updates,
+    updatedAt: now
+  };
+  await db.collections.user_settings.upsert(updated);
+  return updated;
 }

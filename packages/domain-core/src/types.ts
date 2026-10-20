@@ -118,6 +118,42 @@ export interface UserAiSettings {
   ollama_model?: string;
 }
 
+export type TargetMode = 'manual' | 'deterministic_seed' | 'adaptive';
+export type UserSex = 'male' | 'female';
+export type GoalType = 'lose' | 'maintain' | 'gain';
+export type CalibrationStatus = 'collecting_data' | 'ready' | 'insufficient_logs';
+
+export interface UserBiometrics {
+  sex: UserSex;
+  birth_date: string;
+  height_cm: number;
+  activity_multiplier: number;
+}
+
+export interface UserGoalConfig {
+  goal_type: GoalType;
+  weekly_rate_pct: number;
+  protein_g_per_kg: number;
+  fat_calorie_pct: number;
+}
+
+export interface UserAdaptiveState {
+  estimated_tdee: number;
+  prior_tdee?: number;
+  last_calibrated_date?: string;
+  calibration_status?: CalibrationStatus;
+}
+
+export interface WeightLog {
+  id: string; // 'weight_YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
+  timestamp: string; // ISO 8601 UTC
+  weight_kg: number; // min 20, max 500
+  trend_weight_kg: number; // min 20, max 500
+  note?: string; // maxLength 250
+  updatedAt: number; // min 0
+}
+
 export interface UserSettings {
   id: string; // 'global_settings'
   locale: string; // e.g., 'es-AR', 'en-US'
@@ -133,6 +169,10 @@ export interface UserSettings {
     credentials?: any;
   };
   ai_settings?: UserAiSettings;
+  target_mode?: TargetMode;
+  biometrics?: UserBiometrics;
+  goal_config?: UserGoalConfig;
+  adaptive_state?: UserAdaptiveState;
   updatedAt?: number;
 }
 

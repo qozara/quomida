@@ -808,8 +808,10 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fireEvent.click(btnModeBatch!);
 
     // Primary button should now show "Registrar 2 Alimentos en Diario"
-    expect(primaryBtn?.textContent).toContain('Registrar 2 Alimentos en Diario');
-    expect(primaryBtn?.textContent).not.toContain('Guardar Receta y Registrar Plato');
+    await waitFor(() => {
+      expect(document.getElementById('btn-log-batch-ai')?.textContent).toContain('Registrar 2 Alimentos en Diario');
+      expect(document.getElementById('btn-log-batch-ai')?.textContent).not.toContain('Guardar Receta y Registrar Plato');
+    });
 
     // Click primary button
     fireEvent.click(primaryBtn!);

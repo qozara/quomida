@@ -8,6 +8,9 @@ import { MealSection } from './components/MealSection.js';
 import { PortionBottomSheet } from './components/PortionBottomSheet.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { CatalogManager } from './components/CatalogManager.js';
+import { DashboardWeightPill } from './components/DashboardWeightPill.js';
+import { WeightQuickLogModal } from './components/WeightQuickLogModal.js';
+import { AnalyticsModal } from './components/analytics/AnalyticsModal.js';
 import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
@@ -110,6 +113,9 @@ const DashboardContent: React.FC = () => {
         {/* Dynamic Macro Summary Rings */}
         <MacroRings />
 
+        {/* Quick Weight Entry Widget */}
+        <DashboardWeightPill />
+
         {/* Search & Natural Language Input Switcher */}
         <FoodLogger onSelectIngredient={handleOpenPortionModal} />
 
@@ -157,6 +163,8 @@ const DashboardContent: React.FC = () => {
       />
       <SettingsModal />
       <CatalogManager />
+      <WeightQuickLogModal />
+      <AnalyticsModal />
       <StorageSettingsPanel
         isOpen={isStorageSettingsOpen}
         onClose={() => setIsStorageSettingsOpen(false)}

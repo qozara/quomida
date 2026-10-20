@@ -293,8 +293,72 @@ export const portionsSerializer: CollectionSerializer = {
   }
 };
 
+export const weightLogHeaders = [
+  'id',
+  'date',
+  'timestamp',
+  'weight_kg',
+  'trend_weight_kg',
+  'note',
+  'updatedAt',
+  '_deleted'
+];
+
+export const weightLogsSerializer: CollectionSerializer = {
+  headers: weightLogHeaders,
+  docToRow(doc: Record<string, any>): TabularRow {
+    return {
+      id: doc.id,
+      updatedAt: doc.updatedAt,
+      _deleted: doc._deleted,
+      values: [
+        escapeFormulaInjection(doc.id),
+        doc.date,
+        doc.timestamp,
+        parseNumber(doc.weight_kg, 0),
+        parseNumber(doc.trend_weight_kg, 0),
+        escapeFormulaInjection(sanitizeString(doc.note ?? '')),
+        doc.updatedAt ?? Date.now(),
+        Boolean(doc._deleted)
+      ]
+    };
+  },
+  rowToDoc(row: TabularRow): Record<string, any> {
+    const getField = createFieldGetter(row);
+    const idVal = getField('id', 0);
+    const dateVal = getField('date', 1);
+    const timestampVal = getField('timestamp', 2);
+    const weightVal = getField('weight_kg', 3);
+    const trendWeightVal = getField('trend_weight_kg', 4);
+    const noteVal = getField('note', 5);
+    const updatedAtVal = getField('updatedAt', 6);
+    const deletedVal = getField('_deleted', 7);
+
+    const doc: Record<string, any> = {
+      id: sanitizeString(idVal || row.id),
+      date: String(dateVal || ''),
+      timestamp: String(timestampVal || ''),
+      weight_kg: parseNumber(weightVal, 0),
+      trend_weight_kg: parseNumber(trendWeightVal, 0)
+    };
+    if (noteVal !== undefined && noteVal !== null && noteVal !== '') {
+      doc.note = sanitizeString(noteVal);
+    }
+    if (updatedAtVal !== undefined && updatedAtVal !== null && updatedAtVal !== '') {
+      doc.updatedAt = Number(updatedAtVal);
+    } else if (row.updatedAt) {
+      doc.updatedAt = row.updatedAt;
+    }
+    if (deletedVal !== undefined && deletedVal !== null && deletedVal !== '') {
+      doc._deleted = parseBool(deletedVal);
+    }
+    return doc;
+  }
+};
+
 export const collectionSerializers: Record<string, CollectionSerializer> = {
   daily_logs: dailyLogsSerializer,
+  weight_logs: weightLogsSerializer,
   base_ingredients: baseIngredientsSerializer,
   recipes: recipesSerializer,
   portions: portionsSerializer

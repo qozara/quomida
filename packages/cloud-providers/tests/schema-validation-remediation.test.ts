@@ -327,6 +327,7 @@ describe('Google ValidationService & Repair Strategy', () => {
           return new Response(JSON.stringify({
             sheets: [
               { properties: { title: 'daily_logs', sheetId: 0 } },
+              { properties: { title: 'weight_logs', sheetId: 2 } },
               { properties: { title: '_migrations', sheetId: 1 } }
             ]
           }), { status: 200 });
@@ -345,12 +346,17 @@ describe('Google ValidationService & Repair Strategy', () => {
         }
 
         if (url.includes('/values:batchGet')) {
-          const allHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns.map(c => c.name);
+          const dailyHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns.map(c => c.name);
+          const weightHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[1].columns.map(c => c.name);
           return new Response(JSON.stringify({
             valueRanges: [
               {
                 range: 'daily_logs!1:1',
-                values: [allHeaders]
+                values: [dailyHeaders]
+              },
+              {
+                range: 'weight_logs!1:1',
+                values: [weightHeaders]
               }
             ]
           }), { status: 200 });

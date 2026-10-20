@@ -12,6 +12,7 @@ import {
   type DailyLog,
   type UserSettings,
   type MealType,
+  type WeightLog,
   RecipeManager,
   calculateItemMacros,
   convertPortionToGrams,
@@ -43,6 +44,9 @@ interface AppContextType {
   recipes: Recipe[];
   recipeFoods: RecipeFoodItem[];
   dailyLogs: DailyLog[];
+  weightLogs: WeightLog[];
+  logWeight: (date: string, weightKg: number, note?: string) => Promise<void>;
+  deleteWeightLog: (idOrDate: string) => Promise<void>;
   syncStatus: SyncStatus;
   uxSyncState: UXSyncState;
   activeProvider: CloudSyncProvider | null;
@@ -81,6 +85,10 @@ interface AppContextType {
   setIsCatalogOpen: (open: boolean) => void;
   isStorageSettingsOpen: boolean;
   setIsStorageSettingsOpen: (open: boolean) => void;
+  isAnalyticsOpen: boolean;
+  setIsAnalyticsOpen: (open: boolean) => void;
+  isWeightModalOpen: boolean;
+  setIsWeightModalOpen: (open: boolean) => void;
   dbInitError: QuomidaDBError | null;
   dbVersion: number;
   clearLocalDatabase: () => Promise<void>;
@@ -97,7 +105,8 @@ const defaultSettings: UserSettings = {
   locale: 'es-AR',
   theme: 'dark',
   daily_calorie_target: 2000,
-  custom_macros: { protein: 150, carbs: 200, fats: 65 }
+  custom_macros: { protein: 150, carbs: 200, fats: 65 },
+  target_mode: 'manual'
 };
 
 export async function runWithSyncLock<T>(
@@ -145,12 +154,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return recipes.map(r => recipeManager.toFoodItem(r));
   }, [recipes, recipeManager]);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(new Date().toLocaleTimeString());
   const [itemCounts, setItemCounts] = useState<{ logs: number; customFoods: number }>({ logs: 0, customFoods: 0 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
@@ -260,6 +272,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let subLogs: any = null;
     let subIngs: any = null;
     let subRecipes: any = null;
+    let subWeightLogs: any = null;
+    let subSettings: any = null;
 
     dbService.init().then(async (rxdb) => {
       setDb(rxdb);
@@ -277,6 +291,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (settings.locale?.startsWith('en')) setLocaleState('en');
       if (settings.theme) setThemeState(settings.theme as any);
 
+      // Adaptive calibration check on boot
+      dbService.runAdaptiveCalibrationIfNeeded(selectedDate).then((calibratedSettings) => {
+        if (calibratedSettings) {
+          setUserSettings(calibratedSettings);
+        }
+      }).catch((err) => {
+        console.warn('[AppContext] Boot adaptive calibration notice:', err);
+      });
+
       // Check if we need to auto-connect
       const activeProviderSettings = settings.active_cloud_provider;
       if (activeProviderSettings) {
@@ -292,6 +315,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setSyncStatus('syncing');
                 try {
                   await syncDatabaseWithRemote(rxdb, newAdapter);
+                  await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+                  const updated = await dbService.getSettings();
+                  setUserSettings(updated);
                 } finally {
                   setSyncStatus(newAdapter.getStatus());
                   setLastSyncedTime(newAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
@@ -319,6 +345,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subLogs = dbService.observeLogsByDate(selectedDate).subscribe((docs: any[]) => {
         setDailyLogs(docs.map((d) => (d.toJSON ? d.toJSON() : d)));
       });
+
+      // Subscribe to Weight Logs
+      subWeightLogs = dbService.observeWeightLogs().subscribe((docs: WeightLog[]) => {
+        setWeightLogs(docs);
+      });
+
+      // Subscribe to user_settings changes (e.g. from background sync or adaptive calibration)
+      if (rxdb.user_settings) {
+        const settingsDoc = rxdb.user_settings.findOne('global_settings');
+        if (settingsDoc) {
+          subSettings = settingsDoc.$.subscribe((doc: any) => {
+            if (doc) {
+              const json: UserSettings = doc.toJSON ? doc.toJSON() : doc;
+              setUserSettings((prev) => {
+                if (prev.updatedAt === json.updatedAt) return prev;
+                return json;
+              });
+              if (json.locale?.startsWith('en')) {
+                setLocaleState((prev) => (prev !== 'en' ? 'en' : prev));
+              } else if (json.locale?.startsWith('es')) {
+                setLocaleState((prev) => (prev !== 'es' ? 'es' : prev));
+              }
+              if (json.theme) {
+                setThemeState((prev) => (prev !== json.theme ? json.theme as any : prev));
+              }
+            }
+          });
+        }
+      }
 
       // Background asynchronous catalog hydration on boot [APP-207]
       dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
@@ -349,8 +404,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subLogs?.unsubscribe();
       subIngs?.unsubscribe();
       subRecipes?.unsubscribe();
+      subWeightLogs?.unsubscribe();
+      subSettings?.unsubscribe();
     };
   }, [selectedDate, dbService]);
+
+  // Recalibrate adaptive targets when opening analytics modal using effective latest horizon
+  useEffect(() => {
+    if (isAnalyticsOpen && db) {
+      const maxWeightDate = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].date : undefined;
+      const effectiveDate = [
+        selectedDate,
+        maxWeightDate,
+        userSettings.adaptive_state?.last_calibrated_date
+      ].filter(Boolean).reduce((max, d) => (d! > max! ? d : max), selectedDate);
+
+      dbService.runAdaptiveCalibrationIfNeeded(effectiveDate).then((calibratedSettings) => {
+        if (calibratedSettings) {
+          setUserSettings(calibratedSettings);
+        }
+      }).catch((err) => {
+        console.warn('[AppContext] Analytics open adaptive calibration notice:', err);
+      });
+    }
+  }, [isAnalyticsOpen, selectedDate, weightLogs, userSettings.adaptive_state?.last_calibrated_date, db, dbService]);
 
   // Update item counts for storage settings panel
   const updateItemCounts = useCallback(async () => {
@@ -378,15 +455,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [locale, theme]);
 
-  const setLocale = (lang: LocaleKey) => {
-    setLocaleState(lang);
-    dbService.saveSettings({ locale: lang === 'es' ? 'es-AR' : 'en-US' });
-  };
+  const setLocale = useCallback((lang: LocaleKey) => {
+    setLocaleState((prev) => (prev !== lang ? lang : prev));
+    dbService.getSettings().then((current) => {
+      const targetLocale = lang === 'es' ? 'es-AR' : 'en-US';
+      if (current.locale !== targetLocale) {
+        dbService.saveSettings({ locale: targetLocale });
+      }
+    });
+  }, [dbService]);
 
-  const setTheme = (t: 'dark' | 'light' | 'system') => {
-    setThemeState(t);
-    dbService.saveSettings({ theme: t });
-  };
+  const setTheme = useCallback((t: 'dark' | 'light' | 'system') => {
+    setThemeState((prev) => (prev !== t ? t : prev));
+    dbService.getSettings().then((current) => {
+      if (current.theme !== t) {
+        dbService.saveSettings({ theme: t });
+      }
+    });
+  }, [dbService]);
 
   const updateUserSettings = async (newSettings: Partial<UserSettings>) => {
     await dbService.saveSettings(newSettings);
@@ -405,13 +491,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         if (db) {
           await syncDatabaseWithRemote(db, activeProvider);
+          await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+          const updated = await dbService.getSettings();
+          setUserSettings(updated);
         }
       } finally {
         setSyncStatus(activeProvider.getStatus());
         setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
       }
     }, syncLock);
-  }, [activeProvider, isOnline, db]);
+  }, [activeProvider, isOnline, db, dbService, selectedDate]);
 
 
   // Transparent Background Sync: Polling and Visibility focus
@@ -511,6 +600,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSyncStatus('syncing');
         try {
           await syncDatabaseWithRemote(db, adapter);
+          await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+          const updated = await dbService.getSettings();
+          setUserSettings(updated);
         } finally {
           setSyncStatus(adapter.getStatus());
           setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
@@ -566,6 +658,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       portion_name: portionName,
       macros: macrosSnapshot
     });
+
+    try {
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      if (updatedSettings) {
+        setUserSettings(updatedSettings);
+      }
+    } catch (err) {
+      console.warn('[AppContext] Adaptive recalculation notice after logFoodItem:', err);
+    }
 
     // Background sync - do not await
     forceSync().catch(console.error);
@@ -625,11 +726,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    try {
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      if (updatedSettings) {
+        setUserSettings(updatedSettings);
+      }
+    } catch (err) {
+      console.warn('[AppContext] Adaptive recalculation notice after logBatchFoodItems:', err);
+    }
+
     forceSync().catch(console.error);
   };
 
   const deleteLogItem = async (id: string) => {
     await dbService.deleteLogItem(id);
+    try {
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      if (updatedSettings) {
+        setUserSettings(updatedSettings);
+      }
+    } catch (err) {
+      console.warn('[AppContext] Adaptive recalculation notice after deleteLogItem:', err);
+    }
+    forceSync().catch(console.error);
+  };
+
+  const logWeight = async (date: string, weightKg: number, note?: string) => {
+    await dbService.saveWeightLog({ date, weight_kg: weightKg, note });
+    try {
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(date, true);
+      if (updatedSettings) {
+        setUserSettings(updatedSettings);
+      }
+    } catch (err) {
+      console.warn('[AppContext] Adaptive recalculation notice after logWeight:', err);
+    }
+    forceSync().catch(console.error);
+  };
+
+  const deleteWeightLog = async (idOrDate: string) => {
+    await dbService.deleteWeightLog(idOrDate);
+    try {
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      if (updatedSettings) {
+        setUserSettings(updatedSettings);
+      }
+    } catch (err) {
+      console.warn('[AppContext] Adaptive recalculation notice after deleteWeightLog:', err);
+    }
     forceSync().catch(console.error);
   };
 
@@ -686,6 +830,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recipes,
         recipeFoods,
         dailyLogs,
+        weightLogs,
+        logWeight,
+        deleteWeightLog,
         syncStatus,
         uxSyncState,
         activeProvider,
@@ -711,6 +858,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsCatalogOpen,
         isStorageSettingsOpen,
         setIsStorageSettingsOpen,
+        isAnalyticsOpen,
+        setIsAnalyticsOpen,
+        isWeightModalOpen,
+        setIsWeightModalOpen,
         dbInitError,
         dbVersion: dailyLogsSchema.version,
         clearLocalDatabase: clearDatabase,
