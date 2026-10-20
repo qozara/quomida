@@ -13,17 +13,24 @@ import { WeightQuickLogModal } from './components/WeightQuickLogModal.js';
 import { AnalyticsModal } from './components/analytics/AnalyticsModal.js';
 import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
+import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
+import { AddFoodModal } from './components/AddFoodModal.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
 import { Plus, Cloud, X } from 'lucide-react';
 
 const DashboardContent: React.FC = () => {
   const {
     t,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    isCatalogOpen,
+    setIsCatalogOpen,
+    isAnalyticsOpen,
+    setIsAnalyticsOpen,
     isStorageSettingsOpen,
     setIsStorageSettingsOpen,
     dbInitError,
     dbVersion,
-    clearLocalDatabase,
     uxSyncState,
     itemCounts,
     activeProvider,
@@ -32,6 +39,7 @@ const DashboardContent: React.FC = () => {
   const [selectedIngredient, setSelectedIngredient] = useState<FoodItem | BaseIngredient | null>(null);
 
   const [targetMealType, setTargetMealType] = useState<MealType>('meal_lunch');
+  const [isAddFoodModalOpen, setIsAddFoodModalOpen] = useState(false);
 
   const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
     return localStorage.getItem('quomida_onboarding_dismissed') === 'true';
@@ -64,16 +72,43 @@ const DashboardContent: React.FC = () => {
     setTargetMealType(mealType);
   };
 
+  const handleOpenAddModal = (mealType: MealType) => {
+    setTargetMealType(mealType);
+    setIsAddFoodModalOpen(true);
+  };
+
   const handleFabClick = () => {
-    const searchInput = document.getElementById('input-food-search');
-    if (searchInput) {
-      searchInput.focus();
-      searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setIsAddFoodModalOpen(true);
+  };
+
+  // 4-Tab Bottom Navigation State
+  let activeTab: NavTab = 'diary';
+  if (isSettingsOpen) activeTab = 'settings';
+  else if (isCatalogOpen) activeTab = 'catalog';
+  else if (isAnalyticsOpen) activeTab = 'analytics';
+
+  const handleSelectTab = (tab: NavTab) => {
+    if (tab === 'diary') {
+      setIsSettingsOpen(false);
+      setIsCatalogOpen(false);
+      setIsAnalyticsOpen(false);
+    } else if (tab === 'analytics') {
+      setIsSettingsOpen(false);
+      setIsCatalogOpen(false);
+      setIsAnalyticsOpen(true);
+    } else if (tab === 'catalog') {
+      setIsSettingsOpen(false);
+      setIsAnalyticsOpen(false);
+      setIsCatalogOpen(true);
+    } else if (tab === 'settings') {
+      setIsCatalogOpen(false);
+      setIsAnalyticsOpen(false);
+      setIsSettingsOpen(true);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
       {/* Top Fixed Header */}
       <Header />
 
@@ -125,21 +160,25 @@ const DashboardContent: React.FC = () => {
             mealType="meal_breakfast"
             title={t.dashboard.meals.breakfast}
             onOpenPortionModal={handleOpenPortionModal}
+            onOpenAddModal={handleOpenAddModal}
           />
           <MealSection
             mealType="meal_lunch"
             title={t.dashboard.meals.lunch}
             onOpenPortionModal={handleOpenPortionModal}
+            onOpenAddModal={handleOpenAddModal}
           />
           <MealSection
             mealType="meal_dinner"
             title={t.dashboard.meals.dinner}
             onOpenPortionModal={handleOpenPortionModal}
+            onOpenAddModal={handleOpenAddModal}
           />
           <MealSection
             mealType="meal_snack"
             title={t.dashboard.meals.snack}
             onOpenPortionModal={handleOpenPortionModal}
+            onOpenAddModal={handleOpenAddModal}
           />
         </div>
 
@@ -150,12 +189,21 @@ const DashboardContent: React.FC = () => {
         onClick={handleFabClick}
         id="fab-add-food"
         aria-label="Add Food Log"
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white rounded-full shadow-2xl shadow-emerald-950/80 flex items-center justify-center transition-all duration-200 border border-emerald-400/40"
+        className="fixed bottom-20 right-5 z-20 w-14 h-14 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white rounded-full shadow-2xl shadow-emerald-950/80 flex items-center justify-center transition-all duration-200 border border-emerald-400/40"
       >
         <Plus className="w-7 h-7" />
       </button>
 
+      {/* 4-Tab Bottom Navigation Bar */}
+      <BottomNav activeTab={activeTab} onSelectTab={handleSelectTab} />
+
       {/* Modals & Bottom Sheets */}
+      <AddFoodModal
+        isOpen={isAddFoodModalOpen}
+        targetMealType={targetMealType}
+        onClose={() => setIsAddFoodModalOpen(false)}
+        onSelectIngredient={handleOpenPortionModal}
+      />
       <PortionBottomSheet
         ingredient={selectedIngredient}
         defaultMealType={targetMealType}
