@@ -10,3 +10,7 @@ export * from './recipes/index.js';
 export * from './recipes/RecipeManager.js';
 export * from './logging/DailyLogManager.js';
 export * from './services/energyExpenditureEngine.js';
+export * from './parser/types.js';
+export * from './parser/StandardMealParser.js';
+export * from './parser/locales/es.js';
+export * from './parser/locales/en.js';

@@ -297,6 +297,13 @@
     "title": "Inteligencia y Edge AI",
     "description": "Configura el registro de comidas en lenguaje natural con la IA perimetral de Qozara Intelligence o tu modelo privado.",
     "providerLabel": "Proveedor de IA Activo",
+    "enableAi": "Habilitar funciones de IA",
+    "enableAiDesc": "Permite a la IA estimar ingredientes y recetas de platos no encontrados en el catálogo. Cuando está desactivado, el registro funciona 100% local.",
+    "decomposingDish": "Estimando ingredientes con IA...",
+    "decomposedRecipeBadge": "Receta sugerida por IA",
+    "decomposedRecipeNotice": "Este plato no se encontró en el catálogo. La IA estimó sus ingredientes típicos.",
+    "saveToMyRecipes": "Guardar en mis recetas",
+    "discardAiRecipe": "Descartar receta sugerida",
     "providers": {
       "qozaraIntelligence": "Qozara Intelligence (Predeterminado)",
       "qozaraIntelligenceDesc": "IA perimetral gestionada impulsada por Gemini 2.0 Flash (5 sol/día anónimo, 20 sol/día con cuenta Google).",

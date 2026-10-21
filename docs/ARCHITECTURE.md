@@ -160,3 +160,24 @@ sequenceDiagram
 - **Heartbeat & Network Detection**: `AppContext` listens to browser `online`/`offline` window events and executes a periodic 30-second `HEAD /` ping to verify real server reachability. Updates status reactively to `'disconnected'` on connection drop or failed ping.
 - **WCAG 2.2 Accessibility**: Header status badge uses an `sr-only` element inside an `aria-live="polite"` region to announce connectivity state changes to screen readers in English and Spanish.
 
+---
+
+## 7. Hybrid Smart-Escalation Meal Architecture
+
+Quomida uses a hybrid natural language meal ingestion pipeline that cleanly separates linguistic syntax parsing from catalog resolution, re-allocating generative AI strictly as an optional culinary knowledge escalator:
+
+1. **Modular Deterministic Parser (`StandardMealParser`)**:
+   - Executes 100% locally in `packages/domain-core` with sub-millisecond latency (< 1ms) and zero API consumption.
+   - Uses pluggable `ParserLocalePack` interfaces (`esLocalePack`, `enLocalePack`) encapsulating language-specific word numbers, canonical units, meal verbs, and conjunction rules.
+   - Dynamically selects the active pack from App Settings (`userSettings.locale`), falling back cleanly to heuristic multi-pack detection if unconfigured.
+2. **Deterministic Offline Recipe Decomposition (No AI Required)**:
+   - When users log composite meals or multiple foods (e.g., *"milanesa con puré de papas"*, *"2 huevos revueltos con tostadas"*), the parser splits the clause into distinct items.
+   - `BatchAiMealResolver` resolves each component against the local catalog and automatically synthesizes a composite Virtual Recipe proposal 100% offline.
+3. **Master AI Toggle & Offline Graceful Degradation**:
+   - `userSettingsSchema` includes `ai_settings.enabled`. When toggled off, Quomida operates in 100% private, local-first mode with zero external network requests.
+   - If the device is offline or provider quotas are exhausted, meal parsing and multi-item recipe synthesis continue to work without interruption.
+4. **Just-In-Time (JIT) Culinary LLM Decomposer (`LlmRecipeDecomposer`)**:
+   - Triggers only when a single food query yields no catalog match (e.g., regional/cultural dishes like *"locro"*).
+   - Prompts the LLM to decompose the dish into base agricultural staples (e.g. white corn, beans, beef, squash) with realistic gram weights in the user's language.
+   - Resolves those base ingredients against the catalog to synthesize an editable Virtual Recipe with real calculated macronutrients, eliminating the dead-end *"Alimento no encontrado"* error state.
+

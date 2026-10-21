@@ -109,6 +109,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         }
       }
 
+      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
+
       const aiService = new AiMealService({
         parserConfig: {
           proxyUrl: AI_CONFIG.proxyUrl,
@@ -129,7 +131,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         existingRecipes: recipes,
         customPortions,
         catalogProvider: remoteService,
-        locale
+        locale,
+        aiEnabled: isAiEnabled
       } as any);
 
       setIsParsing(false);

@@ -40,6 +40,7 @@ export interface ResolvedAiMealItem {
   macros: MacroSnapshot;
   unmatched: boolean;
   mealType?: MealType;
+  isAiDecomposed?: boolean;
 }
 
 export interface ResolvedAiBatchMeal {
@@ -51,6 +52,8 @@ export interface ResolvedAiBatchMeal {
   synthesizedRecipe?: SynthesizedCompositeRecipe;
   defaultLoggingMode?: 'recipe' | 'batch';
   isMultiMeal?: boolean;
+  isAiDecomposed?: boolean;
+  sourceDishName?: string;
 }
 
 export interface BatchAiMealOptions {

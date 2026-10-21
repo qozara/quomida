@@ -465,6 +465,30 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
           </button>
         </div>
 
+        {/* AI Recipe Decomposition Banner */}
+        {batchMeal.isAiDecomposed && (
+          <div className="shrink-0 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-3 flex items-start gap-3 animate-in fade-in duration-150">
+            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-300">
+                  {t.ai?.decomposedRecipeBadge || 'AI Suggested Recipe'}
+                </span>
+                {batchMeal.sourceDishName && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30 truncate">
+                    {batchMeal.sourceDishName}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {t.ai?.decomposedRecipeNotice || 'This dish was not found in the catalog. AI estimated its typical ingredients.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Meal Category Switcher */}
         <div className="shrink-0 space-y-1.5">
           <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">

@@ -28,4 +28,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0021: Headless AI Meal Service & Presentation Layer Decoupling](./0021-headless-ai-meal-service-and-presentation-decoupling.md)
 * [ADR 0022: Transparent Grounded RAG Search & Nutritional Recipe Deduplication](./0022-transparent-rag-search-and-recipe-deduplication.md)
 * [ADR 0023: Adaptive Expenditure & Weight Tracking Engine](./0023-adaptive-expenditure-and-weight-tracking-engine.md)
+* [ADR 0024: Hybrid Meal Parser and JIT Culinary Recipe Decomposer](./0024-hybrid-meal-parser-and-jit-recipe-decomposer.md)
 

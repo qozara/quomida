@@ -556,4 +556,135 @@ describe('AiMealService - Headless Natural Language Meal Orchestrator', () => {
       expect(result.defaultLoggingMode).toBe('batch');
     });
   });
+
+  describe('Hybrid Offline Parsing & JIT Culinary Recipe Decomposition', () => {
+    const mockBeef: BaseIngredient = {
+      id: 'ing-carne',
+      name: 'Carne vacuna',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 250,
+      protein_100g: 26,
+      carbs_100g: 0,
+      fats_100g: 17,
+    };
+
+    const mockCorn: BaseIngredient = {
+      id: 'ing-maiz',
+      name: 'Maíz blanco',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 110,
+      protein_100g: 3,
+      carbs_100g: 22,
+      fats_100g: 1.5,
+    };
+
+    const mockSquash: BaseIngredient = {
+      id: 'ing-zapallo',
+      name: 'Zapallo',
+      source: 'system',
+      lang: 'es',
+      calories_100g: 30,
+      protein_100g: 1,
+      carbs_100g: 7,
+      fats_100g: 0.2,
+    };
+
+    const mockCatalogProvider: ICatalogProvider = {
+      searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+        const q = query.toLowerCase();
+        if (q.includes('carne') || q.includes('beef')) return [mockBeef];
+        if (q.includes('maiz') || q.includes('maíz') || q.includes('corn')) return [mockCorn];
+        if (q.includes('zapallo') || q.includes('pumpkin')) return [mockSquash];
+        return [];
+      }),
+      getPortionsForIngredient: vi.fn().mockResolvedValue([]),
+    };
+
+    it('Scenario A: Standard single query parses locally with zero LLM calls', async () => {
+      const service = new AiMealService(); // No LLM provider configured!
+      const result = await service.processMeal({
+        input: '100g de carne vacuna',
+        catalogProvider: mockCatalogProvider,
+        locale: 'es',
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].food?.id).toBe('ing-carne');
+      expect(result.items[0].quantity).toBe(100);
+      expect(result.items[0].unmatched).toBe(false);
+      expect(result.totalMacros.calories).toBeGreaterThan(0);
+    });
+
+    it('Scenario B: Multi-food query synthesizes composite recipe 100% locally with AI disabled', async () => {
+      const service = new AiMealService();
+      const result = await service.processMeal({
+        input: 'carne vacuna con zapallo para cenar',
+        catalogProvider: mockCatalogProvider,
+        locale: 'es',
+        aiEnabled: false, // AI disabled in settings!
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].food?.id).toBe('ing-carne');
+      expect(result.items[1].food?.id).toBe('ing-zapallo');
+      expect(result.detectedMealType).toBe('meal_dinner');
+      expect(result.defaultLoggingMode).toBe('recipe');
+      expect(result.synthesizedRecipe).toBeDefined();
+    });
+
+    it('Scenario C: Unknown dish triggers JIT LlmRecipeDecomposer to synthesize virtual recipe', async () => {
+      const mockDecomposer = {
+        decomposeDish: vi.fn().mockResolvedValue({
+          dishName: 'Locro criollo',
+          rationale: 'Traditional stew',
+          estimatedTotalWeightGrams: 350,
+          ingredients: [
+            { food_name: 'maíz blanco', quantity: 100, unit: 'g' },
+            { food_name: 'carne vacuna', quantity: 150, unit: 'g' },
+            { food_name: 'zapallo', quantity: 100, unit: 'g' },
+          ],
+        }),
+      };
+
+      const service = new AiMealService({ decomposer: mockDecomposer as any });
+      const result = await service.processMeal({
+        input: 'cené 1 plato de locro',
+        catalogProvider: mockCatalogProvider,
+        locale: 'es',
+        aiEnabled: true,
+      });
+
+      expect(mockDecomposer.decomposeDish).toHaveBeenCalledWith('locro', '1 plato', 'es');
+      expect(result.isAiDecomposed).toBe(true);
+      expect(result.sourceDishName).toBe('locro');
+      expect(result.compositeDishName).toBe('Locro criollo');
+      expect(result.defaultLoggingMode).toBe('recipe');
+      expect(result.synthesizedRecipe).toBeDefined();
+      expect(result.items).toHaveLength(3);
+      expect(result.items.every(it => it.isAiDecomposed)).toBe(true);
+      expect(result.totalMacros.calories).toBeGreaterThan(0);
+    });
+
+    it('Scenario D: Unknown dish gracefully returns unmatched when AI is disabled or offline', async () => {
+      const mockDecomposer = {
+        decomposeDish: vi.fn(),
+      };
+
+      const service = new AiMealService({ decomposer: mockDecomposer as any });
+      const result = await service.processMeal({
+        input: 'cené 1 plato de locro',
+        catalogProvider: mockCatalogProvider,
+        locale: 'es',
+        aiEnabled: false, // AI is disabled!
+      });
+
+      expect(mockDecomposer.decomposeDish).not.toHaveBeenCalled();
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].unmatched).toBe(true);
+      expect(result.items[0].rawQuery).toBe('locro');
+      expect(result.isAiDecomposed).toBeUndefined();
+    });
+  });
 });

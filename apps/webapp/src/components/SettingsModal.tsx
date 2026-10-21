@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
@@ -203,6 +203,9 @@ export const SettingsModal: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);
 
   // AI & Qozara Intelligence State
+  const [aiEnabled, setAiEnabled] = useState<boolean>(
+    userSettings?.ai_settings?.enabled !== false
+  );
   const [aiProvider, setAiProvider] = useState<AiProviderType>(
     userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider
   );
@@ -215,6 +218,12 @@ export const SettingsModal: React.FC = () => {
   );
   const [isEncryptingKey, setIsEncryptingKey] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (userSettings?.ai_settings?.enabled !== undefined) {
+      setAiEnabled(userSettings.ai_settings.enabled !== false);
+    }
+  }, [userSettings?.ai_settings?.enabled]);
 
   // Extract User Info
   const connectedAccount = activeProvider?.getConnectedAccount?.();
@@ -233,11 +242,25 @@ export const SettingsModal: React.FC = () => {
   const displayUserName = userName || t.settings?.accountLocalUser || 'Local Profile';
   const displayUserEmail = userEmail || t.settings?.accountLocalSubtitle || 'Offline mode (no cloud connected)';
 
+  const handleToggleAiEnabled = async (enabled: boolean) => {
+    setAiEnabled(enabled);
+    await updateUserSettings({
+      ai_settings: {
+        provider: aiProvider,
+        enabled,
+        ciphertext: userSettings?.ai_settings?.ciphertext,
+        ollama_base_url: ollamaUrl,
+        ollama_model: ollamaModel,
+      },
+    });
+  };
+
   const handleSaveAiProvider = async (newProvider: AiProviderType) => {
     setAiProvider(newProvider);
     await updateUserSettings({
       ai_settings: {
         provider: newProvider,
+        enabled: aiEnabled,
         ciphertext: userSettings?.ai_settings?.ciphertext,
         ollama_base_url: ollamaUrl,
         ollama_model: ollamaModel,
@@ -255,6 +278,7 @@ export const SettingsModal: React.FC = () => {
       await updateUserSettings({
         ai_settings: {
           provider: 'byok',
+          enabled: aiEnabled,
           ciphertext,
           ollama_base_url: ollamaUrl,
           ollama_model: ollamaModel,
@@ -274,6 +298,7 @@ export const SettingsModal: React.FC = () => {
     await updateUserSettings({
       ai_settings: {
         provider: AI_CONFIG.defaultProvider,
+        enabled: aiEnabled,
         ciphertext: undefined,
         ollama_base_url: ollamaUrl,
         ollama_model: ollamaModel,
@@ -288,6 +313,7 @@ export const SettingsModal: React.FC = () => {
     await updateUserSettings({
       ai_settings: {
         provider: 'ollama',
+        enabled: aiEnabled,
         ciphertext: userSettings?.ai_settings?.ciphertext,
         ollama_base_url: ollamaUrl.trim(),
         ollama_model: ollamaModel.trim(),
@@ -896,12 +922,39 @@ export const SettingsModal: React.FC = () => {
               className={openSections['ai'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
             >
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  {t.ai?.description || 'Configure natural language meal logging with Qozara Intelligence edge AI or your private model.'}
-                </p>
+                {/* Master AI Toggle */}
+                <div className="flex items-center justify-between p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+                  <div className="space-y-0.5 pr-3">
+                    <label htmlFor="toggle-ai-enabled" className="text-xs font-semibold text-slate-200 block cursor-pointer">
+                      {t.ai?.enableAi || 'Enable AI Features'}
+                    </label>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      {t.ai?.enableAiDesc || 'Allows AI to estimate typical ingredients and recipes for uncataloged foods. When disabled, logging runs 100% locally.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="toggle-ai-enabled"
+                    data-testid="toggle-ai-enabled"
+                    role="switch"
+                    aria-checked={aiEnabled}
+                    onClick={() => handleToggleAiEnabled(!aiEnabled)}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1 rounded-xl hover:bg-slate-800/60 transition-colors"
+                  >
+                    <div className={`w-11 h-6 rounded-full transition-colors relative p-0.5 pointer-events-none ${aiEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                      <div className={`w-5 h-5 rounded-full bg-white transition-transform ${aiEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                </div>
 
-                {/* Provider Selection */}
-                <div className="space-y-2">
+                {aiEnabled ? (
+                  <>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {t.ai?.description || 'Configure natural language meal logging with Qozara Intelligence edge AI or your private model.'}
+                    </p>
+
+                    {/* Provider Selection */}
+                    <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-300 block">
                     {t.ai?.providerLabel || 'Active AI Provider'}
                   </label>
@@ -1034,6 +1087,14 @@ export const SettingsModal: React.FC = () => {
                       {t.ai?.saveOllamaBtn || 'Save Ollama Settings'}
                     </button>
                   </form>
+                )}
+                  </>
+                ) : (
+                  <div className="p-3 bg-slate-900/50 border border-slate-800/80 rounded-xl text-center">
+                    <p className="text-xs text-slate-400">
+                      {t.ai?.aiDisabled || 'AI features are disabled. Quomida is running 100% locally.'}
+                    </p>
+                  </div>
                 )}
 
                 {aiFeedback && (

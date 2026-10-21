@@ -297,6 +297,13 @@
     "title": "Intelligence & Edge AI",
     "description": "Configure natural language meal logging with Qozara Intelligence edge AI or your private model.",
     "providerLabel": "Active AI Provider",
+    "enableAi": "Enable AI Features",
+    "enableAiDesc": "Allows AI to estimate typical ingredients and recipes for uncataloged foods. When disabled, logging runs 100% locally.",
+    "decomposingDish": "Estimating typical ingredients with AI...",
+    "decomposedRecipeBadge": "AI Suggested Recipe",
+    "decomposedRecipeNotice": "This dish was not found in the catalog. AI estimated its typical ingredients.",
+    "saveToMyRecipes": "Save to My Recipes",
+    "discardAiRecipe": "Discard Suggested Recipe",
     "providers": {
       "qozaraIntelligence": "Qozara Intelligence (Default)",
       "qozaraIntelligenceDesc": "Managed edge AI powered by Gemini 2.0 Flash (5 req/day anonymous, 20 req/day with Google login).",
