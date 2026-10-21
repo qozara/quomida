@@ -354,8 +354,8 @@
     "modeCombineRecipe": "Combine as 1 Dish (Recipe)",
     "modeSeparateItems": "Log Separate Items ({count})",
     "multiMealDetectedNotice": "Multiple meal times detected — each food will be logged to its assigned meal",
-    "forceDecomposeBtn": "Estimate recipe with AI",
-    "forceDecomposeHint": "Not what you ate? Ask AI to estimate recipe",
+    "forceDecomposeBtn": "Not what you were looking for? Estimate recipe with AI",
+    "forceDecomposeHint": "Not what you were looking for? Estimate recipe with AI",
     "decomposingItem": "Estimating recipe with AI..."
   },
   "weight": {

@@ -47,9 +47,9 @@ We implement a **Hybrid Smart-Escalation Meal Architecture** that decouples ling
    - Low-confidence candidates return `null`, correctly marking the item `unmatched: true` and triggering automatic JIT decomposition via `LlmRecipeDecomposer`.
 
 7. **User-Driven "Force AI Recipe Decomposition" Action**:
-   - In `BatchAiMealReviewModal`, users have explicit agency to trigger culinary recipe decomposition on any resolved or unmatched item (via item row button or substitute search drawer).
+   - In `BatchAiMealReviewModal`, users have explicit agency to trigger culinary recipe decomposition via a dedicated button (*"¿No es lo que buscabas? Estimar receta con IA"*) positioned directly below the Total Meal Macros summary and above the primary save/log action.
    - This action is conditionally displayed only when AI is enabled in Settings (`userSettings.ai_settings.enabled !== false`) and network connectivity is active (`navigator.onLine !== false`).
-   - When triggered, it estimates base recipe components via `LlmRecipeDecomposer`, resolves them with `BatchMealResolver`, and replaces the false match with the decomposed ingredients and synthesized recipe proposal.
+   - When triggered, it estimates base recipe components via `LlmRecipeDecomposer`, resolves them with `BatchMealResolver`, and replaces the false or incomplete match with the decomposed ingredients and synthesized recipe proposal.
 
 ## Consequences
 

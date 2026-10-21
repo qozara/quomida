@@ -354,7 +354,7 @@
     "modeCombineRecipe": "Combinar en 1 Plato (Receta)",
     "modeSeparateItems": "Registrar por Separado ({count})",
     "multiMealDetectedNotice": "Múltiples comidas detectadas — cada alimento se registrará en su momento asignado",
-    "forceDecomposeBtn": "Estimar receta con IA",
+    "forceDecomposeBtn": "¿No es lo que buscabas? Estimar receta con IA",
     "forceDecomposeHint": "¿No es lo que buscabas? Estimar receta con IA",
     "decomposingItem": "Estimando receta con IA..."
   },

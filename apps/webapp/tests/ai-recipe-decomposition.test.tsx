@@ -226,7 +226,7 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
       totalMacros: { calories: 220, protein: 10, carbs: 40, fats: 4 }
     };
 
-    it('renders Force AI button on item row and drawer when AI is enabled and online', () => {
+    it('renders single Force AI button below macro card when AI is enabled and online', () => {
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       const mockUseApp = {
@@ -251,17 +251,13 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
         />
       );
 
-      // Force AI button on item row should be present
-      const forceBtn = screen.getByTestId('btn-force-decompose-item-canelones');
+      // Single Force AI button below macros should be present
+      const forceBtn = screen.getByTestId('btn-force-decompose-meal');
       expect(forceBtn).toBeDefined();
-
-      // Open substitute drawer
-      const searchBtn = screen.getByLabelText(dictionaries.es.ai.changeItem);
-      fireEvent.click(searchBtn);
-
-      // Drawer Force AI button should be present
-      expect(screen.getByTestId('btn-drawer-force-decompose-item-canelones')).toBeDefined();
       expect(screen.getByText(dictionaries.es.ai.forceDecomposeHint)).toBeDefined();
+
+      // Per-item force buttons should not exist
+      expect(screen.queryByTestId('btn-force-decompose-item-canelones')).toBeNull();
     });
 
     it('does NOT render Force AI button when AI is disabled in userSettings', () => {
@@ -289,7 +285,7 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
         />
       );
 
-      expect(screen.queryByTestId('btn-force-decompose-item-canelones')).toBeNull();
+      expect(screen.queryByTestId('btn-force-decompose-meal')).toBeNull();
     });
 
     it('does NOT render Force AI button when browser is offline (navigator.onLine = false)', () => {
@@ -317,10 +313,10 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
         />
       );
 
-      expect(screen.queryByTestId('btn-force-decompose-item-canelones')).toBeNull();
+      expect(screen.queryByTestId('btn-force-decompose-meal')).toBeNull();
     });
 
-    it('calls decomposer.decomposeDish and replaces the item with decomposed ingredients on click', async () => {
+    it('calls decomposer.decomposeDish and replaces items with decomposed ingredients on click', async () => {
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       const mockDecomposer = {
@@ -373,7 +369,7 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
         />
       );
 
-      const forceBtn = screen.getByTestId('btn-force-decompose-item-canelones');
+      const forceBtn = screen.getByTestId('btn-force-decompose-meal');
       fireEvent.click(forceBtn);
 
       expect(mockDecomposer.decomposeDish).toHaveBeenCalledWith('canelones de verdura', '1 1 unidad', 'es');
