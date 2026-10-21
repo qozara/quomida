@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedAiBatchMeal } from '@quomida/domain-core';
 import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
-import { AiMealService, AiMealError } from '@quomida/llm-engine';
+import { MealService, AiMealError } from '@quomida/llm-engine';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
 import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
@@ -111,8 +111,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
 
       const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
 
-      const aiService = new AiMealService({
-        parserConfig: {
+      const mealService = new MealService({
+        decomposerConfig: {
           proxyUrl: AI_CONFIG.proxyUrl,
           provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
           ciphertext: userSettings?.ai_settings?.ciphertext,
@@ -124,7 +124,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         batchResolver
       });
 
-      const resolved = await aiService.processMeal({
+      const resolved = await mealService.processMeal({
         input: query,
         customIngredients: ingredients,
         customRecipes: recipeFoods,
@@ -133,7 +133,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         catalogProvider: remoteService,
         locale,
         aiEnabled: isAiEnabled
-      } as any);
+      });
 
       setIsParsing(false);
       setBatchMeal(resolved);

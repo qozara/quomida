@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { AiMealService, AiMealError, MockLLMProvider } from '@quomida/llm-engine';
+import { MealService, AiMealError, MockLLMProvider } from '@quomida/llm-engine';
 import type { BaseIngredient, Portion, ICatalogProvider } from '@quomida/domain-core';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,7 +98,7 @@ async function runCliAiLog() {
 
   // If AI_PROXY_URL is set in environment, use QozaraAiMealParser; otherwise fallback to MockLLMProvider for offline demo
   const proxyUrl = process.env.AI_PROXY_URL || process.env.VITE_AI_PROXY_URL;
-  const service = new AiMealService({
+  const service = new MealService({
     ...(proxyUrl
       ? {
           parserConfig: {
