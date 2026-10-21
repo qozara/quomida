@@ -4,6 +4,8 @@ import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
 
 export type DownloadStatus = 'idle' | 'fetching' | 'decompressing_and_writing' | 'complete' | 'error';
 
+export const AUTO_DOWNLOAD_MAX_BYTES = 10 * 1024 * 1024; // 10 MB threshold
+
 export function useCatalogDownload() {
   const [status, setStatus] = useState<DownloadStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -11,13 +13,13 @@ export function useCatalogDownload() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    // Check if OPFS catalog.sqlite exists and is larger than 10MB (suggesting it's the full catalog)
+    // Check if OPFS catalog.sqlite exists and is larger than 1MB (suggesting it's the full catalog, vs ~264KB system catalog)
     if (typeof navigator !== 'undefined' && navigator.storage) {
       navigator.storage.getDirectory().then(async (root) => {
         try {
           const handle = await root.getFileHandle('catalog.sqlite');
           const file = await handle.getFile();
-          if (file.size > 10 * 1024 * 1024) {
+          if (file.size > 1 * 1024 * 1024) {
             setStatus('complete');
             setProgress(100);
           }
@@ -55,7 +57,7 @@ export function useCatalogDownload() {
       }
     };
 
-    worker.onerror = (err) => {
+    worker.onerror = () => {
       setStatus('error');
       setError('Worker failed to initialize or crashed');
       worker.terminate();
@@ -81,5 +83,40 @@ export function useCatalogDownload() {
     }
   }, [isDeleting]);
 
-  return { status, progress, error, isDeleting, downloadCatalog, deleteCatalog };
+  /**
+   * Evaluates whether auto-download should occur based on size, saveData, and user opt-in
+   */
+  const checkAndTriggerAutoDownload = useCallback((options: {
+    downloadUrl: string;
+    fileSizeBytes?: number | null;
+    isOnline: boolean;
+    userAutoDownloadPref?: boolean;
+  }): boolean => {
+    const { downloadUrl, fileSizeBytes, isOnline, userAutoDownloadPref = true } = options;
+
+    if (!isOnline || status !== 'idle') {
+      return false;
+    }
+
+    if (userAutoDownloadPref === false) {
+      return false;
+    }
+
+    if (typeof navigator !== 'undefined') {
+      const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      if (conn && conn.saveData === true) {
+        return false;
+      }
+    }
+
+    const effectiveSize = fileSizeBytes && fileSizeBytes > 0 ? fileSizeBytes : 0;
+    if (effectiveSize > AUTO_DOWNLOAD_MAX_BYTES) {
+      return false;
+    }
+
+    downloadCatalog(downloadUrl);
+    return true;
+  }, [status, downloadCatalog]);
+
+  return { status, progress, error, isDeleting, downloadCatalog, deleteCatalog, checkAndTriggerAutoDownload };
 }

@@ -45,7 +45,8 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       error: null,
       isDeleting: false,
       downloadCatalog: vi.fn(),
-      deleteCatalog: vi.fn()
+      deleteCatalog: vi.fn(),
+      checkAndTriggerAutoDownload: vi.fn()
     });
     // Stub fetch for online heartbeat checks
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as any);

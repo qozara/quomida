@@ -102,8 +102,8 @@ export const SettingsModal: React.FC = () => {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   const approximateSizeMb = catalogFileSizeBytes && catalogFileSizeBytes > 0
-    ? String(Math.round(catalogFileSizeBytes / (1024 * 1024)))
-    : '55';
+    ? String(Math.round(catalogFileSizeBytes / (1024 * 1024)) || 2)
+    : '2';
 
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
 
@@ -1207,8 +1207,48 @@ export const SettingsModal: React.FC = () => {
                   <span>{(t.settings as any).offlineDbTitle || 'Offline Food Database'}</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  {(t.settings as any).offlineDbDescription || 'Quomida supports downloading the massive 1.1 million item database directly to your device for instant offline searches without using cellular data.'}
+                  {(t.settings as any).offlineDbDescription || 'Quomida supports downloading the complete food database directly to your device for instant offline searches without using cellular data.'}
                 </p>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-slate-300">
+                      {(t.settings as any).offlineDbAutoDownloadTitle || 'Auto-download updates'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      {(t.settings as any).offlineDbAutoDownloadDesc || 'Automatically download database updates in background when under 10MB.'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    data-testid="toggle-catalog-auto-download"
+                    aria-label={(t.settings as any).offlineDbAutoDownloadTitle || 'Auto-download updates'}
+                    aria-checked={typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true}
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        const current = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
+                        localStorage.setItem('catalog_auto_download_enabled', (!current).toString());
+                        // Trigger re-render
+                        setIsSaved((s) => !s);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                      (typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true)
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        (typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true)
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
                   <div className="flex flex-col">

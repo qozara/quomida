@@ -156,4 +156,20 @@ describe('Offline Database Download UX & Lifecycle', () => {
       expect(mockDeleteCatalog).toHaveBeenCalled();
     });
   });
+
+  it('renders auto-download toggle switch in settings and allows toggling preference', () => {
+    render(<SettingsModal />);
+
+    const autoDownloadSwitch = screen.getByTestId('toggle-catalog-auto-download');
+    expect(autoDownloadSwitch).toBeDefined();
+    expect(autoDownloadSwitch.getAttribute('aria-checked')).toBe('true');
+
+    // Click toggle to disable
+    fireEvent.click(autoDownloadSwitch);
+    expect(localStorage.getItem('catalog_auto_download_enabled')).toBe('false');
+
+    // Click toggle to enable
+    fireEvent.click(autoDownloadSwitch);
+    expect(localStorage.getItem('catalog_auto_download_enabled')).toBe('true');
+  });
 });
