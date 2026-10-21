@@ -15,7 +15,7 @@ Welcome to the Quomida developer and architectural documentation repository. Thi
 | 🛠️ [Developer CLI Harness](../apps/cli/README.md) | Terminal CLI for OAuth login/logout, domain catalog calculations, and live E2E testing. |
 | 👩‍💻 [Contributing & TDD Guide](./CONTRIBUTING.md) | Development setup, Test-Driven Development (TDD) cycle, schema migrations, and sync adapter guidelines. |
 | 🤖 [AI Agent Guidelines](../AGENTS.md) | Operational invariants, schema rules, and instructions optimized for autonomous AI coding agents. |
-| 📜 [Architectural Decision Records (ADRs)](./adr/README.md) | Formal records of key technical and architectural decisions (0000 through 0025). |
+| 📜 [Architectural Decision Records (ADRs)](./adr/README.md) | Formal records of key technical and architectural decisions (0000 through 0026). |
 | 📦 [Archived Initial Drafts](./archive/) | Original raw product spec, product idea, and initial implementation draft files. |
 
 ---
@@ -50,3 +50,4 @@ All architectural decisions in Quomida are recorded using the [MADR (Markdown Ar
 - [ADR 0023: Adaptive Expenditure & Weight Tracking Engine](./adr/0023-adaptive-expenditure-and-weight-tracking-engine.md)
 - [ADR 0024: Hybrid Meal Parser and JIT Culinary Recipe Decomposer](./adr/0024-hybrid-meal-parser-and-jit-recipe-decomposer.md)
 - [ADR 0025: Pure Domain MealService and Hexagonal AI Services Architecture](./adr/0025-pure-domain-meal-service-and-ai-services-hexagonal-architecture.md)
+- [ADR 0026: In-Memory LRU Cache for AI Recipe Decomposition](./adr/0026-in-memory-lru-cache-for-ai-recipe-decomposition.md)

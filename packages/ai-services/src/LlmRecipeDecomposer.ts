@@ -1,5 +1,6 @@
 import { AiProviderFactory, type AuthTokenGetter, type AiFactoryConfig } from '@qozara/ai-client';
 import type { IRecipeDecomposer, DecomposedDishResult, DecomposedDishIngredient } from '@quomida/domain-core';
+import { LruMemoryCache } from './cache/LruMemoryCache.js';
 
 export interface LlmRecipeDecomposerConfig {
   proxyUrl: string;
@@ -9,6 +10,19 @@ export interface LlmRecipeDecomposerConfig {
   ollamaModel?: string;
   getAuthToken?: AuthTokenGetter;
   systemPrompt?: string;
+  cache?: LruMemoryCache<string, DecomposedDishResult> | null;
+}
+
+const defaultGlobalDecompositionCache = new LruMemoryCache<string, DecomposedDishResult>(50);
+
+/**
+ * Normalizes dish name, portion, and locale into a deterministic, case-insensitive cache key.
+ */
+export function normalizeDecompositionKey(dishName: string, portionContext: string, locale: string): string {
+  const cleanDish = dishName.trim().toLowerCase().replace(/\s+/g, ' ');
+  const cleanPortion = (portionContext || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cleanLocale = (locale || '').trim().toLowerCase();
+  return `${cleanDish}|${cleanPortion}|${cleanLocale}`;
 }
 
 export const DECOMPOSE_DISH_TOOL = {
@@ -76,7 +90,25 @@ export const DEFAULT_DECOMPOSE_SYSTEM_PROMPT =
   '5. ALWAYS call the `decompose_dish` tool. Never return plain text.';
 
 export class LlmRecipeDecomposer implements IRecipeDecomposer {
-  constructor(private readonly config: LlmRecipeDecomposerConfig) {}
+  private readonly cache: LruMemoryCache<string, DecomposedDishResult> | null;
+
+  constructor(private readonly config: LlmRecipeDecomposerConfig) {
+    this.cache = config.cache === null ? null : (config.cache ?? defaultGlobalDecompositionCache);
+  }
+
+  /**
+   * Clears the default shared in-memory decomposition cache.
+   */
+  static clearCache(): void {
+    defaultGlobalDecompositionCache.clear();
+  }
+
+  /**
+   * Clears the instance's cache.
+   */
+  clearCache(): void {
+    this.cache?.clear();
+  }
 
   private mapPreference(provider?: string): AiFactoryConfig['providerPreference'] {
     switch (provider) {
@@ -100,6 +132,16 @@ export class LlmRecipeDecomposer implements IRecipeDecomposer {
     if (!dishName || !dishName.trim()) return null;
 
     const trimmedDish = dishName.trim();
+    const cacheKey = normalizeDecompositionKey(trimmedDish, portionContext, locale);
+
+    // 1. Transparent in-memory cache check (Last decision step in pipeline)
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached && cached.ingredients && cached.ingredients.length > 0) {
+        return cached;
+      }
+    }
+
     const prompt = `Decompose standard single portion of this dish into base ingredients:\nDish: "${trimmedDish}"\nPortion Context: "${portionContext}"\nPreferred Language: ${locale}`;
 
     const factoryConfig: AiFactoryConfig = {
@@ -191,12 +233,19 @@ export class LlmRecipeDecomposer implements IRecipeDecomposer {
         ? parsedData.estimated_total_weight_g
         : ingredients.reduce((sum, ing) => sum + (ing.unit === 'g' || ing.unit === 'ml' ? ing.quantity : 100), 0);
 
-    return {
+    const result: DecomposedDishResult = {
       dishName: dish,
       rationale: parsedData.rationale || `AI culinary decomposition for ${dish}`,
       estimatedTotalWeightGrams: totalWeight,
       ingredients
     };
+
+    // Cache valid result in-memory
+    if (this.cache && result.ingredients.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   private extractData(raw: any): any {

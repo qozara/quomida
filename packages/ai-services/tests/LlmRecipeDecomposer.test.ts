@@ -7,6 +7,7 @@ describe('LlmRecipeDecomposer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    LlmRecipeDecomposer.clearCache();
     vi.spyOn(AiProviderFactory, 'createProvider').mockResolvedValue({
       id: 'mock-provider',
       mode: 'cloud',
@@ -103,5 +104,77 @@ describe('LlmRecipeDecomposer', () => {
     const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
     const result = await decomposer.decomposeDish('asdfasdf');
     expect(result).toBeNull();
+  });
+
+  it('reuses in-memory cached decomposition on repeat queries without calling remote provider', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Locro Criollo',
+        ingredients: [
+          { food_name: 'maíz blanco', quantity: 100, unit: 'g' }
+        ]
+      }
+    });
+
+    const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
+
+    // First call -> misses cache, calls chat
+    const firstResult = await decomposer.decomposeDish('locro', '1 plato', 'es');
+    expect(firstResult).not.toBeNull();
+    expect(mockChat).toHaveBeenCalledTimes(1);
+
+    // Second call -> hits cache, 0 chat calls
+    const secondResult = await decomposer.decomposeDish('locro', '1 plato', 'es');
+    expect(secondResult).toEqual(firstResult);
+    expect(mockChat).toHaveBeenCalledTimes(1);
+
+    // Third call with uppercase and extra spaces -> hits cache
+    const thirdResult = await decomposer.decomposeDish('  LOCRO  ', '1 plato', 'es');
+    expect(thirdResult).toEqual(firstResult);
+    expect(mockChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT cache transient provider errors so retries can succeed', async () => {
+    mockChat
+      .mockResolvedValueOnce({ error: 'High demand (503)' })
+      .mockResolvedValueOnce({
+        type: 'tool_call',
+        arguments: {
+          dish_name: 'Locro Criollo',
+          ingredients: [{ food_name: 'maíz blanco', quantity: 100, unit: 'g' }]
+        }
+      });
+
+    const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
+
+    // First call fails with error
+    await expect(decomposer.decomposeDish('locro', '1 plato', 'es')).rejects.toThrow('High demand (503)');
+    expect(mockChat).toHaveBeenCalledTimes(1);
+
+    // Second call succeeds because error was not cached
+    const result = await decomposer.decomposeDish('locro', '1 plato', 'es');
+    expect(result).not.toBeNull();
+    expect(mockChat).toHaveBeenCalledTimes(2);
+  });
+
+  it('bypasses caching completely when cache is explicitly disabled with null', async () => {
+    mockChat
+      .mockResolvedValueOnce({
+        type: 'tool_call',
+        arguments: { dish_name: 'Locro', ingredients: [{ food_name: 'maíz', quantity: 100, unit: 'g' }] }
+      })
+      .mockResolvedValueOnce({
+        type: 'tool_call',
+        arguments: { dish_name: 'Locro', ingredients: [{ food_name: 'maíz', quantity: 100, unit: 'g' }] }
+      });
+
+    const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local', cache: null });
+
+    await decomposer.decomposeDish('locro', '1 plato', 'es');
+    await decomposer.decomposeDish('locro', '1 plato', 'es');
+
+    expect(mockChat).toHaveBeenCalledTimes(2);
   });
 });

@@ -189,5 +189,6 @@ Quomida uses a hybrid natural language meal ingestion pipeline that cleanly sepa
 Following Clean Hexagonal Architecture (Ports & Adapters):
 - **Core Domain (`packages/domain-core`)**: Owns `MealService` and the `IRecipeDecomposer` interface (port). `MealService` runs 100% offline out-of-the-box with `StandardMealParser` and `BatchMealResolver`. It has zero knowledge of HTTP or AI SDKs.
 - **AI Infrastructure Adapter (`packages/ai-services`)**: Owns `LlmRecipeDecomposer`, implementing `IRecipeDecomposer` using `@qozara/ai-client`.
+- **In-Memory LRU Decomposition Cache**: `LlmRecipeDecomposer` maintains an in-memory LRU cache (`LruMemoryCache`, capacity 50). Repeat queries for the same uncataloged dish (e.g. accidental double-submits, portion edits, or page navigations) resolve in 0ms without hitting the remote AI proxy, while transient errors (500/503/429) bypass the cache to allow retries.
 - **Composition Root (`apps/webapp`)**: Dynamically passes `new LlmRecipeDecomposer(...)` into `new MealService({ decomposer })` only when AI features are enabled by the user. If disabled or offline, `MealService` operates cleanly without any AI adapter.
 
