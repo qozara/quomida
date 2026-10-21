@@ -3,9 +3,8 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "paths": {
-      "@quomida/domain-core": ["../domain-core/dist/index.d.ts"]
-    }
+    "paths": {}
   },
   "include": ["src/**/*"]
 }
+

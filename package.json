@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "packages/domain-core",
+    "packages/i18n-locales",
+    "packages/cloud-providers",
+    "packages/ai-services",
     "packages/*",
     "apps/*"
   ],
