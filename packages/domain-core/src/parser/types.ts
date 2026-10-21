@@ -29,3 +29,26 @@ export interface MealParserOptions {
   locale?: string;
   fallbackLocale?: string;
 }
+
+export interface DecomposedDishIngredient {
+  food_name: string;
+  quantity: number;
+  unit: string;
+  search_alias?: string;
+  notes?: string;
+}
+
+export interface DecomposedDishResult {
+  dishName: string;
+  rationale?: string;
+  estimatedTotalWeightGrams?: number;
+  ingredients: DecomposedDishIngredient[];
+}
+
+export interface IRecipeDecomposer {
+  decomposeDish(
+    dishName: string,
+    portionContext?: string,
+    locale?: string
+  ): Promise<DecomposedDishResult | null>;
+}

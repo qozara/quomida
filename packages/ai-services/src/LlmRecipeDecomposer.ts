@@ -1,5 +1,5 @@
 import { AiProviderFactory, type AuthTokenGetter, type AiFactoryConfig } from '@qozara/ai-client';
-import type { DecomposedDishResult, DecomposedIngredient } from './types.js';
+import type { IRecipeDecomposer, DecomposedDishResult, DecomposedDishIngredient } from '@quomida/domain-core';
 
 export interface LlmRecipeDecomposerConfig {
   proxyUrl: string;
@@ -75,7 +75,7 @@ export const DEFAULT_DECOMPOSE_SYSTEM_PROMPT =
   '4. Use the user\'s requested language for `food_name` (e.g., Spanish for Spanish queries). If food_name is in Spanish, provide a canonical English alias in `search_alias` when helpful.\n' +
   '5. ALWAYS call the `decompose_dish` tool. Never return plain text.';
 
-export class LlmRecipeDecomposer {
+export class LlmRecipeDecomposer implements IRecipeDecomposer {
   constructor(private readonly config: LlmRecipeDecomposerConfig) {}
 
   private mapPreference(provider?: string): AiFactoryConfig['providerPreference'] {
@@ -162,7 +162,7 @@ export class LlmRecipeDecomposer {
       return null;
     }
 
-    const ingredients: DecomposedIngredient[] = [];
+    const ingredients: DecomposedDishIngredient[] = [];
     for (const raw of rawIngredients) {
       const name = raw.food_name || raw.name || raw.food || raw.ingredient;
       if (!name || typeof name !== 'string') continue;

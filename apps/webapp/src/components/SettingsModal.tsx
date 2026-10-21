@@ -31,7 +31,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
-import { AiKeyEncryptionService } from '@quomida/llm-engine';
+import { AiKeyEncryptionService } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
 import {
   calculateBaselineSeed,

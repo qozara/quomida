@@ -5,8 +5,8 @@ import type {
   FoodItem,
   BaseIngredient,
   TaggedPortion,
-  ResolvedAiBatchMeal,
-  ResolvedAiMealItem,
+  ResolvedBatchMeal,
+  ResolvedMealItem,
   Portion,
   Recipe
 } from '@quomida/domain-core';
@@ -16,7 +16,7 @@ import {
   CatalogSearchManager,
   PortionManager,
   matchPortionUnit,
-  BatchAiMealResolver,
+  BatchMealResolver,
   RecipeManager
 } from '@quomida/domain-core';
 import {
@@ -37,7 +37,7 @@ import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 interface BatchAiMealReviewModalProps {
   isOpen: boolean;
-  batchMeal: ResolvedAiBatchMeal | null;
+  batchMeal: ResolvedBatchMeal | null;
   onClose: () => void;
   onLoggedSuccess?: () => void;
 }
@@ -58,7 +58,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t, locale } = useApp();
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
-  const [items, setItems] = useState<Array<ResolvedAiMealItem & { mealType?: MealType }>>(() =>
+  const [items, setItems] = useState<Array<ResolvedMealItem & { mealType?: MealType }>>(() =>
     (batchMeal?.items || []).map((it) => ({
       ...it,
       mealType: (it as any).mealType || batchMeal?.detectedMealType || 'meal_lunch'
@@ -96,7 +96,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   const [portionManager] = useState(() => new PortionManager());
   const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
-  const [batchResolver] = useState(() => new BatchAiMealResolver(searchManager, portionManager, recipeManager));
+  const [batchResolver] = useState(() => new BatchMealResolver(searchManager, portionManager, recipeManager));
 
   const existingRecipes = useMemo<Recipe[]>(() => {
     if (recipes.length > 0) return recipes;

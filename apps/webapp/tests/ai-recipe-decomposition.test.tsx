@@ -9,7 +9,7 @@ import { BatchAiMealReviewModal } from '../src/components/BatchAiMealReviewModal
 import { SettingsModal } from '../src/components/SettingsModal.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { dictionaries } from '@quomida/i18n-locales';
-import type { ResolvedAiBatchMeal } from '@quomida/domain-core';
+import type { ResolvedBatchMeal } from '@quomida/domain-core';
 
 describe('AI Recipe Decomposition & Master Toggle UI', () => {
   beforeEach(() => {
@@ -21,7 +21,7 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
   });
 
   it('renders AI recipe decomposition banner in BatchAiMealReviewModal when isAiDecomposed is true', () => {
-    const mockBatchMeal: ResolvedAiBatchMeal = {
+    const mockBatchMeal: ResolvedBatchMeal = {
       rawInput: 'cené 1 plato de locro',
       detectedMealType: 'meal_dinner',
       isAiDecomposed: true,

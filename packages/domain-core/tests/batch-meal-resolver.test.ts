@@ -3,13 +3,13 @@ import {
   detectMealTypeFromText,
   normalizeMealType,
   matchPortionUnit,
-  BatchAiMealResolver,
-  type RawParsedAiItem
-} from '../src/catalog/BatchAiMealResolver.js';
+  BatchMealResolver,
+  type RawParsedMealItem
+} from '../src/catalog/BatchMealResolver.js';
 import type { BaseIngredient, Portion, RecipeFoodItem } from '../src/types.js';
 import type { ICatalogProvider } from '../src/catalog/CatalogSearchManager.js';
 
-describe('BatchAiMealResolver & Portion Matching', () => {
+describe('BatchMealResolver & Portion Matching', () => {
   describe('detectMealTypeFromText', () => {
     it('detects breakfast from keywords in Spanish and English', () => {
       expect(detectMealTypeFromText('Desayuné dos huevos y café')).toBe('meal_breakfast');
@@ -75,7 +75,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
     });
   });
 
-  describe('BatchAiMealResolver.resolveBatch', () => {
+  describe('BatchMealResolver.resolveBatch', () => {
     const mockCustomIngredients: BaseIngredient[] = [
       {
         id: 'cust-egg',
@@ -149,14 +149,14 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       getPortionsForIngredient: vi.fn().mockResolvedValue([]),
     };
 
-    let resolver: BatchAiMealResolver;
+    let resolver: BatchMealResolver;
 
     beforeEach(() => {
-      resolver = new BatchAiMealResolver();
+      resolver = new BatchMealResolver();
     });
 
     it('resolves multiple meal items concurrently and computes accurate macro totals', async () => {
-      const rawItems: RawParsedAiItem[] = [
+      const rawItems: RawParsedMealItem[] = [
         { foodQuery: 'huevo revuelto', quantity: 2, unit: 'unit' },
         { foodQuery: 'panqueques de avena', quantity: 150, unit: 'g' },
         { foodQuery: 'manzana roja', quantity: 1, unit: 'unit' },
@@ -208,7 +208,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
     });
 
     it('marks unmatched items gracefully without failing the entire batch', async () => {
-      const rawItems: RawParsedAiItem[] = [
+      const rawItems: RawParsedMealItem[] = [
         { foodQuery: 'huevo revuelto', quantity: 1, unit: 'unit' },
         { foodQuery: 'alien space food xyz', quantity: 200, unit: 'g' },
       ];
@@ -468,7 +468,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       };
 
       it('resolves items directly using candidateId when matched in custom ingredients', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           {
             foodQuery: 'huevo revuelto',
             quantity: 1,
@@ -489,7 +489,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('resolves items directly using candidateId when matched via catalog provider search', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           {
             foodQuery: 'milanesa',
             quantity: 1,
@@ -510,7 +510,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('synthesizes a new Recipe when >= 2 items are resolved with automatic joined name', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
           { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
         ];
@@ -530,7 +530,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('uses explicit compositeDishName when provided for synthesized recipe', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
           { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
         ];
@@ -547,7 +547,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('detects existing duplicate recipe and marks isExistingDuplicate: true', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
           { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
         ];
@@ -592,7 +592,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('does NOT synthesize a recipe when only 1 item is resolved', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' }
         ];
 
@@ -606,7 +606,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('recalculates item quantity and updates synthesized recipe', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
           { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
         ];
@@ -630,7 +630,7 @@ describe('BatchAiMealResolver & Portion Matching', () => {
       });
 
       it('swaps item food and recomputes synthesized recipe', async () => {
-        const rawItems: RawParsedAiItem[] = [
+        const rawItems: RawParsedMealItem[] = [
           { foodQuery: 'Milanesa de Ternera', quantity: 1, unit: 'unit', candidateId: 'ing-milanesa-123' },
           { foodQuery: 'Puré de Papas Casero', quantity: 1, unit: 'portion', candidateId: 'ing-pure-456' }
         ];

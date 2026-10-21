@@ -407,7 +407,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
   it('correctly passes Google OAuth accessToken from active_cloud_provider credentials to AI provider', async () => {
     let capturedGetAuthToken: any = null;
-    vi.spyOn(AiProviderFactory, 'createProvider').mockImplementation(async (_config: any, getAuthToken: any) => {
+    vi.spyOn(AiProviderFactory, 'createProvider').mockImplementationOnce(async (_config: any, getAuthToken: any) => {
       capturedGetAuthToken = getAuthToken;
       return {
         id: 'mock-provider',
