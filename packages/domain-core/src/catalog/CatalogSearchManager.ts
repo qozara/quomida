@@ -167,14 +167,16 @@ export class CatalogSearchManager {
         if (catalogResults.length === 0 && singularQuery !== effectiveQuery) {
           catalogResults = await catalogProvider.searchIngredients(singularQuery, 10);
         }
-        if (catalogResults.length === 0 && effectiveQuery.length >= 6) {
-          catalogResults = await catalogProvider.searchIngredients(effectiveQuery.slice(0, 5), 10);
-        }
 
         const queryTokens = normQuery
           .split(/\s+/)
           .filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|e|al|a|para|por|of|with|and|the|in|for|at|on)$/i.test(t));
         const primaryToken = queryTokens[0] || normQuery;
+
+        // Only search 5-char prefix slice for single-word queries (e.g. typo tolerance like 'hamburquesa')
+        if (catalogResults.length === 0 && queryTokens.length === 1 && effectiveQuery.length >= 6) {
+          catalogResults = await catalogProvider.searchIngredients(effectiveQuery.slice(0, 5), 10);
+        }
 
         if (catalogResults.length === 0 && queryTokens.length > 1) {
           catalogResults = await catalogProvider.searchIngredients(primaryToken, 10);
@@ -183,9 +185,6 @@ export class CatalogSearchManager {
             if (singPrimary !== primaryToken) {
               catalogResults = await catalogProvider.searchIngredients(singPrimary, 10);
             }
-          }
-          if (catalogResults.length === 0 && primaryToken.length >= 6) {
-            catalogResults = await catalogProvider.searchIngredients(primaryToken.slice(0, 5), 10);
           }
         }
 
@@ -199,7 +198,7 @@ export class CatalogSearchManager {
                 break;
               }
             }
-            if (token.length >= 6) {
+            if (queryTokens.length === 1 && token.length >= 6) {
               const tokenResults = await catalogProvider.searchIngredients(token.slice(0, 5), 10);
               if (tokenResults.length > 0) {
                 catalogResults = tokenResults;
@@ -220,14 +219,14 @@ export class CatalogSearchManager {
             else if (normName.includes(normQuery) || normName.includes(normSingularQuery)) score += 40;
 
             if (normName.startsWith(primaryToken)) score += 50;
-            else if (primaryToken.length >= 6 && normName.startsWith(primaryToken.slice(0, 5))) score += 30;
+            else if (queryTokens.length === 1 && primaryToken.length >= 6 && normName.startsWith(primaryToken.slice(0, 5))) score += 30;
             else if (normName.includes(primaryToken)) score += 30;
 
             for (const token of queryTokens) {
               const singToken = singularizeWord(token);
               if (normName.includes(token) || normName.includes(singToken)) {
                 score += 15;
-              } else if (token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
+              } else if (queryTokens.length === 1 && token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
                 score += 25;
               }
             }
@@ -240,7 +239,23 @@ export class CatalogSearchManager {
           });
 
           scored.sort((a, b) => b.score - a.score);
-          return { ...scored[0].item, kind: 'ingredient' };
+          const top = scored[0];
+          const MIN_CONFIDENCE_SCORE = 30;
+
+          if (top && top.score >= MIN_CONFIDENCE_SCORE) {
+            // For multi-token queries, enforce that at least one full content token or singularized token is present
+            if (queryTokens.length > 1) {
+              const normTopName = normalizeFoodName(top.item.name);
+              const hasActualTokenMatch = queryTokens.some(token => {
+                const sing = singularizeWord(token);
+                return normTopName.includes(token) || normTopName.includes(sing);
+              });
+              if (!hasActualTokenMatch) {
+                return null;
+              }
+            }
+            return { ...top.item, kind: 'ingredient' };
+          }
         }
       } catch (err) {
         console.error('[CatalogSearchManager] AI catalog fallback failed:', err);

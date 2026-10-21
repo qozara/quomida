@@ -687,7 +687,60 @@ describe('CatalogSearchManager', () => {
       expect(ragQueries.some(q => q.toLowerCase() === 'blackberry')).toBe(true);
       expect(ragQueries.some(q => /^slices?$/i.test(q))).toBe(false);
     });
+
+    it('rejects false-positive prefix match when candidate score is below minimum threshold (e.g. canelones de verdura -> Salvado canela)', async () => {
+      const mockFalsePositiveProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+          const q = query.toLowerCase();
+          // "canelones de verdura" returns empty, but prefix "canel" returns "Salvado canela"
+          if (q.includes('canelones')) return [];
+          if (q === 'canel') {
+            return [{
+              id: 'sys-salvado-canela',
+              name: 'Salvado canela',
+              source: 'system' as const,
+              lang: 'es',
+              calories_100g: 220,
+              protein_100g: 10,
+              carbs_100g: 40,
+              fats_100g: 4
+            }];
+          }
+          return [];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([])
+      };
+
+      const match = await manager.resolveAiMatch('canelones de verdura', [], mockFalsePositiveProvider);
+      // It MUST return null because Salvado canela has no genuine semantic match to canelones de verdura
+      expect(match).toBeNull();
+    });
+
+    it('rejects candidates when candidate name shares only an incidental 5-char prefix with zero token overlap', async () => {
+      const mockIncidentalProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+          if (query === 'manzan') {
+            return [{
+              id: 'sys-manzanilla',
+              name: 'Té de Manzanilla',
+              source: 'system' as const,
+              lang: 'es',
+              calories_100g: 1,
+              protein_100g: 0,
+              carbs_100g: 0.2,
+              fats_100g: 0
+            }];
+          }
+          return [];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([])
+      };
+
+      const match = await manager.resolveAiMatch('manzanas asadas con canela', [], mockIncidentalProvider);
+      expect(match).toBeNull();
+    });
   });
 });
+
 
 

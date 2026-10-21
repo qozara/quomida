@@ -41,6 +41,16 @@ We implement a **Hybrid Smart-Escalation Meal Architecture** that decouples ling
    - Today's mixed-language catalogs (USDA English vs. Argenfoods/BEDCA Spanish) are bridged via token normalization and cross-language synonym mappings.
    - Future catalog schema updates with explicit `aliases` or `names_i18n` columns can be queried directly without modifying the query parser.
 
+6. **Strict Confidence Scoring & False-Positive Rejection in `resolveAiMatch`**:
+   - `CatalogSearchManager.resolveAiMatch()` enforces a minimum confidence score threshold (30 points).
+   - Multi-token queries (e.g., *"canelones de verdura"*) reject incidental single-token 5-character prefix matches (e.g. *"Salvado canela"*) when candidate items lack genuine token overlap.
+   - Low-confidence candidates return `null`, correctly marking the item `unmatched: true` and triggering automatic JIT decomposition via `LlmRecipeDecomposer`.
+
+7. **User-Driven "Force AI Recipe Decomposition" Action**:
+   - In `BatchAiMealReviewModal`, users have explicit agency to trigger culinary recipe decomposition on any resolved or unmatched item (via item row button or substitute search drawer).
+   - This action is conditionally displayed only when AI is enabled in Settings (`userSettings.ai_settings.enabled !== false`) and network connectivity is active (`navigator.onLine !== false`).
+   - When triggered, it estimates base recipe components via `LlmRecipeDecomposer`, resolves them with `BatchMealResolver`, and replaces the false match with the decomposed ingredients and synthesized recipe proposal.
+
 ## Consequences
 
 ### Positive

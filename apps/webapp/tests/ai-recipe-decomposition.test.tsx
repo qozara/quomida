@@ -191,4 +191,197 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
       })
     );
   });
+
+  describe('Force AI Decomposition Action in BatchAiMealReviewModal', () => {
+    const singleMatchedBatchMeal: ResolvedBatchMeal = {
+      rawInput: 'canelones de verdura',
+      detectedMealType: 'meal_lunch',
+      isAiDecomposed: false,
+      items: [
+        {
+          id: 'item-canelones',
+          rawQuery: 'canelones de verdura',
+          food: {
+            kind: 'ingredient',
+            id: 'ing-salvado-canela',
+            name: 'Salvado canela',
+            source: 'system',
+            lang: 'es',
+            calories_100g: 220,
+            protein_100g: 10,
+            carbs_100g: 40,
+            fats_100g: 4
+          },
+          quantity: 1,
+          selectedPortionName: '1 unidad',
+          availablePortions: [
+            { id: 'p1', base_food_id: 'ing-salvado-canela', name: '1 unidad', equivalent_weight_g: 100, source: 'system', tag: 'Generic' }
+          ],
+          calculatedWeightGrams: 100,
+          macros: { calories: 220, protein: 10, carbs: 40, fats: 4 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 220, protein: 10, carbs: 40, fats: 4 }
+    };
+
+    it('renders Force AI button on item row and drawer when AI is enabled and online', () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      const mockUseApp = {
+        t: dictionaries.es,
+        locale: 'es',
+        recipes: [],
+        recipeFoods: [],
+        ingredients: [],
+        userSettings: {
+          ai_settings: { enabled: true, provider: 'qozara-intelligence' }
+        },
+        logBatchFoodItems: vi.fn(),
+        addRecipe: vi.fn()
+      };
+      vi.spyOn(AppContext, 'useApp').mockReturnValue(mockUseApp as any);
+
+      render(
+        <BatchAiMealReviewModal
+          isOpen={true}
+          batchMeal={singleMatchedBatchMeal}
+          onClose={vi.fn()}
+        />
+      );
+
+      // Force AI button on item row should be present
+      const forceBtn = screen.getByTestId('btn-force-decompose-item-canelones');
+      expect(forceBtn).toBeDefined();
+
+      // Open substitute drawer
+      const searchBtn = screen.getByLabelText(dictionaries.es.ai.changeItem);
+      fireEvent.click(searchBtn);
+
+      // Drawer Force AI button should be present
+      expect(screen.getByTestId('btn-drawer-force-decompose-item-canelones')).toBeDefined();
+      expect(screen.getByText(dictionaries.es.ai.forceDecomposeHint)).toBeDefined();
+    });
+
+    it('does NOT render Force AI button when AI is disabled in userSettings', () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      const mockUseApp = {
+        t: dictionaries.es,
+        locale: 'es',
+        recipes: [],
+        recipeFoods: [],
+        ingredients: [],
+        userSettings: {
+          ai_settings: { enabled: false }
+        },
+        logBatchFoodItems: vi.fn(),
+        addRecipe: vi.fn()
+      };
+      vi.spyOn(AppContext, 'useApp').mockReturnValue(mockUseApp as any);
+
+      render(
+        <BatchAiMealReviewModal
+          isOpen={true}
+          batchMeal={singleMatchedBatchMeal}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByTestId('btn-force-decompose-item-canelones')).toBeNull();
+    });
+
+    it('does NOT render Force AI button when browser is offline (navigator.onLine = false)', () => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      const mockUseApp = {
+        t: dictionaries.es,
+        locale: 'es',
+        recipes: [],
+        recipeFoods: [],
+        ingredients: [],
+        userSettings: {
+          ai_settings: { enabled: true }
+        },
+        logBatchFoodItems: vi.fn(),
+        addRecipe: vi.fn()
+      };
+      vi.spyOn(AppContext, 'useApp').mockReturnValue(mockUseApp as any);
+
+      render(
+        <BatchAiMealReviewModal
+          isOpen={true}
+          batchMeal={singleMatchedBatchMeal}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByTestId('btn-force-decompose-item-canelones')).toBeNull();
+    });
+
+    it('calls decomposer.decomposeDish and replaces the item with decomposed ingredients on click', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      const mockDecomposer = {
+        decomposeDish: vi.fn().mockResolvedValue({
+          dishName: 'Canelones de Verdura',
+          ingredients: [
+            { food_name: 'Espinaca', quantity: 150, unit: 'g' },
+            { food_name: 'Ricotta', quantity: 100, unit: 'g' }
+          ]
+        })
+      };
+
+      const mockUseApp = {
+        t: dictionaries.es,
+        locale: 'es',
+        recipes: [],
+        recipeFoods: [],
+        ingredients: [
+          {
+            id: 'ing-espinaca',
+            name: 'Espinaca',
+            calories_100g: 23,
+            protein_100g: 2.9,
+            carbs_100g: 3.6,
+            fats_100g: 0.4
+          },
+          {
+            id: 'ing-ricotta',
+            name: 'Ricotta',
+            calories_100g: 174,
+            protein_100g: 11,
+            carbs_100g: 3,
+            fats_100g: 13
+          }
+        ],
+        userSettings: {
+          ai_settings: { enabled: true }
+        },
+        logBatchFoodItems: vi.fn(),
+        addRecipe: vi.fn()
+      };
+      vi.spyOn(AppContext, 'useApp').mockReturnValue(mockUseApp as any);
+
+      render(
+        <BatchAiMealReviewModal
+          isOpen={true}
+          batchMeal={singleMatchedBatchMeal}
+          onClose={vi.fn()}
+          decomposer={mockDecomposer as any}
+        />
+      );
+
+      const forceBtn = screen.getByTestId('btn-force-decompose-item-canelones');
+      fireEvent.click(forceBtn);
+
+      expect(mockDecomposer.decomposeDish).toHaveBeenCalledWith('canelones de verdura', '1 1 unidad', 'es');
+
+      // The original item should be replaced with Espinaca and Ricotta
+      expect(await screen.findByText('Espinaca')).toBeDefined();
+      expect(await screen.findByText('Ricotta')).toBeDefined();
+      expect(screen.queryByText('Salvado canela')).toBeNull();
+    });
+  });
 });

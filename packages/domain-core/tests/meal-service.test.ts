@@ -100,4 +100,50 @@ describe('MealService (domain-core)', () => {
     expect(result.items[0].unmatched).toBe(true);
     expect(result.isAiDecomposed).toBeFalsy();
   });
+
+  it('rejects low-confidence prefix false-positives and escalates to decomposer (e.g. canelones de verdura vs Salvado canela)', async () => {
+    const mockDecomposer: IRecipeDecomposer = {
+      decomposeDish: vi.fn().mockResolvedValue({
+        dishName: 'Canelones de Verdura',
+        ingredients: [
+          { food_name: 'Huevo Revuelto', quantity: 100, unit: 'g' },
+          { food_name: 'Tostada', quantity: 50, unit: 'g' }
+        ]
+      })
+    };
+
+    const mockCatalogWithPrefixHit = {
+      searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+        const q = query.toLowerCase();
+        if (q === 'canel') {
+          return [{
+            id: 'sys-salvado-canela',
+            name: 'Salvado canela',
+            source: 'system' as const,
+            lang: 'es',
+            calories_100g: 220,
+            protein_100g: 10,
+            carbs_100g: 40,
+            fats_100g: 4
+          }];
+        }
+        return [];
+      }),
+      getPortionsForIngredient: vi.fn().mockResolvedValue([])
+    };
+
+    const service = new MealService({ decomposer: mockDecomposer });
+    const result = await service.processMeal({
+      input: 'canelones de verdura',
+      customIngredients: [mockEgg, mockToast],
+      catalogProvider: mockCatalogWithPrefixHit,
+      locale: 'es',
+      aiEnabled: true
+    });
+
+    expect(mockDecomposer.decomposeDish).toHaveBeenCalledWith('canelones de verdura', '1 unit', 'es');
+    expect(result.isAiDecomposed).toBe(true);
+    expect(result.compositeDishName).toBe('Canelones de Verdura');
+    expect(result.items).toHaveLength(2);
+  });
 });
