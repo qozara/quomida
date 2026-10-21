@@ -23,7 +23,7 @@ We implement a **Hybrid Smart-Escalation Meal Architecture** that decouples ling
    - Extracts quantities, canonical units, meal types, and clean food tokens offline.
 
 2. **Deterministic Offline Multi-Food Recipe Decomposition (Zero LLM Required)**:
-   - When a user query lists multiple foods or a composite meal (e.g., *"milanesa con puré de papas"*, *"arroz con atún y huevo"*), `StandardMealParser` segments each item and `BatchAiMealResolver` resolves each component against the catalog.
+   - When a user query lists multiple foods or a composite meal (e.g., *"milanesa con puré de papas"*, *"arroz con atún y huevo"*), `StandardMealParser` segments each item and `BatchMealResolver` resolves each component against the catalog.
    - If multiple components resolve, `computeSynthesizedRecipe()` synthesizes an editable Virtual Recipe proposal 100% locally without calling any LLM.
 
 3. **Master AI Toggle & Graceful Degradation**:

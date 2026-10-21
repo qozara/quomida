@@ -1,0 +1,12 @@
+# @quomida/ai-services
+
+Optional external AI adapters for Quomida, encapsulating edge KMS API key encryption and Just-In-Time (JIT) culinary recipe decomposition.
+
+## Architectural Boundary
+
+`@quomida/ai-services` contains strictly external AI infrastructure adapters that depend on `@qozara/ai-client`:
+- **`LlmRecipeDecomposer`**: Implements the `IRecipeDecomposer` domain port declared in `@quomida/domain-core`. Decomposes unknown cultural dishes into base agricultural staples when queries yield no catalog match.
+- **`AiKeyEncryptionService`**: Encrypts user Gemini API keys using Quomida's edge KMS proxy for safe storage in RxDB and cloud spreadsheets.
+- **`AiMealError` & `classifyAiError`**: Error normalization classifying provider status codes (`RATE_LIMIT_EXCEEDED`, `AI_DISABLED`, `AUTHENTICATION_REQUIRED`).
+
+Deterministic natural language meal parsing and core meal logging workflow orchestration live 100% offline in `@quomida/domain-core` (`MealService`, `StandardMealParser`, `BatchMealResolver`).

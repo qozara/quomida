@@ -15,7 +15,7 @@ Welcome to the Quomida developer and architectural documentation repository. Thi
 | 🛠️ [Developer CLI Harness](../apps/cli/README.md) | Terminal CLI for OAuth login/logout, domain catalog calculations, and live E2E testing. |
 | 👩‍💻 [Contributing & TDD Guide](./CONTRIBUTING.md) | Development setup, Test-Driven Development (TDD) cycle, schema migrations, and sync adapter guidelines. |
 | 🤖 [AI Agent Guidelines](../AGENTS.md) | Operational invariants, schema rules, and instructions optimized for autonomous AI coding agents. |
-| 📜 [Architectural Decision Records (ADRs)](./adr/README.md) | Formal records of key technical and architectural decisions (0000 through 0022). |
+| 📜 [Architectural Decision Records (ADRs)](./adr/README.md) | Formal records of key technical and architectural decisions (0000 through 0025). |
 | 📦 [Archived Initial Drafts](./archive/) | Original raw product spec, product idea, and initial implementation draft files. |
 
 ---
@@ -42,3 +42,11 @@ All architectural decisions in Quomida are recorded using the [MADR (Markdown Ar
 - [ADR 0015: Decoupled Catalog Hydration & Two-File Delta Synchronization](./adr/0015-decoupled-catalog-hydration-and-two-file-delta-sync.md)
 - [ADR 0016: ETL Cloudflare Pages Deployment Strategy](./adr/0016-etl-cloudflare-pages-deployment-strategy.md)
 - [ADR 0017: Resumable Streaming & Memory-Safe Catalog Architecture](./adr/0017-resumable-streaming-memory-safe-catalog.md)
+- [ADR 0018: Hybrid OPFS SQLite Catalog Engine](./adr/0018-hybrid-opfs-catalog.md)
+- [ADR 0019: Google OAuth Certification Compliance & Support](./adr/0019-google-oauth-certification-compliance-and-support.md)
+- [ADR 0020: Composite Food Items and Recipe Manager Architecture](./adr/0020-composite-food-items-and-recipe-manager.md)
+- [ADR 0021: Headless AI Meal Service & Presentation Layer Decoupling](./adr/0021-headless-ai-meal-service-and-presentation-decoupling.md)
+- [ADR 0022: Transparent Grounded RAG Search & Nutritional Recipe Deduplication](./adr/0022-transparent-rag-search-and-recipe-deduplication.md)
+- [ADR 0023: Adaptive Expenditure & Weight Tracking Engine](./adr/0023-adaptive-expenditure-and-weight-tracking-engine.md)
+- [ADR 0024: Hybrid Meal Parser and JIT Culinary Recipe Decomposer](./adr/0024-hybrid-meal-parser-and-jit-recipe-decomposer.md)
+- [ADR 0025: Pure Domain MealService and Hexagonal AI Services Architecture](./adr/0025-pure-domain-meal-service-and-ai-services-hexagonal-architecture.md)
