@@ -25,6 +25,7 @@ vi.mock('@react-oauth/google', () => ({
 
 describe('Past Food & Weight Logs Edition: Tendency & Adaptive Target Recalculation', () => {
   beforeEach(async () => {
+    vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
     vi.clearAllMocks();
     vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
       status: 'idle',
@@ -40,6 +41,7 @@ describe('Past Food & Weight Logs Edition: Tendency & Adaptive Target Recalculat
 
   afterEach(async () => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await destroyDatabase();
   });

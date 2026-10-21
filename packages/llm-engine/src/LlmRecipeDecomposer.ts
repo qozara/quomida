@@ -118,6 +118,10 @@ export class LlmRecipeDecomposer {
       systemPrompt: this.config.systemPrompt || DEFAULT_DECOMPOSE_SYSTEM_PROMPT
     });
 
+    if (!response) {
+      return null;
+    }
+
     if (response.error) {
       throw new Error(`AI Provider returned error: ${response.error}`);
     }

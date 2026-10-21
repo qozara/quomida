@@ -256,6 +256,7 @@ function createMockGoogleCloudBackend() {
 
 describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Suite', () => {
   beforeEach(async () => {
+    vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
     vi.clearAllMocks();
     vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
       status: 'idle',
@@ -271,6 +272,7 @@ describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Sui
 
   afterEach(async () => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await destroyDatabase();
   });
