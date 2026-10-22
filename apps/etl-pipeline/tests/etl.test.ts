@@ -250,4 +250,157 @@ describe('ETL Pipeline & Catalog Generation [ETL-203]', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('deduplicates package size variants (Pass 4A) into quality leader and merges distinct portions', async () => {
+    const ndjsonPath = path.join(tempDir, 'off-variants.ndjson');
+    const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const systemPath = path.join(publicDir, 'system.sqlite');
+    const metaPath = path.join(publicDir, 'catalog_meta.json');
+
+    // Two Oreo variants with identical cleanName, brandTag, macroBucket
+    // Winner: Barcode 779111111111 (qualityScore 10050)
+    // Loser: Barcode 779222222222 (qualityScore 10010)
+    const lines = [
+      // Leader ingredient
+      JSON.stringify({
+        id: 'ing-off-779111111111',
+        name: 'Galletitas Oreo - Oreo',
+        cleanName: 'Galletitas Oreo',
+        brandTag: 'oreo',
+        categoryTag: 'en:chocolate-biscuits',
+        qualityScore: 10050,
+        originSource: 'OPENFOODFACTS',
+        barcode: '779111111111',
+        lang: 'es-AR',
+        calories_100g: 480,
+        protein_100g: 5.0,
+        carbs_100g: 71.0,
+        fats_100g: 20.0
+      }),
+      // Portion 1 for Leader
+      JSON.stringify({
+        _type: 'portion',
+        id: 'port-off-779111111111-1',
+        base_food_id: 'ing-off-779111111111',
+        name: '1 paquete individual (36g)',
+        equivalent_weight_g: 36,
+        source: 'system',
+        originSource: 'OPENFOODFACTS'
+      }),
+      // Variant 2 (package size 118g)
+      JSON.stringify({
+        id: 'ing-off-779222222222',
+        name: 'Galletitas Oreo - Oreo',
+        cleanName: 'Galletitas Oreo',
+        brandTag: 'oreo',
+        categoryTag: 'en:chocolate-biscuits',
+        qualityScore: 10010,
+        originSource: 'OPENFOODFACTS',
+        barcode: '779222222222',
+        lang: 'es-AR',
+        calories_100g: 480,
+        protein_100g: 5.0,
+        carbs_100g: 71.0,
+        fats_100g: 20.0
+      }),
+      // Portion 2 for Variant 2 (distinct weight 118g)
+      JSON.stringify({
+        _type: 'portion',
+        id: 'port-off-779222222222-1',
+        base_food_id: 'ing-off-779222222222',
+        name: '1 paquete mediano (118g)',
+        equivalent_weight_g: 118,
+        source: 'system',
+        originSource: 'OPENFOODFACTS'
+      }),
+      // Portion 3 for Variant 2 with duplicate weight (36g) - should be merged/deduped
+      JSON.stringify({
+        _type: 'portion',
+        id: 'port-off-779222222222-2',
+        base_food_id: 'ing-off-779222222222',
+        name: '3 galletas (36g)',
+        equivalent_weight_g: 36,
+        source: 'system',
+        originSource: 'OPENFOODFACTS'
+      })
+    ].join('\n') + '\n';
+
+    fs.writeFileSync(ndjsonPath, lines, 'utf-8');
+
+    await exportSQLiteCatalog([ndjsonPath], catalogPath, systemPath, metaPath);
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(catalogPath);
+
+    // Assert only the leader barcode exists in base_ingredients
+    const ingredients = db.prepare('SELECT id, name, calories_100g FROM base_ingredients').all() as any[];
+    expect(ingredients.length).toBe(1);
+    expect(ingredients[0].id).toBe('ing-off-779111111111');
+    expect(ingredients[0].name).toBe('Galletitas Oreo - Oreo');
+
+    // Assert both distinct portions (36g and 118g) were merged under winning base_food_id
+    const portions = db.prepare('SELECT id, base_food_id, equivalent_weight_g FROM portions WHERE base_food_id = ?').all('ing-off-779111111111') as any[];
+    expect(portions.length).toBe(2);
+    const weights = portions.map(p => p.equivalent_weight_g).sort((a, b) => a - b);
+    expect(weights).toEqual([36, 118]);
+
+    db.close();
+  });
+
+  it('deduplicates cross-language products (Pass 4B) into higher-scored LatAm/Spain leader', async () => {
+    const ndjsonPath = path.join(tempDir, 'off-xlang.ndjson');
+    const catalogPath = path.join(publicDir, 'catalog.sqlite');
+    const systemPath = path.join(publicDir, 'system.sqlite');
+    const metaPath = path.join(publicDir, 'catalog_meta.json');
+
+    // French product vs Spanish product sharing brandTag + categoryTag + tightMacroBucket
+    // Winner: Spanish (qualityScore 10050 due to LatAm/Spain priority)
+    // Loser: French (qualityScore 25)
+    const lines = [
+      JSON.stringify({
+        id: 'ing-off-301760000001',
+        name: 'Oréo Biscuit Cacaoté - Oreo',
+        cleanName: 'Oréo Biscuit Cacaoté',
+        brandTag: 'oreo',
+        categoryTag: 'en:chocolate-biscuits',
+        qualityScore: 25,
+        originSource: 'OPENFOODFACTS',
+        barcode: '301760000001',
+        lang: 'fr-FR',
+        calories_100g: 480,
+        protein_100g: 5.0,
+        carbs_100g: 71.0,
+        fats_100g: 20.0
+      }),
+      JSON.stringify({
+        id: 'ing-off-779111111112',
+        name: 'Galletitas Oreo - Oreo',
+        cleanName: 'Galletitas Oreo',
+        brandTag: 'oreo',
+        categoryTag: 'en:chocolate-biscuits',
+        qualityScore: 10050,
+        originSource: 'OPENFOODFACTS',
+        barcode: '779111111112',
+        lang: 'es-AR',
+        calories_100g: 480,
+        protein_100g: 5.0,
+        carbs_100g: 71.0,
+        fats_100g: 20.0
+      })
+    ].join('\n') + '\n';
+
+    fs.writeFileSync(ndjsonPath, lines, 'utf-8');
+
+    await exportSQLiteCatalog([ndjsonPath], catalogPath, systemPath, metaPath);
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(catalogPath);
+
+    const ingredients = db.prepare('SELECT id, name FROM base_ingredients').all() as any[];
+    expect(ingredients.length).toBe(1);
+    expect(ingredients[0].id).toBe('ing-off-779111111112');
+    expect(ingredients[0].name).toBe('Galletitas Oreo - Oreo');
+
+    db.close();
+  });
 });

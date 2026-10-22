@@ -31,4 +31,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0024: Hybrid Meal Parser and JIT Culinary Recipe Decomposer](./0024-hybrid-meal-parser-and-jit-recipe-decomposer.md)
 * [ADR 0025: Pure Domain MealService and Hexagonal AI Services Architecture](./0025-pure-domain-meal-service-and-ai-services-hexagonal-architecture.md)
 * [ADR 0026: In-Memory LRU Cache for AI Recipe Decomposition](./0026-in-memory-lru-cache-for-ai-recipe-decomposition.md)
+* [ADR 0027: Open Food Facts Catalog Reduction and Cross-Language Deduplication](./0027-off-catalog-reduction-and-cross-language-deduplication.md)
 
