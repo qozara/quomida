@@ -174,6 +174,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
   const [catalogItemCount, setCatalogItemCount] = useState<number | null>(null);
   const syncLock = React.useRef(false);
+  const hasBootHydratedRef = useRef(false);
   const { checkAndTriggerAutoDownload } = useCatalogDownload();
 
   const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
@@ -415,36 +416,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Background asynchronous catalog hydration on boot [APP-207]
-      dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
-        if (v) setCatalogVersion(v);
-      });
-      dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
-        if (v) setCatalogGeneratedAt(v);
-      });
-      dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
-        if (v) setCatalogFileSizeBytes(Number(v));
-      });
-      dbService.getMetadata('lastIngestedCatalogItemCount').then((v) => {
-        if (v) setCatalogItemCount(Number(v));
-      });
-      DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
-        const res = await refreshCatalog();
-        // Check adaptive auto-download if remote catalog is <= 10MB
-        if (typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof checkAndTriggerAutoDownload === 'function') {
-          const userPref = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
-          const baseUrl = (import.meta as any).env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
-          const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
-          checkAndTriggerAutoDownload({
-            downloadUrl,
-            fileSizeBytes: res.fileSizeBytes,
-            isOnline: navigator.onLine !== false,
-            userAutoDownloadPref: userPref
-          });
-        }
-      }).catch((err) => {
-        console.warn('[CatalogHydration] Background boot hydration notice:', err);
-      });
+      if (!hasBootHydratedRef.current) {
+        hasBootHydratedRef.current = true;
+        // Background asynchronous catalog hydration on boot [APP-207]
+        dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
+          if (v) setCatalogVersion(v);
+        });
+        dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
+          if (v) setCatalogGeneratedAt(v);
+        });
+        dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
+          if (v) setCatalogFileSizeBytes(Number(v));
+        });
+        dbService.getMetadata('lastIngestedCatalogItemCount').then((v) => {
+          if (v) setCatalogItemCount(Number(v));
+        });
+        DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
+          const currentOpfsStatus = await refreshCatalogDownloadStatus();
+          const res = await refreshCatalog();
+          const isUpdateAvailable = res.status === 'UPDATED';
+
+          // Only trigger auto-download if:
+          // 1. Full catalog is NOT installed locally yet (currentOpfsStatus !== 'complete'), OR
+          // 2. A newer catalog version was found (isUpdateAvailable)
+          if (
+            (currentOpfsStatus !== 'complete' || isUpdateAvailable) &&
+            typeof window !== 'undefined' &&
+            typeof Worker !== 'undefined' &&
+            typeof checkAndTriggerAutoDownload === 'function'
+          ) {
+            const userPref = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
+            const baseUrl = (import.meta as any).env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
+            const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+            checkAndTriggerAutoDownload({
+              downloadUrl,
+              fileSizeBytes: res.fileSizeBytes,
+              isOnline: navigator.onLine !== false,
+              userAutoDownloadPref: userPref,
+              isUpdateAvailable
+            });
+          }
+        }).catch((err) => {
+          console.warn('[CatalogHydration] Background boot hydration notice:', err);
+        });
+      }
     }).catch((err: any) => {
       console.error('[AppContext] Failed to initialize local database:', err);
       // Ensure the error is cast to QuomidaDBError if it isn't already

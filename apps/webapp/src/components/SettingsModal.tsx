@@ -403,13 +403,15 @@ export const SettingsModal: React.FC = () => {
       const baseUrl = ((import.meta as any).env?.VITE_CATALOG_BASE_URL || '').replace(/\/+$/, '');
       const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
 
+      const isUpdateAvailable = res.status === 'UPDATED';
       let autoTriggered = false;
-      if (userPref && (currentStatus !== 'complete' || res.status === 'UPDATED') && typeof checkAndTriggerAutoDownload === 'function') {
+      if (userPref && (currentStatus !== 'complete' || isUpdateAvailable) && typeof checkAndTriggerAutoDownload === 'function') {
         autoTriggered = checkAndTriggerAutoDownload({
           downloadUrl,
           fileSizeBytes: res.fileSizeBytes,
           isOnline: isOnline && navigator.onLine !== false,
-          userAutoDownloadPref: userPref
+          userAutoDownloadPref: userPref,
+          isUpdateAvailable
         });
       }
 

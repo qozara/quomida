@@ -161,6 +161,7 @@ export interface UseCatalogDownloadResult {
     fileSizeBytes?: number | null;
     isOnline: boolean;
     userAutoDownloadPref?: boolean;
+    isUpdateAvailable?: boolean;
   }) => boolean;
   refreshStatus?: () => Promise<DownloadStatus>;
 }
@@ -200,10 +201,17 @@ export function useCatalogDownload(): UseCatalogDownloadResult {
     fileSizeBytes?: number | null;
     isOnline: boolean;
     userAutoDownloadPref?: boolean;
+    isUpdateAvailable?: boolean;
   }): boolean => {
-    const { downloadUrl, fileSizeBytes, isOnline, userAutoDownloadPref = true } = options;
+    const { downloadUrl, fileSizeBytes, isOnline, userAutoDownloadPref = true, isUpdateAvailable = false } = options;
 
     if (!isOnline || sharedState.status === 'fetching' || sharedState.status === 'decompressing_and_writing') {
+      return false;
+    }
+
+    // If full catalog is already installed and up-to-date, do not re-download
+    if (sharedState.status === 'complete' && !isUpdateAvailable) {
+      console.log('[CatalogDownload] Auto-download skipped: catalog is already installed and up to date.');
       return false;
     }
 
