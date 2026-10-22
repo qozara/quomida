@@ -203,7 +203,7 @@ export function useCatalogDownload(): UseCatalogDownloadResult {
   }): boolean => {
     const { downloadUrl, fileSizeBytes, isOnline, userAutoDownloadPref = true } = options;
 
-    if (!isOnline || sharedState.status !== 'idle') {
+    if (!isOnline || sharedState.status === 'fetching' || sharedState.status === 'decompressing_and_writing') {
       return false;
     }
 

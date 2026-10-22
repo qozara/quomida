@@ -73,7 +73,8 @@ export const SettingsModal: React.FC = () => {
     catalogItemCount,
     refreshCatalog,
     isOnline,
-    t
+    t,
+    resetCatalogState
   } = useApp();
 
   const {
@@ -83,6 +84,7 @@ export const SettingsModal: React.FC = () => {
     isDeleting,
     downloadCatalog,
     deleteCatalog,
+    checkAndTriggerAutoDownload,
     refreshStatus
   } = useCatalogDownload();
 
@@ -91,6 +93,12 @@ export const SettingsModal: React.FC = () => {
       refreshStatus();
     }
   }, [isSettingsOpen, refreshStatus]);
+
+  useEffect(() => {
+    if (downloadStatus === 'complete') {
+      setCatalogFeedback(null);
+    }
+  }, [downloadStatus]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'app-settings': false,
@@ -387,9 +395,29 @@ export const SettingsModal: React.FC = () => {
     try {
       const res = await refreshCatalog({ force: true });
       console.log('[SettingsModal] Catalog refresh result:', res);
-      const count = res.itemCount ?? res.itemsUpserted ?? (downloadStatus === 'complete' ? catalogItemCount : SYSTEM_CATALOG_META.itemCount);
+      const currentStatus = typeof refreshStatus === 'function' ? await refreshStatus() : downloadStatus;
+      const count = res.itemCount ?? res.itemsUpserted ?? (currentStatus === 'complete' ? catalogItemCount : SYSTEM_CATALOG_META.itemCount);
       const shortVersion = res.version ? res.version.substring(0, 8) : '';
-      if (res.status === 'UPDATED') {
+
+      const userPref = typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true;
+      const baseUrl = ((import.meta as any).env?.VITE_CATALOG_BASE_URL || '').replace(/\/+$/, '');
+      const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+
+      let autoTriggered = false;
+      if (userPref && (currentStatus !== 'complete' || res.status === 'UPDATED') && typeof checkAndTriggerAutoDownload === 'function') {
+        autoTriggered = checkAndTriggerAutoDownload({
+          downloadUrl,
+          fileSizeBytes: res.fileSizeBytes,
+          isOnline: isOnline && navigator.onLine !== false,
+          userAutoDownloadPref: userPref
+        });
+      }
+
+      if (autoTriggered) {
+        setCatalogFeedback(
+          (t.settings as any).catalogDownloadingUpdate || 'Downloading catalog update...'
+        );
+      } else if (res.status === 'UPDATED') {
         const updateText = (t.settings as any).catalogUpdated
           ?.replace('{{version}}', shortVersion)
           ?.replace('{{count}}', count !== null && count !== undefined ? count.toLocaleString() : '') ||
@@ -1580,6 +1608,9 @@ export const SettingsModal: React.FC = () => {
                   console.log('[SettingsModal] User confirmed delete. Removing downloaded catalog...');
                   setCatalogFeedback(null);
                   await deleteCatalog();
+                  if (typeof resetCatalogState === 'function') {
+                    await resetCatalogState();
+                  }
                 }}
                 className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
               >

@@ -112,6 +112,7 @@
     "catalogVersion": "Versión del catálogo: {{version}}",
     "checkCatalogUpdates": "Buscar Actualizaciones de Catálogo",
     "checkingCatalog": "Buscando actualizaciones...",
+    "catalogDownloadingUpdate": "Descargando actualización de catálogo...",
     "catalogUpToDate": "El catálogo está actualizado",
     "catalogUpdated": "Catálogo actualizado a {{version}} ({{count}} alimentos)",
     "catalogFullInstalled": "Catálogo completo instalado ({{count}} alimentos)",

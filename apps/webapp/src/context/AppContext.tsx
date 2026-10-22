@@ -3,7 +3,8 @@ import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db
 import { syncDatabaseWithRemote } from '../db/replication.js';
 import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
 import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
-import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { useCatalogDownload, refreshCatalogDownloadStatus } from '../hooks/useCatalogDownload.js';
+import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 import {
   type BaseIngredient,
   type Recipe,
@@ -100,6 +101,7 @@ interface AppContextType {
   catalogFileSizeBytes: number | null;
   catalogItemCount: number | null;
   refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
+  resetCatalogState?: () => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -191,6 +193,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { status: 'ERROR', itemsUpserted: 0, error: e?.message };
     }
   }, [hydrationService]);
+
+  const resetCatalogState = useCallback(async () => {
+    try {
+      await dbService.setMetadata('lastIngestedCatalogVersion', '');
+      await dbService.setMetadata('lastIngestedCatalogGeneratedAt', '');
+      await dbService.setMetadata('lastIngestedCatalogFileSizeBytes', '');
+      await dbService.setMetadata('lastIngestedCatalogItemCount', '');
+    } catch (e) {
+      console.warn('[AppContext] Could not clear catalog metadata:', e);
+    }
+    setCatalogVersion(null);
+    setCatalogGeneratedAt(null);
+    setCatalogFileSizeBytes(null);
+    setCatalogItemCount(null);
+  }, [dbService]);
+
+  useEffect(() => {
+    const unsub = RemoteCatalogService.onCatalogDownloaded(async () => {
+      console.log('[AppContext] Detected catalog change event.');
+      const status = await refreshCatalogDownloadStatus();
+      if (status === 'complete') {
+        await refreshCatalog();
+      } else {
+        await resetCatalogState();
+      }
+    });
+    return unsub;
+  }, [refreshCatalog, resetCatalogState]);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -894,7 +924,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         catalogGeneratedAt,
         catalogFileSizeBytes,
         catalogItemCount,
-        refreshCatalog
+        refreshCatalog,
+        resetCatalogState
       }}
     >
       {children}

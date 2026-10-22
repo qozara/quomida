@@ -112,6 +112,7 @@
     "catalogVersion": "Catalog Version: {{version}}",
     "checkCatalogUpdates": "Check for Catalog Updates",
     "checkingCatalog": "Checking for updates...",
+    "catalogDownloadingUpdate": "Downloading catalog update...",
     "catalogUpToDate": "Catalog is up to date",
     "catalogUpdated": "Catalog updated to {{version}} ({{count}} items)",
     "catalogFullInstalled": "Full catalog installed ({{count}} items)",

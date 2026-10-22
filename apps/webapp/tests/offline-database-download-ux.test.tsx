@@ -237,4 +237,76 @@ describe('Offline Database Download UX & Lifecycle', () => {
       expect(screen.getByText(/catalog updated to 0a766c76 \(19,?994 items\)/i)).toBeDefined();
     });
   });
+
+  it('triggers auto-download and informs user when checking for updates with auto-download enabled', async () => {
+    const mockCheckAndTriggerAutoDownload = vi.fn().mockReturnValue(true);
+    const mockRefreshCatalog = vi.fn().mockResolvedValue({
+      status: 'UPDATED',
+      version: '0a766c76a9120d41196a5ebd41f14aa0',
+      itemCount: 19994,
+      itemsUpserted: 19994,
+      fileSizeBytes: 2000000
+    });
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ...baseAppContext,
+      refreshCatalog: mockRefreshCatalog
+    } as any);
+
+    vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
+      status: 'idle',
+      progress: 0,
+      error: null,
+      isDeleting: false,
+      downloadCatalog: mockDownloadCatalog,
+      deleteCatalog: mockDeleteCatalog,
+      checkAndTriggerAutoDownload: mockCheckAndTriggerAutoDownload,
+      refreshStatus: vi.fn().mockResolvedValue('idle')
+    } as any);
+
+    localStorage.setItem('catalog_auto_download_enabled', 'true');
+
+    render(<SettingsModal />);
+
+    const checkUpdatesBtn = screen.getByRole('button', { name: /check for catalog updates/i });
+    fireEvent.click(checkUpdatesBtn);
+
+    await waitFor(() => {
+      expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
+      expect(mockCheckAndTriggerAutoDownload).toHaveBeenCalled();
+      expect(screen.getByText(/downloading catalog update/i)).toBeDefined();
+    });
+  });
+
+  it('invokes resetCatalogState upon catalog deletion to clear version and item count metrics', async () => {
+    const mockResetCatalogState = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ...baseAppContext,
+      resetCatalogState: mockResetCatalogState
+    } as any);
+
+    vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
+      status: 'complete',
+      progress: 100,
+      error: null,
+      isDeleting: false,
+      downloadCatalog: mockDownloadCatalog,
+      deleteCatalog: mockDeleteCatalog,
+      refreshStatus: vi.fn().mockResolvedValue('complete')
+    } as any);
+
+    render(<SettingsModal />);
+
+    const deleteBtn = screen.getByRole('button', { name: /delete/i });
+    fireEvent.click(deleteBtn);
+
+    const confirmDeleteBtn = screen.getByRole('button', { name: /delete and free space|confirm/i });
+    fireEvent.click(confirmDeleteBtn);
+
+    await waitFor(() => {
+      expect(mockDeleteCatalog).toHaveBeenCalled();
+      expect(mockResetCatalogState).toHaveBeenCalled();
+    });
+  });
 });
