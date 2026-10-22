@@ -212,9 +212,84 @@ describe('Offline Database Download UX & Lifecycle', () => {
     expect(screen.getByText(/v: 0a766c76/i)).toBeDefined();
   });
 
-  it('displays updated item count when check for catalog updates succeeds', async () => {
+  it('displays update available when check for catalog updates succeeds and catalog is not yet downloaded', async () => {
     const mockRefreshCatalog = vi.fn().mockResolvedValue({
       status: 'UPDATED',
+      version: '0a766c76a9120d41196a5ebd41f14aa0',
+      itemCount: 19994,
+      itemsUpserted: 19994
+    });
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ...baseAppContext,
+      refreshCatalog: mockRefreshCatalog,
+      catalogVersion: null,
+      catalogItemCount: null
+    } as any);
+
+    render(<SettingsModal />);
+
+    const checkUpdatesBtn = screen.getByRole('button', { name: /check for catalog updates/i });
+    fireEvent.click(checkUpdatesBtn);
+
+    await waitFor(() => {
+      expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
+      expect(screen.getByText(/update available: v: 0a766c76 \(19,?994 items\)/i)).toBeDefined();
+    });
+  });
+
+  it('displays update available without claiming updated when auto-download is disabled and catalog is not downloaded', async () => {
+    const mockCheckAndTriggerAutoDownload = vi.fn();
+    const mockRefreshCatalog = vi.fn().mockResolvedValue({
+      status: 'UPDATED',
+      version: '0a766c76a9120d41196a5ebd41f14aa0',
+      itemCount: 19994,
+      itemsUpserted: 19994,
+      fileSizeBytes: 2000000
+    });
+
+    localStorage.setItem('catalog_auto_download_enabled', 'false');
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ...baseAppContext,
+      refreshCatalog: mockRefreshCatalog,
+      catalogVersion: null,
+      catalogItemCount: null
+    } as any);
+
+    vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
+      status: 'idle',
+      progress: 0,
+      error: null,
+      isDeleting: false,
+      downloadCatalog: mockDownloadCatalog,
+      deleteCatalog: mockDeleteCatalog,
+      checkAndTriggerAutoDownload: mockCheckAndTriggerAutoDownload,
+      refreshStatus: vi.fn().mockResolvedValue('idle')
+    } as any);
+
+    render(<SettingsModal />);
+
+    const checkUpdatesBtn = screen.getByRole('button', { name: /check for catalog updates/i });
+    fireEvent.click(checkUpdatesBtn);
+
+    await waitFor(() => {
+      expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
+      expect(mockCheckAndTriggerAutoDownload).not.toHaveBeenCalled();
+      // Must display update available
+      expect(screen.getByText(/update available: v: 0a766c76 \(19,?994 items\)/i)).toBeDefined();
+      // Must NOT display catalog updated to
+      expect(screen.queryByText(/catalog updated to/i)).toBeNull();
+      // Download button in offline database remains present and enabled
+      const downloadBtn = screen.getByRole('button', { name: /download/i });
+      expect(downloadBtn).toBeDefined();
+      expect((downloadBtn as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
+
+  it('displays catalog up to date when full catalog is installed and versions match', async () => {
+    const mockRefreshCatalog = vi.fn().mockResolvedValue({
+      status: 'UP_TO_DATE',
       version: '0a766c76a9120d41196a5ebd41f14aa0',
       itemCount: 19994,
       itemsUpserted: 19994
@@ -227,6 +302,16 @@ describe('Offline Database Download UX & Lifecycle', () => {
       catalogItemCount: 19994
     } as any);
 
+    vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
+      status: 'complete',
+      progress: 100,
+      error: null,
+      isDeleting: false,
+      downloadCatalog: mockDownloadCatalog,
+      deleteCatalog: mockDeleteCatalog,
+      refreshStatus: vi.fn().mockResolvedValue('complete')
+    } as any);
+
     render(<SettingsModal />);
 
     const checkUpdatesBtn = screen.getByRole('button', { name: /check for catalog updates/i });
@@ -234,7 +319,7 @@ describe('Offline Database Download UX & Lifecycle', () => {
 
     await waitFor(() => {
       expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
-      expect(screen.getByText(/catalog updated to 0a766c76 \(19,?994 items\)/i)).toBeDefined();
+      expect(screen.getByText(/catalog is up to date \(v: 0a766c76, 19,?994 items\)/i)).toBeDefined();
     });
   });
 

@@ -115,6 +115,8 @@
     "catalogDownloadingUpdate": "Descargando actualización de catálogo...",
     "catalogUpToDate": "El catálogo está actualizado",
     "catalogUpdated": "Catálogo actualizado a {{version}} ({{count}} alimentos)",
+    "catalogUpdateAvailable": "Actualización disponible: v: {{version}} ({{count}} alimentos)",
+    "catalogItems": "alimentos",
     "catalogFullInstalled": "Catálogo completo instalado ({{count}} alimentos)",
     "catalogBaseInstalled": "Catálogo base integrado ({{count}} alimentos). Actualización disponible (~{{size}}MB)",
     "catalogCheckError": "Error al buscar actualizaciones",

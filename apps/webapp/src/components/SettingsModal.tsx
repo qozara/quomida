@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
@@ -94,10 +94,12 @@ export const SettingsModal: React.FC = () => {
     }
   }, [isSettingsOpen, refreshStatus]);
 
+  const prevDownloadStatusRef = useRef(downloadStatus);
   useEffect(() => {
-    if (downloadStatus === 'complete') {
+    if (prevDownloadStatusRef.current !== 'complete' && downloadStatus === 'complete') {
       setCatalogFeedback(null);
     }
+    prevDownloadStatusRef.current = downloadStatus;
   }, [downloadStatus]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -403,15 +405,15 @@ export const SettingsModal: React.FC = () => {
       const baseUrl = ((import.meta as any).env?.VITE_CATALOG_BASE_URL || '').replace(/\/+$/, '');
       const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
 
-      const isUpdateAvailable = res.status === 'UPDATED';
+      const isUpdateAvailable = currentStatus !== 'complete' || res.status === 'UPDATED';
       let autoTriggered = false;
-      if (userPref && (currentStatus !== 'complete' || isUpdateAvailable) && typeof checkAndTriggerAutoDownload === 'function') {
+      if (userPref && isUpdateAvailable && typeof checkAndTriggerAutoDownload === 'function') {
         autoTriggered = checkAndTriggerAutoDownload({
           downloadUrl,
           fileSizeBytes: res.fileSizeBytes,
           isOnline: isOnline && navigator.onLine !== false,
           userAutoDownloadPref: userPref,
-          isUpdateAvailable
+          isUpdateAvailable: true
         });
       }
 
@@ -419,17 +421,18 @@ export const SettingsModal: React.FC = () => {
         setCatalogFeedback(
           (t.settings as any).catalogDownloadingUpdate || 'Downloading catalog update...'
         );
-      } else if (res.status === 'UPDATED') {
-        const updateText = (t.settings as any).catalogUpdated
+      } else if (currentStatus !== 'complete' || res.status === 'UPDATED') {
+        const availableText = (t.settings as any).catalogUpdateAvailable
           ?.replace('{{version}}', shortVersion)
           ?.replace('{{count}}', count !== null && count !== undefined ? count.toLocaleString() : '') ||
-          `Catalog updated to ${shortVersion}${count ? ` (${count.toLocaleString()} items)` : ''}`;
-        setCatalogFeedback(updateText);
+          `Update available: v: ${shortVersion}${count ? ` (${count.toLocaleString()} items)` : ''}`;
+        setCatalogFeedback(availableText);
       } else if (res.status === 'UP_TO_DATE') {
+        const itemsLabel = (t.settings as any).catalogItems || 'items';
         setCatalogFeedback(
           (t.settings as any).catalogUpToDate
-            ? `${(t.settings as any).catalogUpToDate}${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${(t.settings as any).items || 'alimentos'}` : ''})` : ''}`
-            : `Catalog is up to date${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} items` : ''})` : ''}`
+            ? `${(t.settings as any).catalogUpToDate}${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${itemsLabel}` : ''})` : ''}`
+            : `Catalog is up to date${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${itemsLabel}` : ''})` : ''}`
         );
       } else if (res.status === 'SKIPPED') {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Catalog update skipped');

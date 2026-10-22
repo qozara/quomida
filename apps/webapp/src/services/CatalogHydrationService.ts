@@ -14,6 +14,7 @@ export interface CatalogHydrationOptions {
   force?: boolean;
   baseUrl?: string;
   signal?: AbortSignal;
+  saveMetadata?: boolean;
 }
 
 export class CatalogHydrationService {
@@ -64,7 +65,7 @@ export class CatalogHydrationService {
 
     // Compare versions
     const localVersion = await this.dbService.getMetadata('lastIngestedCatalogVersion');
-    if (!options?.force && localVersion === remoteVersion) {
+    if (localVersion === remoteVersion) {
       return {
         status: 'UP_TO_DATE',
         version: remoteVersion,
@@ -75,16 +76,18 @@ export class CatalogHydrationService {
       };
     }
 
-    // Update metadata in local RxDB
-    await this.dbService.setMetadata('lastIngestedCatalogVersion', remoteVersion);
-    if (remoteGeneratedAt) {
-      await this.dbService.setMetadata('lastIngestedCatalogGeneratedAt', remoteGeneratedAt);
-    }
-    if (remoteFileSizeBytes) {
-      await this.dbService.setMetadata('lastIngestedCatalogFileSizeBytes', String(remoteFileSizeBytes));
-    }
-    if (remoteItemCount) {
-      await this.dbService.setMetadata('lastIngestedCatalogItemCount', String(remoteItemCount));
+    if (options?.saveMetadata !== false) {
+      // Update metadata in local RxDB
+      await this.dbService.setMetadata('lastIngestedCatalogVersion', remoteVersion);
+      if (remoteGeneratedAt) {
+        await this.dbService.setMetadata('lastIngestedCatalogGeneratedAt', remoteGeneratedAt);
+      }
+      if (remoteFileSizeBytes) {
+        await this.dbService.setMetadata('lastIngestedCatalogFileSizeBytes', String(remoteFileSizeBytes));
+      }
+      if (remoteItemCount) {
+        await this.dbService.setMetadata('lastIngestedCatalogItemCount', String(remoteItemCount));
+      }
     }
 
     return {

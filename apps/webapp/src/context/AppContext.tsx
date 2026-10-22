@@ -100,7 +100,7 @@ interface AppContextType {
   catalogGeneratedAt: string | null;
   catalogFileSizeBytes: number | null;
   catalogItemCount: number | null;
-  refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
+  refreshCatalog: (options?: { force?: boolean; saveMetadata?: boolean }) => Promise<HydrationResult>;
   resetCatalogState?: () => Promise<void>;
 }
 
@@ -177,16 +177,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const hasBootHydratedRef = useRef(false);
   const { checkAndTriggerAutoDownload } = useCatalogDownload();
 
-  const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
+  const refreshCatalog = useCallback(async (options?: { force?: boolean; saveMetadata?: boolean }): Promise<HydrationResult> => {
     try {
       console.log('[AppContext] Checking for catalog updates with options:', options);
-      const res = await hydrationService.hydrate(options);
+      const currentOpfsStatus = await refreshCatalogDownloadStatus();
+      const shouldSaveMetadata = options?.saveMetadata !== undefined
+        ? options.saveMetadata
+        : currentOpfsStatus === 'complete';
+
+      const res = await hydrationService.hydrate({
+        ...options,
+        saveMetadata: shouldSaveMetadata
+      });
       console.log('[AppContext] Catalog hydration result:', res);
-      if (res.version) setCatalogVersion(res.version);
-      if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
-      if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
-      if (res.itemCount !== undefined || res.itemsUpserted !== undefined) {
-        setCatalogItemCount(res.itemCount ?? res.itemsUpserted ?? null);
+      if (shouldSaveMetadata) {
+        if (res.version) setCatalogVersion(res.version);
+        if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
+        if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
+        if (res.itemCount !== undefined || res.itemsUpserted !== undefined) {
+          setCatalogItemCount(res.itemCount ?? res.itemsUpserted ?? null);
+        }
       }
       return res;
     } catch (e: any) {
@@ -433,6 +443,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
           const currentOpfsStatus = await refreshCatalogDownloadStatus();
+          if (currentOpfsStatus !== 'complete') {
+            await resetCatalogState();
+          }
           const res = await refreshCatalog();
           const isUpdateAvailable = res.status === 'UPDATED';
 

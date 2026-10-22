@@ -115,6 +115,8 @@
     "catalogDownloadingUpdate": "Downloading catalog update...",
     "catalogUpToDate": "Catalog is up to date",
     "catalogUpdated": "Catalog updated to {{version}} ({{count}} items)",
+    "catalogUpdateAvailable": "Update available: v: {{version}} ({{count}} items)",
+    "catalogItems": "items",
     "catalogFullInstalled": "Full catalog installed ({{count}} items)",
     "catalogBaseInstalled": "Built-in catalog ({{count}} items). Full update available (~{{size}}MB)",
     "catalogCheckError": "Failed to check for updates",
