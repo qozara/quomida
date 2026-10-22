@@ -234,7 +234,7 @@ describe('Offline Database Download UX & Lifecycle', () => {
 
     await waitFor(() => {
       expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
-      expect(screen.getByText(/catalog updated to 0a766c76 \(19994 items\)/i)).toBeDefined();
+      expect(screen.getByText(/catalog updated to 0a766c76 \(19,?994 items\)/i)).toBeDefined();
     });
   });
 });

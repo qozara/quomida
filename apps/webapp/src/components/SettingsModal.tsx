@@ -387,20 +387,19 @@ export const SettingsModal: React.FC = () => {
     try {
       const res = await refreshCatalog({ force: true });
       console.log('[SettingsModal] Catalog refresh result:', res);
-      const count = res.itemCount || res.itemsUpserted || (downloadStatus === 'complete' ? (catalogItemCount || 19994) : (SYSTEM_CATALOG_META.itemCount || 887));
+      const count = res.itemCount ?? res.itemsUpserted ?? (downloadStatus === 'complete' ? catalogItemCount : SYSTEM_CATALOG_META.itemCount);
       const shortVersion = res.version ? res.version.substring(0, 8) : '';
       if (res.status === 'UPDATED') {
-        setCatalogFeedback(
-          (t.settings as any).catalogUpdated
-            ?.replace('{{version}}', shortVersion)
-            .replace('{{count}}', String(count)) ||
-            `Catalog updated to ${shortVersion} (${count} items)`
-        );
+        const updateText = (t.settings as any).catalogUpdated
+          ?.replace('{{version}}', shortVersion)
+          ?.replace('{{count}}', count !== null && count !== undefined ? count.toLocaleString() : '') ||
+          `Catalog updated to ${shortVersion}${count ? ` (${count.toLocaleString()} items)` : ''}`;
+        setCatalogFeedback(updateText);
       } else if (res.status === 'UP_TO_DATE') {
         setCatalogFeedback(
           (t.settings as any).catalogUpToDate
-            ? `${(t.settings as any).catalogUpToDate} (v: ${shortVersion}, ${count} ${(t.settings as any).items || 'alimentos'})`
-            : `Catalog is up to date (v: ${shortVersion}, ${count} items)`
+            ? `${(t.settings as any).catalogUpToDate}${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${(t.settings as any).items || 'alimentos'}` : ''})` : ''}`
+            : `Catalog is up to date${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} items` : ''})` : ''}`
         );
       } else if (res.status === 'SKIPPED') {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Catalog update skipped');
@@ -1201,20 +1200,22 @@ export const SettingsModal: React.FC = () => {
                   <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
                     {downloadStatus === 'complete' && catalogVersion
                       ? `v: ${catalogVersion.substring(0, 8)}`
-                      : `v: ${SYSTEM_CATALOG_META.catalogVersion?.substring(0, 8) || 'base'}`}
+                      : (SYSTEM_CATALOG_META.catalogVersion ? `v: ${SYSTEM_CATALOG_META.catalogVersion.substring(0, 8)}` : 'v: base')}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
                   {catalogFeedback || (
                     downloadStatus === 'complete'
-                      ? ((t.settings as any).catalogFullInstalled
-                          ? (t.settings as any).catalogFullInstalled.replace('{{count}}', (catalogItemCount || 19994).toLocaleString())
-                          : `Full catalog installed (${(catalogItemCount || 19994).toLocaleString()} items)`)
+                      ? (catalogItemCount
+                          ? ((t.settings as any).catalogFullInstalled
+                              ? (t.settings as any).catalogFullInstalled.replace('{{count}}', catalogItemCount.toLocaleString())
+                              : `Full catalog installed (${catalogItemCount.toLocaleString()} items)`)
+                          : ((t.settings as any).offlineDbInstalled || 'Available Offline'))
                       : ((t.settings as any).catalogBaseInstalled
                           ? (t.settings as any).catalogBaseInstalled
-                              .replace('{{count}}', (SYSTEM_CATALOG_META.itemCount || 887).toLocaleString())
+                              .replace('{{count}}', (SYSTEM_CATALOG_META.itemCount || 0).toLocaleString())
                               .replace('{{size}}', approximateSizeMb)
-                          : `Built-in catalog (${SYSTEM_CATALOG_META.itemCount || 887} items). Full update available (~${approximateSizeMb}MB)`)
+                          : `Built-in catalog (${(SYSTEM_CATALOG_META.itemCount || 0).toLocaleString()} items). Full update available (~${approximateSizeMb}MB)`)
                   )}
                 </p>
                 <button
@@ -1228,7 +1229,7 @@ export const SettingsModal: React.FC = () => {
                 </button>
               </div>
 
-              {/* 1.1M Offline Food Database */}
+              {/* Offline Food Database */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-white">
                   <Database className="w-4 h-4 text-emerald-400" />
