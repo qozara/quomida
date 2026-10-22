@@ -1,8 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { AiMealService, AiMealError, MockLLMProvider } from '@quomida/llm-engine';
-import type { BaseIngredient, Portion, ICatalogProvider } from '@quomida/domain-core';
+import { MealService, type BaseIngredient, type Portion, type ICatalogProvider } from '@quomida/domain-core';
+import { LlmRecipeDecomposer } from '@quomida/ai-services';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,23 +96,19 @@ async function runCliAiLog() {
 
   const catalog = new NodeSqliteCatalogProvider();
 
-  // If AI_PROXY_URL is set in environment, use QozaraAiMealParser; otherwise fallback to MockLLMProvider for offline demo
+  // If AI_PROXY_URL is set in environment, use LlmRecipeDecomposer for uncataloged cultural dishes; otherwise runs 100% offline
   const proxyUrl = process.env.AI_PROXY_URL || process.env.VITE_AI_PROXY_URL;
-  const service = new AiMealService({
-    ...(proxyUrl
-      ? {
-          parserConfig: {
-            proxyUrl,
-            provider: (process.env.AI_PROVIDER as any) || 'qozara-intelligence',
-            ciphertext: process.env.AI_CIPHERTEXT,
-            ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
-            ollamaModel: process.env.OLLAMA_MODEL
-          }
-        }
-      : {
-          provider: new MockLLMProvider()
-        })
-  });
+  const decomposer = proxyUrl
+    ? new LlmRecipeDecomposer({
+        proxyUrl,
+        provider: (process.env.AI_PROVIDER as any) || 'qozara-intelligence',
+        ciphertext: process.env.AI_CIPHERTEXT,
+        ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
+        ollamaModel: process.env.OLLAMA_MODEL
+      })
+    : undefined;
+
+  const service = new MealService({ decomposer });
 
   try {
     const resolvedMeal = await service.processMeal({

@@ -145,6 +145,7 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
     ai_settings: {
       type: 'object',
       properties: {
+        enabled: { type: 'boolean' },
         provider: { type: 'string', enum: ['qozara-intelligence', 'byok', 'ollama', 'window.ai'] },
         ciphertext: { type: 'string' },
         ollama_base_url: { type: 'string' },

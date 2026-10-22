@@ -14,7 +14,7 @@
   "dependencies": {
     "@quomida/domain-core": "*",
     "@quomida/cloud-providers": "*",
-    "@quomida/llm-engine": "*",
+    "@quomida/ai-services": "*",
     "dotenv": "^18.0.0",
     "express": "^5.2.1",
     "open": "^11.0.4",

@@ -5,10 +5,11 @@ import type {
   FoodItem,
   BaseIngredient,
   TaggedPortion,
-  ResolvedAiBatchMeal,
-  ResolvedAiMealItem,
+  ResolvedBatchMeal,
+  ResolvedMealItem,
   Portion,
-  Recipe
+  Recipe,
+  IRecipeDecomposer
 } from '@quomida/domain-core';
 import {
   convertPortionToGrams,
@@ -16,9 +17,11 @@ import {
   CatalogSearchManager,
   PortionManager,
   matchPortionUnit,
-  BatchAiMealResolver,
+  BatchMealResolver,
   RecipeManager
 } from '@quomida/domain-core';
+import { LlmRecipeDecomposer } from '@quomida/ai-services';
+import { AI_CONFIG } from '../config/ai.js';
 import {
   Sparkles,
   X,
@@ -37,9 +40,10 @@ import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 interface BatchAiMealReviewModalProps {
   isOpen: boolean;
-  batchMeal: ResolvedAiBatchMeal | null;
+  batchMeal: ResolvedBatchMeal | null;
   onClose: () => void;
   onLoggedSuccess?: () => void;
+  decomposer?: IRecipeDecomposer;
 }
 
 const mealIcons: Record<MealType, React.ReactNode> = {
@@ -53,12 +57,38 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   isOpen,
   batchMeal,
   onClose,
-  onLoggedSuccess
+  onLoggedSuccess,
+  decomposer: propsDecomposer
 }) => {
-  const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t, locale } = useApp();
+  const { logBatchFoodItems, addRecipe, ingredients, recipes = [], recipeFoods = [], db, t, locale, userSettings } = useApp();
+
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' ? navigator.onLine : true
+  );
+  const [isDecomposingMeal, setIsDecomposingMeal] = useState<boolean>(false);
+  const [decomposeError, setDecomposeError] = useState<string | null>(null);
+  const [isAiDecomposedBanner, setIsAiDecomposedBanner] = useState<boolean>(() => Boolean(batchMeal?.isAiDecomposed));
+  const [sourceDishTitle, setSourceDishTitle] = useState<string | undefined>(() => batchMeal?.sourceDishName);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const isAiConfigured = userSettings?.ai_settings?.enabled !== false;
+  const isAiAvailable = isAiConfigured && isOnline;
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
-  const [items, setItems] = useState<Array<ResolvedAiMealItem & { mealType?: MealType }>>(() =>
+  const [items, setItems] = useState<Array<ResolvedMealItem & { mealType?: MealType }>>(() =>
     (batchMeal?.items || []).map((it) => ({
       ...it,
       mealType: (it as any).mealType || batchMeal?.detectedMealType || 'meal_lunch'
@@ -96,7 +126,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   const [portionManager] = useState(() => new PortionManager());
   const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
-  const [batchResolver] = useState(() => new BatchAiMealResolver(searchManager, portionManager, recipeManager));
+  const [batchResolver] = useState(() => new BatchMealResolver(searchManager, portionManager, recipeManager));
 
   const existingRecipes = useMemo<Recipe[]>(() => {
     if (recipes.length > 0) return recipes;
@@ -121,6 +151,28 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
       locale
     );
   }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver, locale]);
+
+  const activeDecomposer = useMemo<IRecipeDecomposer | null>(() => {
+    if (propsDecomposer) return propsDecomposer;
+    if (!isAiAvailable) return null;
+
+    const getAuthToken = async () => {
+      const creds = userSettings?.active_cloud_provider?.credentials;
+      if (typeof creds === 'string' && creds.trim()) return creds.trim();
+      const token = creds?.accessToken || creds?.access_token || creds?.token;
+      if (typeof token === 'string' && token.trim()) return token.trim();
+      return null;
+    };
+
+    return new LlmRecipeDecomposer({
+      proxyUrl: AI_CONFIG.proxyUrl,
+      provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+      ciphertext: userSettings?.ai_settings?.ciphertext,
+      ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+      ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+      getAuthToken
+    });
+  }, [propsDecomposer, isAiAvailable, userSettings]);
 
   // Re-sync state whenever batchMeal changes
   useEffect(() => {
@@ -156,8 +208,86 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
       } else {
         setLoggingMode('batch');
       }
+      setIsAiDecomposedBanner(Boolean(batchMeal.isAiDecomposed));
+      setSourceDishTitle(batchMeal.sourceDishName);
+      setDecomposeError(null);
+      setIsDecomposingMeal(false);
     }
   }, [batchMeal]);
+
+  const handleForceDecomposeMeal = async () => {
+    if (!activeDecomposer || isDecomposingMeal) return;
+
+    setIsDecomposingMeal(true);
+    setDecomposeError(null);
+
+    try {
+      const dishQuery = (batchMeal?.rawInput || sourceDishTitle || '').trim();
+      if (!dishQuery) {
+        throw new Error('No meal description available to decompose.');
+      }
+
+      const portionContext =
+        items.length === 1 && items[0]
+          ? `${items[0].quantity} ${items[0].selectedPortionName}`
+          : undefined;
+
+      const decomposed = await activeDecomposer.decomposeDish(dishQuery, portionContext, locale);
+
+      if (!decomposed || !decomposed.ingredients || decomposed.ingredients.length === 0) {
+        throw new Error('AI could not estimate ingredients for this dish.');
+      }
+
+      let customPortions: Portion[] = [];
+      if (db) {
+        try {
+          const pdocs = await db.portions.find().exec();
+          customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+        } catch (e) {
+          console.warn('[BatchAiMealReviewModal] Failed to query local portions for decomposition:', e);
+        }
+      }
+
+      const subResolved = await batchResolver.resolveBatch({
+        rawInput: `${dishQuery} (${decomposed.dishName})`,
+        rawItems: decomposed.ingredients.map((ing) => ({
+          foodQuery: ing.search_alias || ing.food_name,
+          name: ing.food_name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          mealType
+        })),
+        customIngredients: ingredients,
+        customRecipes: recipeFoods,
+        customPortions,
+        catalogProvider: remoteService,
+        detectedMealType: mealType,
+        compositeDishName: decomposed.dishName,
+        existingRecipes,
+        isCompositeDish: true,
+        locale
+      });
+
+      const updatedItems: Array<ResolvedMealItem & { mealType?: MealType }> = subResolved.items.map((it) => ({
+        ...it,
+        isAiDecomposed: true,
+        mealType
+      }));
+
+      setItems(updatedItems);
+      setIsAiDecomposedBanner(true);
+      setSourceDishTitle(dishQuery);
+      setActiveSubstituteId(null);
+      if (updatedItems.length >= 2) {
+        setLoggingMode('recipe');
+      }
+    } catch (err: any) {
+      console.warn('[BatchAiMealReviewModal] Force meal decomposition failed:', err);
+      setDecomposeError(err?.message || t.ai?.parseError || 'AI decomposition failed.');
+    } finally {
+      setIsDecomposingMeal(false);
+    }
+  };
 
   const handleSelectGlobalMeal = (m: MealType) => {
     setMealType(m);
@@ -465,6 +595,43 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
           </button>
         </div>
 
+        {/* AI Recipe Decomposition Banner */}
+        {(isAiDecomposedBanner || batchMeal.isAiDecomposed) && (
+          <div className="shrink-0 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-3 flex items-start gap-3 animate-in fade-in duration-150">
+            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-300">
+                  {t.ai?.decomposedRecipeBadge || 'AI Suggested Recipe'}
+                </span>
+                {(sourceDishTitle || batchMeal.sourceDishName) && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30 truncate">
+                    {sourceDishTitle || batchMeal.sourceDishName}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {t.ai?.decomposedRecipeNotice || 'This dish was not found in the catalog. AI estimated its typical ingredients.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Decomposing Loading or Error Feedback */}
+        {isDecomposingMeal && (
+          <div className="shrink-0 p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-300 animate-in fade-in duration-150" aria-live="polite">
+            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span>{t.ai?.decomposingItem || 'Estimating recipe with AI...'}</span>
+          </div>
+        )}
+        {decomposeError && (
+          <div className="shrink-0 p-3 bg-rose-950/40 border border-rose-500/40 rounded-2xl text-xs text-rose-300 animate-in fade-in duration-150" aria-live="polite">
+            <span>{decomposeError}</span>
+          </div>
+        )}
+
         {/* Meal Category Switcher */}
         <div className="shrink-0 space-y-1.5">
           <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
@@ -655,7 +822,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
 
               {/* Substitute Search dropdown when active */}
               {activeSubstituteId === item.id ? (
-                <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl space-y-2 animate-in fade-in duration-150">
+                <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl space-y-2.5 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-300">
                       {t.ai?.searchSubstitute || 'Search catalog for substitute'}
@@ -663,11 +830,12 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveSubstituteId(null)}
-                      className="text-slate-400 hover:text-white p-1"
+                      className="text-slate-400 hover:text-white p-1 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
                     <input
@@ -699,17 +867,19 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                   <p className="text-xs text-amber-300">
                     {t.ai?.unmatchedNotice || 'Food not found in catalog'}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSubstituteId(item.id);
-                      setSubstituteQuery(item.rawQuery);
-                    }}
-                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[44px]"
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                    <span>{t.ai?.searchSubstitute || 'Search catalog for substitute'}</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubstituteId(item.id);
+                        setSubstituteQuery(item.rawQuery);
+                      }}
+                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[44px]"
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      <span>{t.ai?.searchSubstitute || 'Search catalog for substitute'}</span>
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -808,6 +978,27 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Force AI Decomposition Button: single action below meal macros and above log button */}
+        {isAiAvailable && (
+          <button
+            type="button"
+            id="btn-force-decompose-meal"
+            data-testid="btn-force-decompose-meal"
+            onClick={handleForceDecomposeMeal}
+            disabled={isDecomposingMeal}
+            className="w-full py-2.5 px-3 bg-slate-950/80 hover:bg-slate-800/80 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl text-xs font-semibold text-emerald-300 flex items-center justify-center gap-2 transition-all min-h-[44px] active:scale-[0.99] shrink-0"
+          >
+            {isDecomposingMeal ? (
+              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            )}
+            <span className="truncate">
+              {t.ai?.forceDecomposeHint || '¿No es lo que buscabas? Estimar receta con IA'}
+            </span>
+          </button>
         )}
 
         {/* Primary Action Button */}

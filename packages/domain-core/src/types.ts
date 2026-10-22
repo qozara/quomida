@@ -112,6 +112,7 @@ export interface DailyLog {
 export type AiProviderType = 'qozara-intelligence' | 'byok' | 'ollama' | 'window.ai';
 
 export interface UserAiSettings {
+  enabled?: boolean;
   provider: AiProviderType;
   ciphertext?: string;
   ollama_base_url?: string;

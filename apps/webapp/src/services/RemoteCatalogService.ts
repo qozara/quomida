@@ -196,7 +196,10 @@ export class RemoteCatalogService implements ICatalogProvider {
         // If not in OPFS, fetch the static /system.sqlite (240 KB built-in catalog)
         if (!catalogBytes) {
           try {
-            const res = await fetch('/system.sqlite');
+            const url = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('null')
+              ? new URL('/system.sqlite', window.location.origin).toString()
+              : '/system.sqlite';
+            const res = await fetch(url);
             if (res.ok) {
               const buffer = await res.arrayBuffer();
               if (buffer.byteLength > 0) {
@@ -205,8 +208,8 @@ export class RemoteCatalogService implements ICatalogProvider {
                 console.warn('[RemoteCatalogService] /system.sqlite is empty (0 bytes).');
               }
             }
-          } catch (fetchErr) {
-            console.warn('[RemoteCatalogService] Failed to fetch /system.sqlite:', fetchErr);
+          } catch {
+            // Silently ignore fetch failures in environments without an HTTP server (e.g. Node/jsdom unit tests)
           }
         }
 

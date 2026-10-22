@@ -38,9 +38,9 @@ Quomida operates as a clean monorepo structured to ensure complete isolation bet
 ```
 quomida/
 ├── packages/
-│   ├── domain-core/        # Isomorphic TS logic: RxDB JSON schemas, formulas, domain types
-│   ├── sync-adapters/      # CloudSyncProvider interface, MockCloudSyncProvider, Google Drive adapter
-│   ├── llm-engine/         # Natural language log parser with fallback handlers
+│   ├── domain-core/        # Isomorphic TS logic: RxDB JSON schemas, formulas, MealService & offline parser
+│   ├── cloud-providers/    # CloudSyncProvider interface, MockCloudSyncProvider, Google Drive adapter
+│   ├── ai-services/        # Optional external AI adapters (LlmRecipeDecomposer, AiKeyEncryptionService)
 │   └── i18n-locales/       # Centralized localization keys (es.json, en.json)
 ├── apps/
 │   ├── webapp/             # React 19 + Vite + Tailwind PWA with glassmorphic mobile UI
@@ -49,9 +49,10 @@ quomida/
 ```
 
 ### Dependency Rules & Constraints
-1. **`packages/domain-core`**: MUST remain strictly isomorphic. ZERO DOM dependencies, zero UI framework dependencies, and zero database driver imports.
-2. **`packages/sync-adapters`**: Communicates strictly via `SyncDeltaPayload` objects.
-3. **`apps/webapp`**: Consumes `@quomida/domain-core` and `@quomida/sync-adapters` via generic interfaces.
+1. **`packages/domain-core`**: MUST remain strictly isomorphic. ZERO DOM dependencies, zero UI framework dependencies, zero network calls, and zero external AI SDK imports. Houses the pure domain `MealService` and `StandardMealParser`.
+2. **`packages/cloud-providers`**: Communicates strictly via `SyncDeltaPayload` objects.
+3. **`packages/ai-services`**: Houses external AI adapters (`LlmRecipeDecomposer`, `AiKeyEncryptionService`), consuming `@qozara/ai-client` and implementing the `IRecipeDecomposer` domain port.
+4. **`apps/webapp`**: Consumes `@quomida/domain-core` for pure domain orchestration and optionally injects adapters from `@quomida/cloud-providers` and `@quomida/ai-services`.
 
 ---
 
@@ -159,4 +160,35 @@ sequenceDiagram
 - **PWA Service Worker**: Managed via `vite-plugin-pwa` (`generateSW`). Automatically precaches `index.html`, core JavaScript, CSS, and SVG icons. Serves navigation requests offline (`NetworkFirst` with cache fallback) and hashed assets (`CacheFirst`).
 - **Heartbeat & Network Detection**: `AppContext` listens to browser `online`/`offline` window events and executes a periodic 30-second `HEAD /` ping to verify real server reachability. Updates status reactively to `'disconnected'` on connection drop or failed ping.
 - **WCAG 2.2 Accessibility**: Header status badge uses an `sr-only` element inside an `aria-live="polite"` region to announce connectivity state changes to screen readers in English and Spanish.
+
+---
+
+## 7. Hybrid Smart-Escalation Meal Architecture
+
+Quomida uses a hybrid natural language meal ingestion pipeline that cleanly separates linguistic syntax parsing from catalog resolution, re-allocating generative AI strictly as an optional culinary knowledge escalator:
+
+1. **Modular Deterministic Parser (`StandardMealParser`)**:
+   - Executes 100% locally in `packages/domain-core` with sub-millisecond latency (< 1ms) and zero API consumption.
+   - Uses pluggable `ParserLocalePack` interfaces (`esLocalePack`, `enLocalePack`) encapsulating language-specific word numbers, canonical units, meal verbs, and conjunction rules.
+   - Dynamically selects the active pack from App Settings (`userSettings.locale`), falling back cleanly to heuristic multi-pack detection if unconfigured.
+2. **Deterministic Offline Recipe Decomposition (No AI Required)**:
+   - When users log composite meals or multiple foods (e.g., *"milanesa con puré de papas"*, *"2 huevos revueltos con tostadas"*), the parser splits the clause into distinct items.
+   - `BatchMealResolver` resolves each component against the local catalog and automatically synthesizes a composite Virtual Recipe proposal 100% offline.
+3. **Master AI Toggle & Offline Graceful Degradation**:
+   - `userSettingsSchema` includes `ai_settings.enabled`. When toggled off, Quomida operates in 100% private, local-first mode with zero external network requests.
+   - If the device is offline or provider quotas are exhausted, meal parsing and multi-item recipe synthesis continue to work without interruption.
+4. **Just-In-Time (JIT) Culinary LLM Decomposer (`LlmRecipeDecomposer`)**:
+   - Triggers only when a single food query yields no catalog match (e.g., regional/cultural dishes like *"locro"*).
+   - Prompts the LLM to decompose the dish into base agricultural staples (e.g. white corn, beans, beef, squash) with realistic gram weights in the user's language.
+   - Resolves those base ingredients against the catalog to synthesize an editable Virtual Recipe with real calculated macronutrients, eliminating the dead-end *"Alimento no encontrado"* error state.
+
+---
+
+## 8. Hexagonal Dependency Inversion for AI Meal Services
+
+Following Clean Hexagonal Architecture (Ports & Adapters):
+- **Core Domain (`packages/domain-core`)**: Owns `MealService` and the `IRecipeDecomposer` interface (port). `MealService` runs 100% offline out-of-the-box with `StandardMealParser` and `BatchMealResolver`. It has zero knowledge of HTTP or AI SDKs.
+- **AI Infrastructure Adapter (`packages/ai-services`)**: Owns `LlmRecipeDecomposer`, implementing `IRecipeDecomposer` using `@qozara/ai-client`.
+- **In-Memory LRU Decomposition Cache**: `LlmRecipeDecomposer` maintains an in-memory LRU cache (`LruMemoryCache`, capacity 50). Repeat queries for the same uncataloged dish (e.g. accidental double-submits, portion edits, or page navigations) resolve in 0ms without hitting the remote AI proxy, while transient errors (500/503/429) bypass the cache to allow retries.
+- **Composition Root (`apps/webapp`)**: Dynamically passes `new LlmRecipeDecomposer(...)` into `new MealService({ decomposer })` only when AI features are enabled by the user. If disabled or offline, `MealService` operates cleanly without any AI adapter.
 

@@ -1,4 +1,4 @@
 export * from './CatalogSearchManager.js';
 export * from './PortionManager.js';
-export * from './BatchAiMealResolver.js';
+export * from './BatchMealResolver.js';
 export * from './FoodCatalogManager.js';

@@ -13,7 +13,7 @@ import { PortionManager, type TaggedPortion } from './PortionManager.js';
 import { RecipeManager } from '../recipes/RecipeManager.js';
 import { convertPortionToGrams, calculateItemMacros, createMacroSnapshot } from '../calculations/index.js';
 
-export interface RawParsedAiItem {
+export interface RawParsedMealItem {
   foodQuery: string;
   quantity: number;
   unit: string;
@@ -29,7 +29,7 @@ export interface SynthesizedCompositeRecipe {
   isExistingDuplicate: boolean;
 }
 
-export interface ResolvedAiMealItem {
+export interface ResolvedMealItem {
   id: string;
   rawQuery: string;
   food: FoodItem | null;
@@ -40,22 +40,25 @@ export interface ResolvedAiMealItem {
   macros: MacroSnapshot;
   unmatched: boolean;
   mealType?: MealType;
+  isAiDecomposed?: boolean;
 }
 
-export interface ResolvedAiBatchMeal {
+export interface ResolvedBatchMeal {
   rawInput: string;
   detectedMealType: MealType;
-  items: ResolvedAiMealItem[];
+  items: ResolvedMealItem[];
   totalMacros: MacroSnapshot;
   compositeDishName?: string;
   synthesizedRecipe?: SynthesizedCompositeRecipe;
   defaultLoggingMode?: 'recipe' | 'batch';
   isMultiMeal?: boolean;
+  isAiDecomposed?: boolean;
+  sourceDishName?: string;
 }
 
-export interface BatchAiMealOptions {
+export interface BatchMealOptions {
   rawInput: string;
-  rawItems: RawParsedAiItem[];
+  rawItems: RawParsedMealItem[];
   customIngredients: BaseIngredient[];
   customRecipes?: RecipeFoodItem[];
   customPortions?: Portion[];
@@ -68,7 +71,7 @@ export interface BatchAiMealOptions {
   locale?: string;
 }
 
-export type ResolveBatchOptions = BatchAiMealOptions;
+export type ResolveBatchOptions = BatchMealOptions;
 
 /**
  * Normalizes an explicit LLM-detected meal string into a typed MealType.
@@ -177,9 +180,9 @@ export function matchPortionUnit(unit: string, availablePortions: TaggedPortion[
 }
 
 /**
- * High-performance batch resolver for multi-item AI meal logs.
+ * High-performance batch resolver for multi-item meal logs.
  */
-export class BatchAiMealResolver {
+export class BatchMealResolver {
   private readonly searchManager: CatalogSearchManager;
   private readonly portionManager: PortionManager;
   private readonly recipeManager: RecipeManager;
@@ -198,7 +201,7 @@ export class BatchAiMealResolver {
    * Resolves a collection of parsed meal entities in parallel, matches portions,
    * computes individual and cumulative macro snapshots, and synthesizes composite recipes.
    */
-  async resolveBatch(options: BatchAiMealOptions): Promise<ResolvedAiBatchMeal> {
+  async resolveBatch(options: BatchMealOptions): Promise<ResolvedBatchMeal> {
     const {
       rawInput,
       rawItems,
@@ -215,9 +218,9 @@ export class BatchAiMealResolver {
     const detectedMealType =
       normalizeMealType(explicitMealType) || detectMealTypeFromText(rawInput, currentHour);
 
-    const resolvedItems: ResolvedAiMealItem[] = await Promise.all(
+    const resolvedItems: ResolvedMealItem[] = await Promise.all(
       rawItems.map(async (item, idx) => {
-        const itemId = `ai-item-${Date.now()}-${idx}`;
+        const itemId = `meal-item-${Date.now()}-${idx}`;
         const query = (item.foodQuery || '').trim();
         const itemMealType: MealType = normalizeMealType(item.mealType as string) || detectedMealType;
 
@@ -258,7 +261,7 @@ export class BatchAiMealResolver {
                   }
                 }
               } catch (err) {
-                console.error('[BatchAiMealResolver] Candidate provider lookup failed:', err);
+                console.error('[BatchMealResolver] Candidate provider lookup failed:', err);
               }
             }
           }
@@ -422,7 +425,7 @@ export class BatchAiMealResolver {
    * checking existing recipes for nutritional and component equivalence.
    */
   computeSynthesizedRecipe(
-    items: ResolvedAiMealItem[],
+    items: ResolvedMealItem[],
     compositeDishName?: string,
     existingRecipes: Recipe[] = [],
     locale?: string
@@ -489,7 +492,7 @@ export class BatchAiMealResolver {
    * Recalculates an item in a resolved batch and re-evaluates auto-recipe synthesis.
    */
   recalculateItem(
-    meal: ResolvedAiBatchMeal,
+    meal: ResolvedBatchMeal,
     itemId: string,
     updates: { quantity?: number; portionName?: string },
     options?: {
@@ -497,7 +500,7 @@ export class BatchAiMealResolver {
       existingRecipes?: Recipe[];
       compositeDishName?: string;
     }
-  ): ResolvedAiBatchMeal {
+  ): ResolvedBatchMeal {
     const updatedItems = meal.items.map(it => {
       if (it.id !== itemId || it.unmatched || !it.food) return it;
 
@@ -560,7 +563,7 @@ export class BatchAiMealResolver {
    * Swaps the food of an item in a resolved batch and re-evaluates auto-recipe synthesis.
    */
   swapItemFood(
-    meal: ResolvedAiBatchMeal,
+    meal: ResolvedBatchMeal,
     itemId: string,
     newFood: FoodItem | BaseIngredient,
     availablePortions: TaggedPortion[] = [],
@@ -571,7 +574,7 @@ export class BatchAiMealResolver {
       existingRecipes?: Recipe[];
       compositeDishName?: string;
     }
-  ): ResolvedAiBatchMeal {
+  ): ResolvedBatchMeal {
     const normalizedFood: FoodItem = 'kind' in newFood ? newFood : { ...newFood, kind: 'ingredient' };
 
     const updatedItems = meal.items.map(it => {
@@ -635,7 +638,7 @@ export class BatchAiMealResolver {
     };
   }
 
-  private computeTotalMacros(items: ResolvedAiMealItem[]): MacroSnapshot {
+  private computeTotalMacros(items: ResolvedMealItem[]): MacroSnapshot {
     let totalCals = 0;
     let totalProt = 0;
     let totalCarbs = 0;

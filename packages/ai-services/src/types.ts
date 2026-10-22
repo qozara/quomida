@@ -24,3 +24,19 @@ export interface LLMParseContext {
 export interface LLMProvider {
   parse(input: string, context?: LLMParseContext): Promise<ParsedNaturalLanguageMeal>;
 }
+
+export interface DecomposedIngredient {
+  food_name: string;
+  search_alias?: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+}
+
+export interface DecomposedDishResult {
+  dishName: string;
+  rationale?: string;
+  estimatedTotalWeightGrams?: number;
+  ingredients: DecomposedIngredient[];
+}
+

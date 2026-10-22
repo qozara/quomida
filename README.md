@@ -47,9 +47,9 @@ All architectural decisions, product specifications, component blueprints, and p
 ```
 quomida/
 ├── packages/
-│   ├── domain-core/      # Isomorphic TypeScript SDK: RxDB schemas, yield formulas & calculations
-│   ├── sync-adapters/    # Unified SyncAdapter, Composite strategy, @qozara/gdocs-schema validation, Mock & Google Drive/Sheets
-│   ├── llm-engine/       # Natural language meal log parser with fallback handlers
+│   ├── domain-core/      # Isomorphic TypeScript SDK: RxDB schemas, yield formulas, MealService & offline meal parser
+│   ├── cloud-providers/  # Unified SyncAdapter, Composite strategy, @qozara/gdocs-schema validation, Mock & Google Drive/Sheets
+│   ├── ai-services/      # Optional external AI adapters: JIT culinary recipe decomposition & KMS key encryption
 │   └── i18n-locales/     # Centralized English & Spanish translation dictionaries
 ├── apps/
 │   ├── webapp/           # React 19 + Vite + RxDB PWA with modern glassmorphic mobile UI

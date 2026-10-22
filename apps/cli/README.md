@@ -13,6 +13,7 @@ Run these scripts from the repository root or within the `apps/cli` workspace:
 | **Catalog & Domain Demo** | `npm run cli` | Runs domain calculations and catalog search demo in terminal. |
 | **Google OAuth Login** | `npm run login --workspace=@quomida/cli` | Starts local OAuth listener, launches browser, and saves tokens to `~/.quomida/credentials.json`. |
 | **Google OAuth Logout** | `npm run logout --workspace=@quomida/cli` | Removes cached credentials from `~/.quomida/credentials.json`. |
+| **Natural Language Meal Log** | `npm run ai --workspace=@quomida/cli -- "2 huevos revueltos con tostadas"` | Parses and resolves natural language meal query using domain `MealService`. |
 | **Google Sync E2E Test** | `npm run test:e2e --workspace=@quomida/cli` | Executes live `push()` and `pull()` payloads against user's real Google Drive. |
 
 ---

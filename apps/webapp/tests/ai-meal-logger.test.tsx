@@ -63,6 +63,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockChat.mockReset();
 
     vi.spyOn(AiProviderFactory, 'createProvider').mockResolvedValue({
       id: 'mock-provider',
@@ -348,8 +349,9 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
+    // Query an uncataloged dish to trigger AI recipe decomposer
     fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: 'comí dos hamburguesas de carne en la cena' }
+      target: { value: 'cené 1 plato de locro criollo' }
     });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
@@ -387,8 +389,9 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
+    // Query an uncataloged dish to trigger AI recipe decomposer
     fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: 'comí dos hamburguesas' }
+      target: { value: 'cené 1 plato de locro criollo' }
     });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
@@ -404,7 +407,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
   it('correctly passes Google OAuth accessToken from active_cloud_provider credentials to AI provider', async () => {
     let capturedGetAuthToken: any = null;
-    vi.spyOn(AiProviderFactory, 'createProvider').mockImplementation(async (_config: any, getAuthToken: any) => {
+    vi.spyOn(AiProviderFactory, 'createProvider').mockImplementationOnce(async (_config: any, getAuthToken: any) => {
       capturedGetAuthToken = getAuthToken;
       return {
         id: 'mock-provider',
@@ -444,8 +447,9 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
+    // Query uncataloged dish to trigger AI decomposer
     fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: '1 huevo' }
+      target: { value: 'cené 1 plato de locro criollo' }
     });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
@@ -484,8 +488,9 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
 
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
+    // Query uncataloged dish to trigger AI decomposer
     fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: '1 huevo' }
+      target: { value: 'cené 1 plato de locro criollo' }
     });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
@@ -592,7 +597,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
     const searchInput = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, { target: { value: 'milanesa con pure de papas' } });
+    fireEvent.change(searchInput, { target: { value: 'milanesa con puré de papas' } });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
     await waitFor(() => {
@@ -600,7 +605,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     });
 
     // Check recipe name and badge
-    expect(screen.getByText('Milanesa con puré de papas')).toBeDefined();
+    expect(screen.getByText('Milanesa con Pure de Papas')).toBeDefined();
     expect(screen.getByText(dictionaries.en.ai.autoSavedRecipeBadge)).toBeDefined();
 
     // Confirm log
@@ -613,7 +618,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     });
 
     const savedRecipe = addRecipeMock.mock.calls[0][0];
-    expect(savedRecipe.name).toBe('Milanesa con puré de papas');
+    expect(savedRecipe.name).toBe('Milanesa con Pure de Papas');
     expect(savedRecipe.ingredients).toHaveLength(2);
 
     const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
@@ -706,7 +711,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     render(<FoodLogger onSelectIngredient={onSelectMock} />);
 
     const searchInput = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, { target: { value: 'milanesa con pure de papas' } });
+    fireEvent.change(searchInput, { target: { value: 'milanesa con puré de papas' } });
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
     await waitFor(() => {

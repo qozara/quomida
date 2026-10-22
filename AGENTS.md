@@ -135,7 +135,9 @@ npm run build
 | Google Drive Sheets Sync Adapter | `packages/cloud-providers/src/google/GoogleDriveSheetsCloudSyncProvider.ts` |
 | Macro Calculations & Formulas | `packages/domain-core/src/calculations/index.ts` |
 
-| LLM Natural Log Parser | `packages/llm-engine/src/LLMParser.ts` |
+| Meal Logging Service | `packages/domain-core/src/services/MealService.ts` |
+| AI Recipe Decomposer | `packages/ai-services/src/LlmRecipeDecomposer.ts` |
+| Batch Meal Resolver | `packages/domain-core/src/catalog/BatchMealResolver.ts` |
 | React App Context & DB Provider | `apps/webapp/src/context/AppContext.tsx` |
 | RxDB Database Hydration & DB6 Guard | `apps/webapp/src/db/rxdb.ts` |
 | Schema Remediation Modal | `apps/webapp/src/components/sync/SchemaRemediationModal.tsx` |

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedAiBatchMeal } from '@quomida/domain-core';
-import { CatalogSearchManager, BatchAiMealResolver } from '@quomida/domain-core';
-import { AiMealService, AiMealError } from '@quomida/llm-engine';
+import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedBatchMeal } from '@quomida/domain-core';
+import { CatalogSearchManager, BatchMealResolver, MealService } from '@quomida/domain-core';
+import { LlmRecipeDecomposer, AiMealError, classifyAiError } from '@quomida/ai-services';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
 import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
@@ -21,8 +21,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
-  const [batchResolver] = useState(() => new BatchAiMealResolver(searchManager));
-  const [batchMeal, setBatchMeal] = useState<ResolvedAiBatchMeal | null>(null);
+  const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
+  const [batchMeal, setBatchMeal] = useState<ResolvedBatchMeal | null>(null);
   const [isBatchReviewOpen, setIsBatchReviewOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isFullCatalog, setIsFullCatalog] = useState(() => remoteService.isFullCatalogLoaded);
@@ -109,54 +109,58 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         }
       }
 
-      const aiService = new AiMealService({
-        parserConfig: {
-          proxyUrl: AI_CONFIG.proxyUrl,
-          provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
-          ciphertext: userSettings?.ai_settings?.ciphertext,
-          ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
-          ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
-          getAuthToken
-        },
+      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
+
+      const decomposer = isAiEnabled
+        ? new LlmRecipeDecomposer({
+            proxyUrl: AI_CONFIG.proxyUrl,
+            provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+            ciphertext: userSettings?.ai_settings?.ciphertext,
+            ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+            ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+            getAuthToken
+          })
+        : undefined;
+
+      const mealService = new MealService({
+        decomposer,
         searchManager,
         batchResolver
       });
 
-      const resolved = await aiService.processMeal({
+      const resolved = await mealService.processMeal({
         input: query,
         customIngredients: ingredients,
         customRecipes: recipeFoods,
         existingRecipes: recipes,
         customPortions,
         catalogProvider: remoteService,
-        locale
-      } as any);
+        locale,
+        aiEnabled: isAiEnabled
+      });
 
       setIsParsing(false);
       setBatchMeal(resolved);
       setIsBatchReviewOpen(true);
     } catch (err: unknown) {
       setIsParsing(false);
-      if (err instanceof AiMealError) {
-        switch (err.code) {
-          case 'AUTHENTICATION_REQUIRED':
-            setParseError(t.ai?.tokenExpiredNotice || 'Your Google session has expired or is invalid. Please reconnect in Settings.');
-            break;
-          case 'RATE_LIMIT_EXCEEDED':
-            setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
-            break;
-          case 'AI_DISABLED':
-            setParseError(t.ai?.aiDisabled || 'AI is disabled. Please configure your AI provider in Settings.');
-            break;
-          case 'NO_ITEMS_PARSED':
-            setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
-            break;
-          default:
-            setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
-            break;
-        }
-      } else {
-        setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
+      const aiError = err instanceof AiMealError ? err : classifyAiError(err);
+      switch (aiError.code) {
+        case 'AUTHENTICATION_REQUIRED':
+          setParseError(t.ai?.tokenExpiredNotice || 'Your Google session has expired or is invalid. Please reconnect in Settings.');
+          break;
+        case 'RATE_LIMIT_EXCEEDED':
+          setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
+          break;
+        case 'AI_DISABLED':
+          setParseError(t.ai?.aiDisabled || 'AI is disabled. Please configure your AI provider in Settings.');
+          break;
+        case 'NO_ITEMS_PARSED':
+          setParseError(t.ai?.noItemsParsed || 'Could not extract food items from description.');
+          break;
+        default:
+          setParseError(t.ai?.parseError || 'Natural language parsing failed. Falling back to catalog search.');
+          break;
       }
     }
   };
