@@ -31,6 +31,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { SYSTEM_CATALOG_META } from '../services/RemoteCatalogService.js';
 import { AiKeyEncryptionService } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
 import {
@@ -69,6 +70,7 @@ export const SettingsModal: React.FC = () => {
     catalogVersion,
     catalogGeneratedAt: _catalogGeneratedAt,
     catalogFileSizeBytes,
+    catalogItemCount,
     refreshCatalog,
     isOnline,
     t
@@ -80,8 +82,15 @@ export const SettingsModal: React.FC = () => {
     error: downloadError,
     isDeleting,
     downloadCatalog,
-    deleteCatalog
+    deleteCatalog,
+    refreshStatus
   } = useCatalogDownload();
+
+  useEffect(() => {
+    if (isSettingsOpen && typeof refreshStatus === 'function') {
+      refreshStatus();
+    }
+  }, [isSettingsOpen, refreshStatus]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'app-settings': false,
@@ -374,23 +383,32 @@ export const SettingsModal: React.FC = () => {
     if (isChecking) return;
     setCatalogFeedback(null);
     setIsChecking(true);
+    console.log('[SettingsModal] Checking for catalog updates...');
     try {
       const res = await refreshCatalog({ force: true });
+      console.log('[SettingsModal] Catalog refresh result:', res);
+      const count = res.itemCount || res.itemsUpserted || (downloadStatus === 'complete' ? (catalogItemCount || 19994) : (SYSTEM_CATALOG_META.itemCount || 887));
+      const shortVersion = res.version ? res.version.substring(0, 8) : '';
       if (res.status === 'UPDATED') {
         setCatalogFeedback(
           (t.settings as any).catalogUpdated
-            ?.replace('{{version}}', res.version || '')
-            .replace('{{count}}', String(res.itemsUpserted || 0)) ||
-            `Catalog updated to ${res.version} (${res.itemsUpserted} items)`
+            ?.replace('{{version}}', shortVersion)
+            .replace('{{count}}', String(count)) ||
+            `Catalog updated to ${shortVersion} (${count} items)`
         );
       } else if (res.status === 'UP_TO_DATE') {
-        setCatalogFeedback((t.settings as any).catalogUpToDate || 'Catalog is up to date');
+        setCatalogFeedback(
+          (t.settings as any).catalogUpToDate
+            ? `${(t.settings as any).catalogUpToDate} (v: ${shortVersion}, ${count} ${(t.settings as any).items || 'alimentos'})`
+            : `Catalog is up to date (v: ${shortVersion}, ${count} items)`
+        );
       } else if (res.status === 'SKIPPED') {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Catalog update skipped');
       } else {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Failed to check for updates');
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[SettingsModal] Failed to check for catalog updates:', err);
       setCatalogFeedback((t.settings as any).catalogCheckError || 'Failed to check for updates');
     } finally {
       setIsChecking(false);
@@ -1180,14 +1198,24 @@ export const SettingsModal: React.FC = () => {
                       {t.settings.catalogTitle || 'Food Catalog & Ingredients'}
                     </span>
                   </div>
-                  {catalogVersion && (
-                    <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
-                      v: {catalogVersion.substring(0, 8)}
-                    </span>
-                  )}
+                  <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                    {downloadStatus === 'complete' && catalogVersion
+                      ? `v: ${catalogVersion.substring(0, 8)}`
+                      : `v: ${SYSTEM_CATALOG_META.catalogVersion?.substring(0, 8) || 'base'}`}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  {catalogFeedback || (t.settings.catalogVersion ? t.settings.catalogVersion.replace('{{version}}', catalogVersion || '1.0') : 'Catalog is current')}
+                  {catalogFeedback || (
+                    downloadStatus === 'complete'
+                      ? ((t.settings as any).catalogFullInstalled
+                          ? (t.settings as any).catalogFullInstalled.replace('{{count}}', (catalogItemCount || 19994).toLocaleString())
+                          : `Full catalog installed (${(catalogItemCount || 19994).toLocaleString()} items)`)
+                      : ((t.settings as any).catalogBaseInstalled
+                          ? (t.settings as any).catalogBaseInstalled
+                              .replace('{{count}}', (SYSTEM_CATALOG_META.itemCount || 887).toLocaleString())
+                              .replace('{{size}}', approximateSizeMb)
+                          : `Built-in catalog (${SYSTEM_CATALOG_META.itemCount || 887} items). Full update available (~${approximateSizeMb}MB)`)
+                  )}
                 </p>
                 <button
                   type="button"
@@ -1505,6 +1533,8 @@ export const SettingsModal: React.FC = () => {
                   setShowConfirmDownload(false);
                   const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
                   const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+                  console.log('[SettingsModal] User confirmed download. Starting download from:', targetUrl);
+                  setCatalogFeedback(null);
                   downloadCatalog(targetUrl);
                 }}
                 className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-sm"
@@ -1546,6 +1576,8 @@ export const SettingsModal: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   setShowConfirmDelete(false);
+                  console.log('[SettingsModal] User confirmed delete. Removing downloaded catalog...');
+                  setCatalogFeedback(null);
                   await deleteCatalog();
                 }}
                 className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"

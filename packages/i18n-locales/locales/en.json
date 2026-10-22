@@ -114,6 +114,8 @@
     "checkingCatalog": "Checking for updates...",
     "catalogUpToDate": "Catalog is up to date",
     "catalogUpdated": "Catalog updated to {{version}} ({{count}} items)",
+    "catalogFullInstalled": "Full catalog installed ({{count}} items)",
+    "catalogBaseInstalled": "Built-in catalog ({{count}} items). Full update available (~{{size}}MB)",
     "catalogCheckError": "Failed to check for updates",
     "offlineDbTitle": "Offline Food Database",
     "offlineDbDescription": "Quomida supports downloading the complete food database directly to your device for instant offline searches without using cellular data.",

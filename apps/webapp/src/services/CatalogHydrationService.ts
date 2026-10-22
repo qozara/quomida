@@ -5,6 +5,7 @@ export interface HydrationResult {
   version?: string;
   generatedAt?: string;
   fileSizeBytes?: number;
+  itemCount?: number;
   itemsUpserted: number;
   error?: string;
 }
@@ -57,13 +58,21 @@ export class CatalogHydrationService {
     const remoteVersion = meta?.catalogVersion;
     const remoteGeneratedAt = meta?.generatedAt;
     const remoteFileSizeBytes = meta?.fileSizeBytes;
+    const remoteItemCount = meta?.itemCount ?? 0;
 
     if (!remoteVersion) return { status: 'ERROR', itemsUpserted: 0, error: 'Catalog metadata is missing catalogVersion property' };
 
     // Compare versions
     const localVersion = await this.dbService.getMetadata('lastIngestedCatalogVersion');
     if (!options?.force && localVersion === remoteVersion) {
-      return { status: 'UP_TO_DATE', version: remoteVersion, generatedAt: remoteGeneratedAt, fileSizeBytes: remoteFileSizeBytes, itemsUpserted: 0 };
+      return {
+        status: 'UP_TO_DATE',
+        version: remoteVersion,
+        generatedAt: remoteGeneratedAt,
+        fileSizeBytes: remoteFileSizeBytes,
+        itemCount: remoteItemCount,
+        itemsUpserted: remoteItemCount
+      };
     }
 
     // Update metadata in local RxDB
@@ -74,13 +83,17 @@ export class CatalogHydrationService {
     if (remoteFileSizeBytes) {
       await this.dbService.setMetadata('lastIngestedCatalogFileSizeBytes', String(remoteFileSizeBytes));
     }
+    if (remoteItemCount) {
+      await this.dbService.setMetadata('lastIngestedCatalogItemCount', String(remoteItemCount));
+    }
 
     return {
       status: 'UPDATED',
       version: remoteVersion,
       generatedAt: remoteGeneratedAt,
       fileSizeBytes: remoteFileSizeBytes,
-      itemsUpserted: 0
+      itemCount: remoteItemCount,
+      itemsUpserted: remoteItemCount
     };
   }
 }

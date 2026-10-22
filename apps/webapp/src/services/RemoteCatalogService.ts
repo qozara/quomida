@@ -57,6 +57,7 @@ export class RemoteCatalogService implements ICatalogProvider {
   }
 
   public static notifyCatalogDownloaded(): void {
+    console.log('[RemoteCatalogService] notifyCatalogDownloaded: broadcasting catalog change event.');
     const target = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
     if (target && typeof (target as any).dispatchEvent === 'function') {
       try {
@@ -107,6 +108,7 @@ export class RemoteCatalogService implements ICatalogProvider {
   }
 
   public async reset(): Promise<void> {
+    console.log('[RemoteCatalogService] Resetting worker and closing database connections.');
     this.initPromise = null;
     const wp = this.workerPromise;
     this.workerPromise = null;
@@ -166,6 +168,7 @@ export class RemoteCatalogService implements ICatalogProvider {
           localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
           if (localTotal > 0) {
             opfsOpened = true;
+            console.log(`[RemoteCatalogService] Initialized local catalog with ${localTotal} items (OPFS VFS mode).`);
           }
         } catch (opfsErr) {
           console.warn('[RemoteCatalogService] OPFS mount via vfs:opfs unavailable, falling back to zero-header loading:', opfsErr);
@@ -221,7 +224,7 @@ export class RemoteCatalogService implements ICatalogProvider {
               rowMode: 'array' 
             } as any);
             localTotal = (countRes as any)?.result?.resultRows?.[0]?.[0] || 0;
-            console.log(`[RemoteCatalogService] Initialized local catalog with ${localTotal} items.`);
+            console.log(`[RemoteCatalogService] Initialized local catalog with ${localTotal} items (Memory byteArray mode).`);
           } catch (memErr) {
             console.warn('[RemoteCatalogService] Failed to load catalog via byteArray:', memErr);
           }

@@ -3,12 +3,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useCatalogDownload } from '../src/hooks/useCatalogDownload';
+import { useCatalogDownload, resetSharedCatalogDownloadState } from '../src/hooks/useCatalogDownload';
 
 describe('useCatalogDownload', () => {
   let mockWorker: any;
 
   beforeEach(() => {
+    resetSharedCatalogDownloadState();
     mockWorker = {
       postMessage: vi.fn(),
       terminate: vi.fn(),
