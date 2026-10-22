@@ -3,6 +3,7 @@ import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db
 import { syncDatabaseWithRemote } from '../db/replication.js';
 import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
 import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
+import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 import {
   type BaseIngredient,
   type Recipe,
@@ -169,6 +170,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
   const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
   const syncLock = React.useRef(false);
+  const { checkAndTriggerAutoDownload } = useCatalogDownload();
 
   const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
     try {
@@ -385,8 +387,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
         if (v) setCatalogFileSizeBytes(Number(v));
       });
-      DatabaseBootstrapper.ensureSystemCatalogOPFS().then(() => {
-        return refreshCatalog();
+      DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
+        const res = await refreshCatalog();
+        // Check adaptive auto-download if remote catalog is <= 10MB
+        if (typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof checkAndTriggerAutoDownload === 'function') {
+          const userPref = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
+          const baseUrl = (import.meta as any).env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
+          const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+          checkAndTriggerAutoDownload({
+            downloadUrl,
+            fileSizeBytes: res.fileSizeBytes,
+            isOnline: navigator.onLine !== false,
+            userAutoDownloadPref: userPref
+          });
+        }
       }).catch((err) => {
         console.warn('[CatalogHydration] Background boot hydration notice:', err);
       });

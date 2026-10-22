@@ -128,4 +128,107 @@ describe('useCatalogDownload', () => {
     expect(result.current.status).toBe('idle');
     expect(result.current.progress).toBe(0);
   });
+
+  describe('checkAndTriggerAutoDownload', () => {
+    it('triggers auto-download when online, size <= 10MB, and saveData is false', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024, // 2.3MB
+          isOnline: true,
+          userAutoDownloadPref: true
+        });
+      });
+
+      expect(triggered).toBe(true);
+      expect(result.current.status).toBe('fetching');
+      expect(mockWorker.postMessage).toHaveBeenCalledWith({
+        type: 'START_DOWNLOAD',
+        payload: { url: 'http://example.com/catalog.sqlite.gz' }
+      });
+    });
+
+    it('does NOT trigger auto-download when size > 10MB', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 12 * 1024 * 1024, // 12MB
+          isOnline: true,
+          userAutoDownloadPref: true
+        });
+      });
+
+      expect(triggered).toBe(false);
+      expect(result.current.status).toBe('idle');
+      expect(mockWorker.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('does NOT trigger auto-download when user disabled auto-download preference', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024,
+          isOnline: true,
+          userAutoDownloadPref: false
+        });
+      });
+
+      expect(triggered).toBe(false);
+      expect(result.current.status).toBe('idle');
+      expect(mockWorker.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('does NOT trigger auto-download when browser has saveData enabled', () => {
+      vi.stubGlobal('navigator', {
+        connection: { saveData: true },
+        storage: {
+          getDirectory: vi.fn().mockResolvedValue({
+            getFileHandle: vi.fn().mockRejectedValue(new Error('Not found'))
+          })
+        }
+      });
+
+      const { result } = renderHook(() => useCatalogDownload());
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024,
+          isOnline: true,
+          userAutoDownloadPref: true
+        });
+      });
+
+      expect(triggered).toBe(false);
+      expect(result.current.status).toBe('idle');
+    });
+
+    it('does NOT trigger auto-download when app is offline', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024,
+          isOnline: false,
+          userAutoDownloadPref: true
+        });
+      });
+
+      expect(triggered).toBe(false);
+      expect(result.current.status).toBe('idle');
+    });
+  });
 });
+

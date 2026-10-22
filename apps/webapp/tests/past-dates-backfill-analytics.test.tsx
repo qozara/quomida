@@ -33,7 +33,8 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
       error: null,
       isDeleting: false,
       downloadCatalog: vi.fn(),
-      deleteCatalog: vi.fn()
+      deleteCatalog: vi.fn(),
+      checkAndTriggerAutoDownload: vi.fn()
     });
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as any);
     await clearLocalDatabase();

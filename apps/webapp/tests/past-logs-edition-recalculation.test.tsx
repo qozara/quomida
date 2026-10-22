@@ -33,7 +33,8 @@ describe('Past Food & Weight Logs Edition: Tendency & Adaptive Target Recalculat
       error: null,
       isDeleting: false,
       downloadCatalog: vi.fn(),
-      deleteCatalog: vi.fn()
+      deleteCatalog: vi.fn(),
+      checkAndTriggerAutoDownload: vi.fn()
     });
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as any);
     await clearLocalDatabase();
