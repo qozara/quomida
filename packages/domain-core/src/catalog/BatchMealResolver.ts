@@ -438,6 +438,12 @@ export class BatchMealResolver {
       return undefined;
     }
 
+    // Multi-meal items across distinct meal times must not be synthesized into a single recipe
+    const distinctMeals = new Set(validItems.map(it => it.mealType).filter(Boolean));
+    if (distinctMeals.size > 1) {
+      return undefined;
+    }
+
     const isEn =
       (locale && locale.toLowerCase().startsWith('en')) ||
       (!locale && validItems.every(it => (it.food as any)?.lang === 'en'));
@@ -459,6 +465,11 @@ export class BatchMealResolver {
       dishName = dishName.charAt(0).toUpperCase() + dishName.slice(1);
     }
 
+    // Recipe names must not exceed 100 characters [ADR-0024]
+    if (dishName.length > 100) {
+      dishName = dishName.slice(0, 97).trim() + '...';
+    }
+
     const components: RecipeComponent[] = validItems.map(it =>
       this.recipeManager.buildComponent(
         it.food!,
@@ -467,25 +478,30 @@ export class BatchMealResolver {
       )
     );
 
-    const candidateRecipe = this.recipeManager.createRecipe({
-      name: dishName,
-      ingredients: components
-    });
+    try {
+      const candidateRecipe = this.recipeManager.createRecipe({
+        name: dishName,
+        ingredients: components
+      });
 
-    const existingMatch = this.recipeManager.findEquivalentRecipe(candidateRecipe, existingRecipes);
-    if (existingMatch) {
+      const existingMatch = this.recipeManager.findEquivalentRecipe(candidateRecipe, existingRecipes);
+      if (existingMatch) {
+        return {
+          recipe: existingMatch,
+          foodItem: this.recipeManager.toFoodItem(existingMatch),
+          isExistingDuplicate: true
+        };
+      }
+
       return {
-        recipe: existingMatch,
-        foodItem: this.recipeManager.toFoodItem(existingMatch),
-        isExistingDuplicate: true
+        recipe: candidateRecipe,
+        foodItem: this.recipeManager.toFoodItem(candidateRecipe),
+        isExistingDuplicate: false
       };
+    } catch (err) {
+      console.warn('[BatchMealResolver] Could not synthesize candidate recipe:', err);
+      return undefined;
     }
-
-    return {
-      recipe: candidateRecipe,
-      foodItem: this.recipeManager.toFoodItem(candidateRecipe),
-      isExistingDuplicate: false
-    };
   }
 
   /**

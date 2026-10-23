@@ -144,13 +144,14 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   const isMultiMeal = distinctMeals.size > 1 || Boolean((batchMeal as any)?.isMultiMeal && distinctMeals.size > 1);
 
   const activeSynthesizedRecipe = useMemo(() => {
+    if (isMultiMeal) return undefined;
     return batchResolver.computeSynthesizedRecipe(
       items,
       batchMeal?.compositeDishName,
       existingRecipes,
       locale
     );
-  }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver, locale]);
+  }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver, locale, isMultiMeal]);
 
   const activeDecomposer = useMemo<IRecipeDecomposer | null>(() => {
     if (propsDecomposer) return propsDecomposer;
