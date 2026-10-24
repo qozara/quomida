@@ -89,6 +89,7 @@ export class DatabaseBootstrapper {
 
   static async removeDownloadedCatalogAndReseed(): Promise<void> {
     try {
+      console.log('[DatabaseBootstrapper] Removing downloaded catalog.sqlite from OPFS...');
       if (typeof navigator === 'undefined' || !navigator.storage) {
         return;
       }
@@ -96,6 +97,7 @@ export class DatabaseBootstrapper {
       if (typeof opfsRoot.removeEntry === 'function') {
         try {
           await opfsRoot.removeEntry('catalog.sqlite');
+          console.log('[DatabaseBootstrapper] catalog.sqlite successfully removed from OPFS.');
         } catch (err: any) {
           if (err.name !== 'NotFoundError') {
             console.warn('[DatabaseBootstrapper] Error removing catalog.sqlite:', err);
@@ -106,7 +108,9 @@ export class DatabaseBootstrapper {
         } catch {}
       }
       // Re-seed OPFS with the built-in system.sqlite
+      console.log('[DatabaseBootstrapper] Reseeding OPFS with built-in system.sqlite...');
       await DatabaseBootstrapper.ensureSystemCatalogOPFS();
+      console.log('[DatabaseBootstrapper] OPFS reseeded with system.sqlite successfully.');
     } catch (err) {
       console.warn('[DatabaseBootstrapper] Error removing downloaded catalog and reseeding:', err);
       throw err;

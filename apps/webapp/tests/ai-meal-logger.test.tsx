@@ -1052,4 +1052,126 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(loggedItems[0].mealType).toBe('meal_dinner');
     expect(loggedItems[1].mealType).toBe('meal_dinner');
   });
+
+  it('safely renders multi-meal batch without fatal error when component food names exceed 100 characters', async () => {
+    const multiMealLongNamesBatch: any = {
+      rawInput: 'desayuné queso y almorcé panchos, merendé galletitas y cené tallarines',
+      detectedMealType: 'meal_breakfast',
+      totalMacros: { calories: 1450, protein: 55, carbs: 165, fats: 60 },
+      isMultiMeal: true,
+      defaultLoggingMode: 'batch',
+      items: [
+        {
+          id: 'item-queso',
+          rawQuery: 'queso',
+          food: {
+            id: 'sys-queso',
+            name: 'Queso tipo cuartirolo cremoso de primera calidad con alto contenido graso',
+            calories_100g: 270,
+            protein_100g: 21,
+            carbs_100g: 1.5,
+            fats_100g: 20
+          },
+          quantity: 1,
+          selectedPortionName: '1 porción',
+          availablePortions: [
+            { id: 'p-1', name: '1 porción', equivalent_weight_g: 50, base_food_id: 'sys-queso', source: 'system' }
+          ],
+          calculatedWeightGrams: 50,
+          macros: { calories: 135, protein: 10.5, carbs: 0.75, fats: 10 },
+          unmatched: false,
+          mealType: 'meal_breakfast'
+        },
+        {
+          id: 'item-panchos',
+          rawQuery: 'panchos',
+          food: {
+            id: 'sys-panchos',
+            name: 'Panchos clásicos con salchicha de viena en pan artesanal para hot dog',
+            calories_100g: 260,
+            protein_100g: 11,
+            carbs_100g: 22,
+            fats_100g: 14
+          },
+          quantity: 1,
+          selectedPortionName: '1 unidad',
+          availablePortions: [
+            { id: 'p-2', name: '1 unidad', equivalent_weight_g: 120, base_food_id: 'sys-panchos', source: 'system' }
+          ],
+          calculatedWeightGrams: 120,
+          macros: { calories: 312, protein: 13.2, carbs: 26.4, fats: 16.8 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-galletitas',
+          rawQuery: 'galletitas',
+          food: {
+            id: 'sys-galletitas',
+            name: 'Galletitas dulces surtidas rellenas con crema sabor vainilla y chocolate',
+            calories_100g: 480,
+            protein_100g: 5,
+            carbs_100g: 68,
+            fats_100g: 21
+          },
+          quantity: 1,
+          selectedPortionName: '1 porción',
+          availablePortions: [
+            { id: 'p-3', name: '1 porción', equivalent_weight_g: 60, base_food_id: 'sys-galletitas', source: 'system' }
+          ],
+          calculatedWeightGrams: 60,
+          macros: { calories: 288, protein: 3, carbs: 40.8, fats: 12.6 },
+          unmatched: false,
+          mealType: 'meal_snack'
+        },
+        {
+          id: 'item-tallarines',
+          rawQuery: 'tallarines',
+          food: {
+            id: 'sys-tallarines',
+            name: 'Tallarines secos al huevo tradicionales cocidos al dente con salsa filetto casera',
+            calories_100g: 160,
+            protein_100g: 5.5,
+            carbs_100g: 31,
+            fats_100g: 1.5
+          },
+          quantity: 1,
+          selectedPortionName: '1 plato',
+          availablePortions: [
+            { id: 'p-4', name: '1 plato', equivalent_weight_g: 300, base_food_id: 'sys-tallarines', source: 'system' }
+          ],
+          calculatedWeightGrams: 300,
+          macros: { calories: 480, protein: 16.5, carbs: 93, fats: 4.5 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        }
+      ]
+    };
+
+    // Rendering this must succeed without throwing ERR_RECIPE_NAME_TOO_LONG
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={multiMealLongNamesBatch}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Multiple meal times detected/i)).toBeDefined();
+    expect(screen.getByText(/Log 4 Items to Diary/i)).toBeDefined();
+
+    const logButton = document.getElementById('btn-log-batch-ai');
+    fireEvent.click(logButton!);
+
+    await waitFor(() => {
+      expect(logBatchFoodItemsMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
+    expect(loggedItems).toHaveLength(4);
+    expect(loggedItems[0].mealType).toBe('meal_breakfast');
+    expect(loggedItems[1].mealType).toBe('meal_lunch');
+    expect(loggedItems[2].mealType).toBe('meal_snack');
+    expect(loggedItems[3].mealType).toBe('meal_dinner');
+  });
 });

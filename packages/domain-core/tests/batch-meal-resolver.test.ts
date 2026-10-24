@@ -867,6 +867,99 @@ describe('BatchMealResolver & Portion Matching', () => {
         expect(result.synthesizedRecipe).toBeDefined();
         expect(result.synthesizedRecipe?.recipe.name).toBe('Mashed potatoes with Beef burger');
       });
+
+      it('safely resolves multi-meal queries across multiple meal types without synthesizing recipe', async () => {
+        const mockQueso: BaseIngredient = {
+          id: 'ing-queso',
+          name: 'Queso cuartirolo',
+          source: 'system',
+          calories_100g: 270,
+          protein_100g: 21,
+          carbs_100g: 1.5,
+          fats_100g: 20
+        };
+        const mockPanchos: BaseIngredient = {
+          id: 'ing-panchos',
+          name: 'Panchos con salchicha de viena',
+          source: 'system',
+          calories_100g: 260,
+          protein_100g: 11,
+          carbs_100g: 22,
+          fats_100g: 14
+        };
+        const mockGalletitas: BaseIngredient = {
+          id: 'ing-galletitas',
+          name: 'Galletitas dulces rellenas',
+          source: 'system',
+          calories_100g: 480,
+          protein_100g: 5,
+          carbs_100g: 68,
+          fats_100g: 21
+        };
+        const mockTallarines: BaseIngredient = {
+          id: 'ing-tallarines',
+          name: 'Tallarines secos al huevo',
+          source: 'system',
+          calories_100g: 350,
+          protein_100g: 12,
+          carbs_100g: 72,
+          fats_100g: 2
+        };
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'desayuné queso y almorcé panchos, merendé galletitas y cené tallarines',
+          rawItems: [
+            { foodQuery: 'queso', quantity: 1, unit: 'portion', mealType: 'meal_breakfast' },
+            { foodQuery: 'panchos', quantity: 1, unit: 'portion', mealType: 'meal_lunch' },
+            { foodQuery: 'galletitas', quantity: 1, unit: 'portion', mealType: 'meal_snack' },
+            { foodQuery: 'tallarines', quantity: 1, unit: 'portion', mealType: 'meal_dinner' }
+          ],
+          customIngredients: [mockQueso, mockPanchos, mockGalletitas, mockTallarines]
+        });
+
+        expect(result.items).toHaveLength(4);
+        expect(result.isMultiMeal).toBe(true);
+        expect(result.defaultLoggingMode).toBe('batch');
+        expect(result.synthesizedRecipe).toBeUndefined();
+
+        // computeSynthesizedRecipe directly must also return undefined for multi-meal
+        const directSynthesized = resolver.computeSynthesizedRecipe(result.items);
+        expect(directSynthesized).toBeUndefined();
+      });
+
+      it('safely clamps synthesized recipe name to 100 characters when component food names exceed limit', async () => {
+        const mockVeryLong1: BaseIngredient = {
+          id: 'ing-long-1',
+          name: 'Guiso tradicional de lentejas con chorizo colorado, panceta ahumada y vegetales',
+          source: 'system',
+          calories_100g: 150,
+          protein_100g: 9,
+          carbs_100g: 18,
+          fats_100g: 5
+        };
+        const mockVeryLong2: BaseIngredient = {
+          id: 'ing-long-2',
+          name: 'Ensalada fresca de hojas verdes, tomates cherry confitados, queso parmesano y semillas tostadas',
+          source: 'system',
+          calories_100g: 120,
+          protein_100g: 4,
+          carbs_100g: 8,
+          fats_100g: 8
+        };
+
+        const result = await resolver.resolveBatch({
+          rawInput: 'guiso y ensalada',
+          rawItems: [
+            { foodQuery: mockVeryLong1.name, quantity: 1, unit: 'portion' },
+            { foodQuery: mockVeryLong2.name, quantity: 1, unit: 'portion' }
+          ],
+          customIngredients: [mockVeryLong1, mockVeryLong2]
+        });
+
+        expect(result.synthesizedRecipe).toBeDefined();
+        expect(result.synthesizedRecipe!.recipe.name.length).toBeLessThanOrEqual(100);
+        expect(result.synthesizedRecipe!.recipe.name.endsWith('...')).toBe(true);
+      });
     });
   });
 });

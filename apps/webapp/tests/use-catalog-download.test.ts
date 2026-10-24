@@ -3,12 +3,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useCatalogDownload } from '../src/hooks/useCatalogDownload';
+import { useCatalogDownload, resetSharedCatalogDownloadState } from '../src/hooks/useCatalogDownload';
 
 describe('useCatalogDownload', () => {
   let mockWorker: any;
 
   beforeEach(() => {
+    resetSharedCatalogDownloadState();
     mockWorker = {
       postMessage: vi.fn(),
       terminate: vi.fn(),
@@ -228,6 +229,67 @@ describe('useCatalogDownload', () => {
 
       expect(triggered).toBe(false);
       expect(result.current.status).toBe('idle');
+    });
+
+    it('does NOT trigger auto-download when catalog is already complete and isUpdateAvailable is false', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      // Transition to complete
+      act(() => {
+        result.current.downloadCatalog('url');
+      });
+      act(() => {
+        mockWorker.onmessage({ data: { type: 'COMPLETE' } });
+      });
+      expect(result.current.status).toBe('complete');
+      mockWorker.postMessage.mockClear();
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024,
+          isOnline: true,
+          userAutoDownloadPref: true,
+          isUpdateAvailable: false
+        });
+      });
+
+      expect(triggered).toBe(false);
+      expect(result.current.status).toBe('complete');
+      expect(mockWorker.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('triggers auto-download when catalog is complete but isUpdateAvailable is true', () => {
+      const { result } = renderHook(() => useCatalogDownload());
+
+      // Transition to complete
+      act(() => {
+        result.current.downloadCatalog('url');
+      });
+      act(() => {
+        mockWorker.onmessage({ data: { type: 'COMPLETE' } });
+      });
+      expect(result.current.status).toBe('complete');
+      mockWorker.postMessage.mockClear();
+
+      let triggered = false;
+      act(() => {
+        triggered = result.current.checkAndTriggerAutoDownload({
+          downloadUrl: 'http://example.com/catalog.sqlite.gz',
+          fileSizeBytes: 2.3 * 1024 * 1024,
+          isOnline: true,
+          userAutoDownloadPref: true,
+          isUpdateAvailable: true
+        });
+      });
+
+      expect(triggered).toBe(true);
+      expect(result.current.status).toBe('fetching');
+      expect(mockWorker.postMessage).toHaveBeenCalledWith({
+        type: 'START_DOWNLOAD',
+        payload: { url: 'http://example.com/catalog.sqlite.gz' }
+      });
     });
   });
 });

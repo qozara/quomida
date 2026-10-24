@@ -3,7 +3,8 @@ import { LocalDBService, type QuomidaDatabase, type QuomidaDBError } from '../db
 import { syncDatabaseWithRemote } from '../db/replication.js';
 import { CatalogHydrationService, type HydrationResult } from '../services/CatalogHydrationService.js';
 import { DatabaseBootstrapper } from '../services/DatabaseBootstrapper.js';
-import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { useCatalogDownload, refreshCatalogDownloadStatus } from '../hooks/useCatalogDownload.js';
+import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 import {
   type BaseIngredient,
   type Recipe,
@@ -98,7 +99,9 @@ interface AppContextType {
   catalogVersion: string | null;
   catalogGeneratedAt: string | null;
   catalogFileSizeBytes: number | null;
-  refreshCatalog: (options?: { force?: boolean }) => Promise<HydrationResult>;
+  catalogItemCount: number | null;
+  refreshCatalog: (options?: { force?: boolean; saveMetadata?: boolean }) => Promise<HydrationResult>;
+  resetCatalogState?: () => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -169,20 +172,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [catalogVersion, setCatalogVersion] = useState<string | null>(null);
   const [catalogGeneratedAt, setCatalogGeneratedAt] = useState<string | null>(null);
   const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
+  const [catalogItemCount, setCatalogItemCount] = useState<number | null>(null);
   const syncLock = React.useRef(false);
+  const hasBootHydratedRef = useRef(false);
   const { checkAndTriggerAutoDownload } = useCatalogDownload();
 
-  const refreshCatalog = useCallback(async (options?: { force?: boolean }): Promise<HydrationResult> => {
+  const refreshCatalog = useCallback(async (options?: { force?: boolean; saveMetadata?: boolean }): Promise<HydrationResult> => {
     try {
-      const res = await hydrationService.hydrate(options);
-      if (res.version) setCatalogVersion(res.version);
-      if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
-      if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
+      console.log('[AppContext] Checking for catalog updates with options:', options);
+      const currentOpfsStatus = await refreshCatalogDownloadStatus();
+      const shouldSaveMetadata = options?.saveMetadata !== undefined
+        ? options.saveMetadata
+        : currentOpfsStatus === 'complete';
+
+      const res = await hydrationService.hydrate({
+        ...options,
+        saveMetadata: shouldSaveMetadata
+      });
+      console.log('[AppContext] Catalog hydration result:', res);
+      if (shouldSaveMetadata) {
+        if (res.version) setCatalogVersion(res.version);
+        if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
+        if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
+        if (res.itemCount !== undefined || res.itemsUpserted !== undefined) {
+          setCatalogItemCount(res.itemCount ?? res.itemsUpserted ?? null);
+        }
+      }
       return res;
-    } catch (e) {
-      return { status: 'ERROR', itemsUpserted: 0 };
+    } catch (e: any) {
+      console.error('[AppContext] Failed to refresh catalog:', e);
+      return { status: 'ERROR', itemsUpserted: 0, error: e?.message };
     }
   }, [hydrationService]);
+
+  const resetCatalogState = useCallback(async () => {
+    try {
+      await dbService.setMetadata('lastIngestedCatalogVersion', '');
+      await dbService.setMetadata('lastIngestedCatalogGeneratedAt', '');
+      await dbService.setMetadata('lastIngestedCatalogFileSizeBytes', '');
+      await dbService.setMetadata('lastIngestedCatalogItemCount', '');
+    } catch (e) {
+      console.warn('[AppContext] Could not clear catalog metadata:', e);
+    }
+    setCatalogVersion(null);
+    setCatalogGeneratedAt(null);
+    setCatalogFileSizeBytes(null);
+    setCatalogItemCount(null);
+  }, [dbService]);
+
+  useEffect(() => {
+    const unsub = RemoteCatalogService.onCatalogDownloaded(async () => {
+      console.log('[AppContext] Detected catalog change event.');
+      const status = await refreshCatalogDownloadStatus();
+      if (status === 'complete') {
+        await refreshCatalog();
+      } else {
+        await resetCatalogState();
+      }
+    });
+    return unsub;
+  }, [refreshCatalog, resetCatalogState]);
 
   const clearDatabase = useCallback(async () => {
     try {
@@ -377,33 +426,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Background asynchronous catalog hydration on boot [APP-207]
-      dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
-        if (v) setCatalogVersion(v);
-      });
-      dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
-        if (v) setCatalogGeneratedAt(v);
-      });
-      dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
-        if (v) setCatalogFileSizeBytes(Number(v));
-      });
-      DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
-        const res = await refreshCatalog();
-        // Check adaptive auto-download if remote catalog is <= 10MB
-        if (typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof checkAndTriggerAutoDownload === 'function') {
-          const userPref = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
-          const baseUrl = (import.meta as any).env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
-          const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
-          checkAndTriggerAutoDownload({
-            downloadUrl,
-            fileSizeBytes: res.fileSizeBytes,
-            isOnline: navigator.onLine !== false,
-            userAutoDownloadPref: userPref
-          });
-        }
-      }).catch((err) => {
-        console.warn('[CatalogHydration] Background boot hydration notice:', err);
-      });
+      if (!hasBootHydratedRef.current) {
+        hasBootHydratedRef.current = true;
+        // Background asynchronous catalog hydration on boot [APP-207]
+        dbService.getMetadata('lastIngestedCatalogVersion').then((v) => {
+          if (v) setCatalogVersion(v);
+        });
+        dbService.getMetadata('lastIngestedCatalogGeneratedAt').then((v) => {
+          if (v) setCatalogGeneratedAt(v);
+        });
+        dbService.getMetadata('lastIngestedCatalogFileSizeBytes').then((v) => {
+          if (v) setCatalogFileSizeBytes(Number(v));
+        });
+        dbService.getMetadata('lastIngestedCatalogItemCount').then((v) => {
+          if (v) setCatalogItemCount(Number(v));
+        });
+        DatabaseBootstrapper.ensureSystemCatalogOPFS().then(async () => {
+          const currentOpfsStatus = await refreshCatalogDownloadStatus();
+          if (currentOpfsStatus !== 'complete') {
+            await resetCatalogState();
+          }
+          const res = await refreshCatalog();
+          const isUpdateAvailable = res.status === 'UPDATED';
+
+          // Only trigger auto-download if:
+          // 1. Full catalog is NOT installed locally yet (currentOpfsStatus !== 'complete'), OR
+          // 2. A newer catalog version was found (isUpdateAvailable)
+          if (
+            (currentOpfsStatus !== 'complete' || isUpdateAvailable) &&
+            typeof window !== 'undefined' &&
+            typeof Worker !== 'undefined' &&
+            typeof checkAndTriggerAutoDownload === 'function'
+          ) {
+            const userPref = localStorage.getItem('catalog_auto_download_enabled') !== 'false';
+            const baseUrl = (import.meta as any).env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
+            const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+            checkAndTriggerAutoDownload({
+              downloadUrl,
+              fileSizeBytes: res.fileSizeBytes,
+              isOnline: navigator.onLine !== false,
+              userAutoDownloadPref: userPref,
+              isUpdateAvailable
+            });
+          }
+        }).catch((err) => {
+          console.warn('[CatalogHydration] Background boot hydration notice:', err);
+        });
+      }
     }).catch((err: any) => {
       console.error('[AppContext] Failed to initialize local database:', err);
       // Ensure the error is cast to QuomidaDBError if it isn't already
@@ -882,7 +951,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         catalogVersion,
         catalogGeneratedAt,
         catalogFileSizeBytes,
-        refreshCatalog
+        catalogItemCount,
+        refreshCatalog,
+        resetCatalogState
       }}
     >
       {children}

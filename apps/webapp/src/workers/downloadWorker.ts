@@ -5,22 +5,26 @@ self.onmessage = async (e: MessageEvent) => {
 
   if (type === 'START_DOWNLOAD') {
     const { url } = payload;
+    console.log('[downloadWorker] Starting download from:', url);
     try {
       // 1. Attempt to persist storage
       if (navigator.storage && navigator.storage.persist) {
         const persisted = await navigator.storage.persist();
+        console.log('[downloadWorker] Storage persist result:', persisted);
         self.postMessage({ type: 'LOG', payload: `Storage persisted: ${persisted}` });
       }
 
       // 2. Fetch the massive .gz file
       self.postMessage({ type: 'STATUS', payload: 'fetching' });
+      console.log('[downloadWorker] Fetching catalog archive from:', url);
       const response = await fetch(url);
       if (!response.ok || !response.body) {
-        throw new Error(`Failed to fetch catalog: ${response.status}`);
+        throw new Error(`Failed to fetch catalog: ${response.status} ${response.statusText}`);
       }
 
       const totalBytesStr = response.headers.get('content-length');
       const totalBytes = totalBytesStr ? parseInt(totalBytesStr, 10) : 0;
+      console.log(`[downloadWorker] Archive response OK. Content-Length: ${totalBytes} bytes. Streaming & decompressing...`);
       let loadedBytes = 0;
 
       // 3. Create a progress tracker TransformStream
@@ -71,6 +75,7 @@ self.onmessage = async (e: MessageEvent) => {
 
       // 6. Verify SQLite database integrity before swap
       const tmpFile = await tmpHandle.getFile();
+      console.log(`[downloadWorker] Stream finished. Decompressed file size: ${tmpFile.size} bytes. Verifying SQLite header...`);
       if (tmpFile.size < 100) {
         throw new Error('Downloaded catalog file is too small to be a valid SQLite database');
       }
@@ -79,7 +84,7 @@ self.onmessage = async (e: MessageEvent) => {
       if (headerText !== 'SQLite format 3\x00') {
         throw new Error('Downloaded catalog does not have a valid SQLite format 3 header');
       }
-
+      console.log('[downloadWorker] Header verified: SQLite format 3 OK. Performing atomic swap in OPFS to catalog.sqlite...');
 
       // 7. Atomic Swap: move or copy tmp to target
       if (typeof (tmpHandle as any).move === 'function') {
@@ -108,8 +113,10 @@ self.onmessage = async (e: MessageEvent) => {
         await opfsRoot.removeEntry('catalog.sqlite.tmp').catch(() => {});
       }
 
+      console.log('[downloadWorker] Atomic swap in OPFS completed. catalog.sqlite is ready.');
       self.postMessage({ type: 'COMPLETE' });
     } catch (err: any) {
+      console.error('[downloadWorker] Catalog download/write error:', err);
       try {
         const opfsRoot = await navigator.storage.getDirectory();
         await opfsRoot.removeEntry('catalog.sqlite.tmp').catch(() => {});

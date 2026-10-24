@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
@@ -31,6 +31,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { SYSTEM_CATALOG_META } from '../services/RemoteCatalogService.js';
 import { AiKeyEncryptionService } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
 import {
@@ -69,9 +70,11 @@ export const SettingsModal: React.FC = () => {
     catalogVersion,
     catalogGeneratedAt: _catalogGeneratedAt,
     catalogFileSizeBytes,
+    catalogItemCount,
     refreshCatalog,
     isOnline,
-    t
+    t,
+    resetCatalogState
   } = useApp();
 
   const {
@@ -80,8 +83,24 @@ export const SettingsModal: React.FC = () => {
     error: downloadError,
     isDeleting,
     downloadCatalog,
-    deleteCatalog
+    deleteCatalog,
+    checkAndTriggerAutoDownload,
+    refreshStatus
   } = useCatalogDownload();
+
+  useEffect(() => {
+    if (isSettingsOpen && typeof refreshStatus === 'function') {
+      refreshStatus();
+    }
+  }, [isSettingsOpen, refreshStatus]);
+
+  const prevDownloadStatusRef = useRef(downloadStatus);
+  useEffect(() => {
+    if (prevDownloadStatusRef.current !== 'complete' && downloadStatus === 'complete') {
+      setCatalogFeedback(null);
+    }
+    prevDownloadStatusRef.current = downloadStatus;
+  }, [downloadStatus]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'app-settings': false,
@@ -374,23 +393,54 @@ export const SettingsModal: React.FC = () => {
     if (isChecking) return;
     setCatalogFeedback(null);
     setIsChecking(true);
+    console.log('[SettingsModal] Checking for catalog updates...');
     try {
       const res = await refreshCatalog({ force: true });
-      if (res.status === 'UPDATED') {
+      console.log('[SettingsModal] Catalog refresh result:', res);
+      const currentStatus = typeof refreshStatus === 'function' ? await refreshStatus() : downloadStatus;
+      const count = res.itemCount ?? res.itemsUpserted ?? (currentStatus === 'complete' ? catalogItemCount : SYSTEM_CATALOG_META.itemCount);
+      const shortVersion = res.version ? res.version.substring(0, 8) : '';
+
+      const userPref = typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true;
+      const baseUrl = ((import.meta as any).env?.VITE_CATALOG_BASE_URL || '').replace(/\/+$/, '');
+      const downloadUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+
+      const isUpdateAvailable = currentStatus !== 'complete' || res.status === 'UPDATED';
+      let autoTriggered = false;
+      if (userPref && isUpdateAvailable && typeof checkAndTriggerAutoDownload === 'function') {
+        autoTriggered = checkAndTriggerAutoDownload({
+          downloadUrl,
+          fileSizeBytes: res.fileSizeBytes,
+          isOnline: isOnline && navigator.onLine !== false,
+          userAutoDownloadPref: userPref,
+          isUpdateAvailable: true
+        });
+      }
+
+      if (autoTriggered) {
         setCatalogFeedback(
-          (t.settings as any).catalogUpdated
-            ?.replace('{{version}}', res.version || '')
-            .replace('{{count}}', String(res.itemsUpserted || 0)) ||
-            `Catalog updated to ${res.version} (${res.itemsUpserted} items)`
+          (t.settings as any).catalogDownloadingUpdate || 'Downloading catalog update...'
         );
+      } else if (currentStatus !== 'complete' || res.status === 'UPDATED') {
+        const availableText = (t.settings as any).catalogUpdateAvailable
+          ?.replace('{{version}}', shortVersion)
+          ?.replace('{{count}}', count !== null && count !== undefined ? count.toLocaleString() : '') ||
+          `Update available: v: ${shortVersion}${count ? ` (${count.toLocaleString()} items)` : ''}`;
+        setCatalogFeedback(availableText);
       } else if (res.status === 'UP_TO_DATE') {
-        setCatalogFeedback((t.settings as any).catalogUpToDate || 'Catalog is up to date');
+        const itemsLabel = (t.settings as any).catalogItems || 'items';
+        setCatalogFeedback(
+          (t.settings as any).catalogUpToDate
+            ? `${(t.settings as any).catalogUpToDate}${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${itemsLabel}` : ''})` : ''}`
+            : `Catalog is up to date${shortVersion ? ` (v: ${shortVersion}${count ? `, ${count.toLocaleString()} ${itemsLabel}` : ''})` : ''}`
+        );
       } else if (res.status === 'SKIPPED') {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Catalog update skipped');
       } else {
         setCatalogFeedback(res.error || (t.settings as any).catalogCheckError || 'Failed to check for updates');
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[SettingsModal] Failed to check for catalog updates:', err);
       setCatalogFeedback((t.settings as any).catalogCheckError || 'Failed to check for updates');
     } finally {
       setIsChecking(false);
@@ -1180,14 +1230,26 @@ export const SettingsModal: React.FC = () => {
                       {t.settings.catalogTitle || 'Food Catalog & Ingredients'}
                     </span>
                   </div>
-                  {catalogVersion && (
-                    <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
-                      v: {catalogVersion.substring(0, 8)}
-                    </span>
-                  )}
+                  <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                    {downloadStatus === 'complete' && catalogVersion
+                      ? `v: ${catalogVersion.substring(0, 8)}`
+                      : (SYSTEM_CATALOG_META.catalogVersion ? `v: ${SYSTEM_CATALOG_META.catalogVersion.substring(0, 8)}` : 'v: base')}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  {catalogFeedback || (t.settings.catalogVersion ? t.settings.catalogVersion.replace('{{version}}', catalogVersion || '1.0') : 'Catalog is current')}
+                  {catalogFeedback || (
+                    downloadStatus === 'complete'
+                      ? (catalogItemCount
+                          ? ((t.settings as any).catalogFullInstalled
+                              ? (t.settings as any).catalogFullInstalled.replace('{{count}}', catalogItemCount.toLocaleString())
+                              : `Full catalog installed (${catalogItemCount.toLocaleString()} items)`)
+                          : ((t.settings as any).offlineDbInstalled || 'Available Offline'))
+                      : ((t.settings as any).catalogBaseInstalled
+                          ? (t.settings as any).catalogBaseInstalled
+                              .replace('{{count}}', (SYSTEM_CATALOG_META.itemCount || 0).toLocaleString())
+                              .replace('{{size}}', approximateSizeMb)
+                          : `Built-in catalog (${(SYSTEM_CATALOG_META.itemCount || 0).toLocaleString()} items). Full update available (~${approximateSizeMb}MB)`)
+                  )}
                 </p>
                 <button
                   type="button"
@@ -1200,7 +1262,7 @@ export const SettingsModal: React.FC = () => {
                 </button>
               </div>
 
-              {/* 1.1M Offline Food Database */}
+              {/* Offline Food Database */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-white">
                   <Database className="w-4 h-4 text-emerald-400" />
@@ -1505,6 +1567,8 @@ export const SettingsModal: React.FC = () => {
                   setShowConfirmDownload(false);
                   const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
                   const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
+                  console.log('[SettingsModal] User confirmed download. Starting download from:', targetUrl);
+                  setCatalogFeedback(null);
                   downloadCatalog(targetUrl);
                 }}
                 className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-sm"
@@ -1546,7 +1610,12 @@ export const SettingsModal: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   setShowConfirmDelete(false);
+                  console.log('[SettingsModal] User confirmed delete. Removing downloaded catalog...');
+                  setCatalogFeedback(null);
                   await deleteCatalog();
+                  if (typeof resetCatalogState === 'function') {
+                    await resetCatalogState();
+                  }
                 }}
                 className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
               >

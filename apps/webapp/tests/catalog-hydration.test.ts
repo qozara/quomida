@@ -111,4 +111,30 @@ describe('CatalogHydrationService [APP-206]', () => {
     expect(metaCall).toBeDefined();
     expect(metaCall![1]?.cache).toBe('no-cache');
   });
+
+  it('records remote itemCount from catalog_meta.json into metadata and returns it', async () => {
+    const metaResponse = {
+      catalogVersion: '0a766c76a9120d41196a5ebd41f14aa0',
+      itemCount: 19994,
+      fileSizeBytes: 2452070,
+      generatedAt: '2026-10-21T22:42:06.370Z'
+    };
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('catalog_meta.json')) {
+        return new Response(JSON.stringify(metaResponse), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    const result = await hydrationService.hydrate();
+    expect(result.status).toBe('UPDATED');
+    expect(result.version).toBe('0a766c76a9120d41196a5ebd41f14aa0');
+    expect(result.itemCount).toBe(19994);
+    expect(result.itemsUpserted).toBe(19994);
+    expect(result.fileSizeBytes).toBe(2452070);
+
+    const savedCount = await service.getMetadata('lastIngestedCatalogItemCount');
+    expect(savedCount).toBe('19994');
+  });
 });
