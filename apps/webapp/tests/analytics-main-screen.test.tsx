@@ -113,11 +113,17 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     expect(mainEl).not.toBeNull();
     expect(screen.getByTestId('analytics-screen')).toBeDefined();
 
+    // Floating sync badge is accessible in upper right
+    expect(screen.getByTestId('sync-status-badge')).toBeDefined();
+
+    // Date selector is NOT displayed on analytics screen
+    expect(screen.queryByTestId('dashboard-date-bar')).toBeNull();
+
     // FAB add food button is NOT displayed on analytics screen
     expect(screen.queryByTestId('fab-add-food')).toBeNull();
   });
 
-  it('renders the diary widgets and the FAB button when on diary tab', () => {
+  it('renders the diary widgets, date selector, and FAB button when on diary tab', () => {
     vi.spyOn(AppContextModule, 'useApp').mockReturnValue({
       ...baseMockContext,
       isAnalyticsOpen: false
@@ -127,6 +133,12 @@ describe('Analytics Main Screen UI/UX Specification', () => {
 
     // AnalyticsScreen is NOT rendered
     expect(screen.queryByTestId('analytics-screen')).toBeNull();
+
+    // Date selector IS displayed on diary screen
+    expect(screen.getByTestId('dashboard-date-bar')).toBeDefined();
+
+    // Floating sync badge is also present on diary screen
+    expect(screen.getByTestId('sync-status-badge')).toBeDefined();
 
     // FAB add food button IS displayed on diary screen
     expect(screen.getByLabelText('Add Food Log')).toBeDefined();

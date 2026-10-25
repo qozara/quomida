@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProvider, useApp } from './context/AppContext.js';
-import { Header } from './components/Header.js';
+import { DashboardDateBar } from './components/DashboardDateBar.js';
 import { MacroRings } from './components/MacroRings.js';
 import { FoodLogger } from './components/FoodLogger.js';
 import { MealSection } from './components/MealSection.js';
@@ -11,7 +11,7 @@ import { CatalogManager } from './components/CatalogManager.js';
 import { DashboardWeightPill } from './components/DashboardWeightPill.js';
 import { WeightQuickLogModal } from './components/WeightQuickLogModal.js';
 import { AnalyticsScreen } from './components/analytics/AnalyticsScreen.js';
-import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/index.js';
+import { StorageSettingsPanel, SchemaRemediationModal, HeaderSyncTrigger } from './components/sync/index.js';
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
@@ -110,8 +110,10 @@ export const DashboardContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
-      {/* Top Fixed Header */}
-      <Header />
+      {/* Floating Sync Status Badge (upper right corner, on top of all main screens) */}
+      <div className="fixed top-3 right-3 z-30">
+        <HeaderSyncTrigger />
+      </div>
 
       {/* Main Container */}
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">
@@ -119,6 +121,9 @@ export const DashboardContent: React.FC = () => {
           <AnalyticsScreen />
         ) : (
           <>
+            {/* Thumb-friendly Date Navigation & Brand */}
+            <DashboardDateBar />
+
             {/* Onboarding Banner for Fresh Devices */}
             {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && !activeProvider && !userSettings?.active_cloud_provider && (
               <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">

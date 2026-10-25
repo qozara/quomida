@@ -52,6 +52,7 @@ export const HeaderSyncTrigger: React.FC = () => {
       <button
         ref={triggerRef}
         id="sync-status-badge"
+        data-testid="sync-status-badge"
         onClick={togglePopover}
         aria-haspopup="dialog"
         aria-expanded={isPopoverOpen}

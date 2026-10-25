@@ -8,7 +8,7 @@ import { WeightTrendChart, type WeightChartDataPoint } from '../src/components/a
 import { DashboardWeightPill } from '../src/components/DashboardWeightPill.js';
 import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
-import { Header } from '../src/components/Header.js';
+import { BottomNav } from '../src/components/navigation/BottomNav.js';
 import { SettingsModal } from '../src/components/SettingsModal.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { en } from '@quomida/i18n-locales';
@@ -403,10 +403,11 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     });
   });
 
-  describe('5. Header Analytics Button', () => {
+  describe('5. Bottom Navigation Analytics Button', () => {
     it('renders #btn-open-analytics and meets touch target requirements', () => {
+      const mockOnSelectTab = vi.fn();
       setupMockContext();
-      render(<Header />);
+      render(<BottomNav activeTab="diary" onSelectTab={mockOnSelectTab} />);
 
       const analyticsBtn = screen.getByTestId('btn-open-analytics');
       expect(analyticsBtn).toBeDefined();
@@ -414,7 +415,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(analyticsBtn.className).toMatch(/min-h-\[44px\]/);
 
       fireEvent.click(analyticsBtn);
-      expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(true);
+      expect(mockOnSelectTab).toHaveBeenCalledWith('analytics');
     });
   });
 

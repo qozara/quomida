@@ -234,7 +234,7 @@ const AnalyticsScreenContent: React.FC = () => {
       className="space-y-4 animate-in fade-in duration-200"
     >
       {/* Screen Header Bar */}
-      <div className="flex items-center gap-3 px-1">
+      <div className="flex items-center gap-3 px-1 pr-12">
         <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
           <TrendingUp className="w-5 h-5" />
         </div>
