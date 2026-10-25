@@ -17,7 +17,7 @@ import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Cloud, X } from 'lucide-react';
+import { Cloud, X, Sparkles } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -84,6 +84,17 @@ export const DashboardContent: React.FC = () => {
   else if (isCatalogOpen) activeTab = 'catalog';
   else if (isAnalyticsOpen) activeTab = 'analytics';
 
+  // Cloud Connection & Profile Picture
+  const isCloudConnected = Boolean(
+    (activeProvider && activeProvider.getStatus() !== 'disconnected' && activeProvider.name !== 'Mock Storage') ||
+    (userSettings?.active_cloud_provider?.id && userSettings.active_cloud_provider.id !== 'mock')
+  );
+
+  const userPicture =
+    userSettings?.active_cloud_provider?.credentials?.userPicture ||
+    activeProvider?.getUserPicture?.() ||
+    null;
+
   const handleSelectTab = (tab: NavTab) => {
     if (tab === 'diary') {
       setIsSettingsOpen(false);
@@ -110,6 +121,36 @@ export const DashboardContent: React.FC = () => {
       <div className="fixed top-3 right-3 z-30">
         <HeaderSyncTrigger />
       </div>
+
+      {/* Floating App / User Profile Icon (upper left corner, on home main screen) */}
+      {activeTab === 'diary' && (
+        <div className="fixed top-3 left-3 z-30">
+          <button
+            id="btn-open-settings-avatar"
+            data-testid="btn-open-settings-avatar"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label={t.settings.title}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-300 hover:text-white transition-all active:scale-95 group focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          >
+            {isCloudConnected && userPicture ? (
+              <img
+                src={userPicture}
+                alt="Profile"
+                className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500/50 group-hover:border-emerald-400 shadow-md transition-colors"
+                referrerPolicy="no-referrer"
+              />
+            ) : isCloudConnected ? (
+              <div className="w-9 h-9 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-sm shadow-md group-hover:bg-emerald-500/30 transition-colors">
+                <Cloud className="w-4 h-4" />
+              </div>
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md group-hover:bg-emerald-500/20 group-hover:border-emerald-400/50 transition-colors">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">

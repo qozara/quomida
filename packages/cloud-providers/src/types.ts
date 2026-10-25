@@ -38,6 +38,7 @@ export interface CloudSyncProvider {
   getStatus(): SyncStatus;
   getLastSyncedTime(): string | null;
   getConnectedAccount?(): string | null;
+  getUserPicture?(): string | null;
   initialize(credentials?: string | Record<string, any>): Promise<void>;
   disconnect?(): Promise<void>;
   reauthenticate?(): Promise<void>;

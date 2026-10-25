@@ -144,6 +144,10 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
     return this.initialized ? 'connected-account' : null;
   }
 
+  getUserPicture(): string | null {
+    return null;
+  }
+
   onStatusChange(listener: (status: SyncStatus) => void): () => void {
     this.statusListeners.add(listener);
     return () => {

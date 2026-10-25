@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
+  ArrowLeft,
   Globe,
   Moon,
   Sun,
@@ -63,6 +64,7 @@ export const SettingsModal: React.FC = () => {
     userSettings,
     updateUserSettings,
     syncStatus: _syncStatus,
+    uxSyncState,
     activeProvider,
     lastSyncedTime,
     isSettingsOpen,
@@ -299,6 +301,10 @@ export const SettingsModal: React.FC = () => {
   const connectedAccount = activeProvider?.getConnectedAccount?.();
   let userName = userSettings?.active_cloud_provider?.credentials?.userName;
   let userEmail = userSettings?.active_cloud_provider?.credentials?.userEmail;
+  const userPicture =
+    userSettings?.active_cloud_provider?.credentials?.userPicture ||
+    activeProvider?.getUserPicture?.() ||
+    null;
 
   if (!userName && connectedAccount) {
     if (connectedAccount.includes('(')) {
@@ -308,6 +314,11 @@ export const SettingsModal: React.FC = () => {
       userName = connectedAccount;
     }
   }
+
+  const isCloudConnected = Boolean(
+    (activeProvider && activeProvider.getStatus() !== 'disconnected' && activeProvider.name !== 'Mock Storage') ||
+    (userSettings?.active_cloud_provider?.id && userSettings.active_cloud_provider.id !== 'mock')
+  );
 
   const displayUserName = userName || t.settings?.accountLocalUser || 'Local Profile';
   const displayUserEmail = userEmail || t.settings?.accountLocalSubtitle || 'Offline mode (no cloud connected)';
@@ -504,26 +515,80 @@ export const SettingsModal: React.FC = () => {
   if (!isSettingsOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-      
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-          <div>
-            <h2 className="text-xl font-extrabold text-white tracking-wide">{t.settings.title}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {t.settings.accordionAppSettingsSubtitle || 'Manage your preferences, account and sync'}
-            </p>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-screen-title"
+      className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ease-out"
+    >
+      {/* Modern Sticky Navigation Header */}
+      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
+        <button
+          id="btn-close-settings"
+          data-testid="btn-back-settings"
+          onClick={() => setIsSettingsOpen(false)}
+          aria-label="Back"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 id="settings-screen-title" className="text-base sm:text-lg font-bold text-white tracking-tight">
+          {t.settings.title}
+        </h1>
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
+
+      {/* Main Settings Content */}
+      <div className="max-w-lg mx-auto w-full px-4 py-5 space-y-5 flex-1">
+        {/* Top Hero: Connected Cloud User Info OR App Name */}
+        {isCloudConnected ? (
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/80 border border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="absolute -right-8 -top-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+            {userPicture ? (
+              <img
+                src={userPicture}
+                alt={displayUserName}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-md shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border-2 border-emerald-500/40 text-emerald-300 font-extrabold text-2xl flex items-center justify-center shadow-md shrink-0">
+                {displayUserName.charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            <div className="min-w-0 flex-1 space-y-1">
+              <h2 className="text-lg font-bold text-white truncate">{displayUserName}</h2>
+              <p className="text-xs text-slate-400 truncate">{displayUserEmail}</p>
+
+              {/* Cloud Sync Status Pill */}
+              <div className="pt-1 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {activeProvider?.name || 'Cloud'} • {t.sync?.header?.[uxSyncState] || t.sync?.header?.synced || 'Synced'}
+                </span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setIsSettingsOpen(false)}
-            aria-label="Close"
-            className="min-w-[44px] min-h-[44px] p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        ) : (
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/80 border border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md shrink-0">
+              <Sparkles className="w-7 h-7" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white tracking-tight">Quomida</h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+                  Local-first
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {t.settings?.accountLocalSubtitle || 'Offline mode (no cloud connected)'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* 5-Segment Accordion Menu List */}
         <div className="space-y-3">
@@ -565,26 +630,6 @@ export const SettingsModal: React.FC = () => {
               aria-labelledby="accordion-header-app-settings"
               className={openSections['app-settings'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
             >
-              {/* Connected Account Info */}
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-sm">
-                    {displayUserName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>{displayUserName}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-900 border border-slate-800 text-emerald-400">
-                        {activeProvider && activeProvider.getStatus() !== 'disconnected' ? 'Cloud' : 'Local'}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {displayUserEmail}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Language & Theme Controls */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>

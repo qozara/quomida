@@ -33,6 +33,7 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
       const token = await triggerLogin();
       let userEmail: string | undefined;
       let userName: string | undefined;
+      let userPicture: string | undefined;
 
       try {
         const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -42,13 +43,14 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
           const userInfo = await userInfoRes.json();
           userEmail = userInfo.email;
           userName = userInfo.name;
+          userPicture = userInfo.picture;
         }
       } catch (err) {
         console.warn('[useGoogleDriveProvider] Failed to fetch Google userinfo:', err);
       }
 
       const adapter = new GoogleDriveSheetsCloudSyncProvider({ onTokenRefresh: triggerLogin });
-      await adapter.initialize({ accessToken: token, userEmail, userName });
+      await adapter.initialize({ accessToken: token, userEmail, userName, userPicture });
       return { 
         adapter, 
         credentials: { 
@@ -56,6 +58,7 @@ export const useGoogleDriveProvider = (): CloudProviderFactory => {
           access_token: token,
           userEmail, 
           userName, 
+          userPicture,
           expiresAt: Date.now() + 3500000 
         } 
       };
