@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import {
-  X,
   TrendingUp,
   Activity,
   Flame,
@@ -235,29 +234,16 @@ const AnalyticsScreenContent: React.FC = () => {
       className="space-y-4 animate-in fade-in duration-200"
     >
       {/* Screen Header Bar */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 id="analytics-screen-title" className="text-xl font-extrabold text-white tracking-tight">
-              {t.analytics.title}
-            </h1>
-            <p className="text-xs text-slate-400">{t.analytics.subtitle}</p>
-          </div>
+      <div className="flex items-center gap-3 px-1">
+        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+          <TrendingUp className="w-5 h-5" />
         </div>
-
-        <button
-          type="button"
-          id="btn-close-analytics"
-          data-testid="btn-close-analytics"
-          onClick={() => setIsAnalyticsOpen(false)}
-          aria-label="Close"
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95 border border-slate-800"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div>
+          <h1 id="analytics-screen-title" className="text-xl font-extrabold text-white tracking-tight">
+            {t.analytics.title}
+          </h1>
+          <p className="text-xs text-slate-400">{t.analytics.subtitle}</p>
+        </div>
       </div>
 
       {/* Metabolic Status Banner (2 Metric Cards) */}

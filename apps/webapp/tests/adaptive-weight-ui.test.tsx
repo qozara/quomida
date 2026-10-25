@@ -309,12 +309,8 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       // Check recent logs are listed
       expect(screen.getByText('Morning weigh-in')).toBeDefined();
 
-      // Close button meets touch target
-      const closeBtn = screen.getByTestId('btn-close-analytics');
-      expect(closeBtn.className).toMatch(/min-w-\[44px\]/);
-      expect(closeBtn.className).toMatch(/min-h-\[44px\]/);
-      fireEvent.click(closeBtn);
-      expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(false);
+      // Close button is omitted on main screen as user navigates via bottom bar
+      expect(screen.queryByTestId('btn-close-analytics')).toBeNull();
     });
 
     it('switches between Weight Trend and Energy Trend tabs with contextual chart and bottom list', async () => {

@@ -84,6 +84,9 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
         <button data-testid="btn-open-analytics" onClick={() => setIsAnalyticsOpen(true)}>
           Open Analytics
         </button>
+        <button data-testid="btn-close-analytics" onClick={() => setIsAnalyticsOpen(false)}>
+          Close Analytics
+        </button>
         <button
           data-testid="btn-set-date"
           onClick={(e) => {

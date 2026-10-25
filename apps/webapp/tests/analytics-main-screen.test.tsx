@@ -93,17 +93,11 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     expect(screen.getByText('2450')).toBeDefined();
   });
 
-  it('provides a touch-friendly close button (44x44 CSS px) that invokes setIsAnalyticsOpen(false)', () => {
+  it('does not render a close action button on this new analytics main screen (navigates via bottom bar)', () => {
     vi.spyOn(AppContextModule, 'useApp').mockReturnValue(baseMockContext);
     render(<AnalyticsScreen />);
 
-    const closeBtn = screen.getByTestId('btn-close-analytics');
-    expect(closeBtn).toBeDefined();
-    expect(closeBtn.className).toMatch(/min-w-\[44px\]/);
-    expect(closeBtn.className).toMatch(/min-h-\[44px\]/);
-
-    fireEvent.click(closeBtn);
-    expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(false);
+    expect(screen.queryByTestId('btn-close-analytics')).toBeNull();
   });
 
   it('renders at the same layout level as the home screen inside main when activeTab is analytics in App', () => {
