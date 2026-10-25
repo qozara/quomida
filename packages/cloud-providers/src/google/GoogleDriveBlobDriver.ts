@@ -7,6 +7,7 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
 
   private getAccessToken: () => string | null;
   private client: GoogleHttpClient;
+  private fileIdCache: Map<string, string> = new Map();
 
   constructor(options: GoogleDriverOptions) {
     this.getAccessToken = options.getAccessToken;
@@ -53,74 +54,123 @@ export class GoogleDriveBlobDriver implements BlobStorageDriver {
     }
   }
 
-  private async findFileInAppData(filename: string): Promise<string | null> {
+  private async findFileInAppData(filename: string, bypassCache = false): Promise<string | null> {
+    if (!bypassCache && this.fileIdCache.has(filename)) {
+      return this.fileIdCache.get(filename)!;
+    }
+
     const headers = this.getAuthHeaders();
     const query = encodeURIComponent(`name = '${filename}' and trashed = false`);
-    const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`;
+    const orderBy = encodeURIComponent('modifiedTime desc');
+    const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&orderBy=${orderBy}&fields=files(id,name,modifiedTime)`;
 
     const res = await this.client.fetch(url, { method: 'GET', headers });
     await this.handleResponseErrors(res, 'searching appDataFolder');
 
     const json = await res.json();
     if (json.files && json.files.length > 0) {
-      return json.files[0].id;
+      const primaryId: string = json.files[0].id;
+      this.fileIdCache.set(filename, primaryId);
+
+      // Clean up any stale duplicate files in appDataFolder caused by eventual consistency
+      if (json.files.length > 1) {
+        for (const dup of json.files.slice(1)) {
+          if (dup?.id && dup.id !== primaryId) {
+            this.client
+              .fetch(`https://www.googleapis.com/drive/v3/files/${dup.id}`, {
+                method: 'DELETE',
+                headers
+              })
+              .catch(() => {});
+          }
+        }
+      }
+
+      return primaryId;
     }
     return null;
   }
 
   async readBlob<T = any>(filename: string): Promise<T | null> {
-    const fileId = await this.findFileInAppData(filename);
+    let fileId = await this.findFileInAppData(filename);
     if (!fileId) return null;
 
     const headers = this.getAuthHeaders();
-    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    let url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
 
-    const res = await this.client.fetch(url, { method: 'GET', headers });
+    let res = await this.client.fetch(url, { method: 'GET', headers });
+    if (res.status === 404) {
+      this.fileIdCache.delete(filename);
+      fileId = await this.findFileInAppData(filename, true);
+      if (!fileId) return null;
+      url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      res = await this.client.fetch(url, { method: 'GET', headers });
+    }
+
     await this.handleResponseErrors(res, 'reading blob from appDataFolder');
 
     return (await res.json()) as T;
   }
 
   async writeBlob<T = any>(filename: string, data: T): Promise<void> {
-    const existingFileId = await this.findFileInAppData(filename);
+    let existingFileId = await this.findFileInAppData(filename);
     const headers = this.getAuthHeaders();
     const boundary = '-------quomida_blob_boundary';
     const delimiter = `\r\n--${boundary}\r\n`;
     const closeDelimiter = `\r\n--${boundary}--`;
 
-    const metadata = existingFileId
-      ? { name: filename }
-      : { name: filename, parents: ['appDataFolder'] };
+    const buildBody = (isUpdate: boolean) => {
+      const metadata = isUpdate
+        ? { name: filename }
+        : { name: filename, parents: ['appDataFolder'] };
 
-    const multipartRequestBody =
-      delimiter +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      JSON.stringify(metadata) +
-      delimiter +
-      'Content-Type: application/json\r\n\r\n' +
-      JSON.stringify(data) +
-      closeDelimiter;
+      return (
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        JSON.stringify(data) +
+        closeDelimiter
+      );
+    };
 
-    const url = existingFileId
-      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
-      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    const sendUpload = async (targetFileId: string | null) => {
+      const url = targetFileId
+        ? `https://www.googleapis.com/upload/drive/v3/files/${targetFileId}?uploadType=multipart`
+        : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+      const method = targetFileId ? 'PATCH' : 'POST';
 
-    const method = existingFileId ? 'PATCH' : 'POST';
+      return await this.client.fetch(url, {
+        method,
+        headers: {
+          ...headers,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: buildBody(Boolean(targetFileId))
+      });
+    };
 
-    const res = await this.client.fetch(url, {
-      method,
-      headers: {
-        ...headers,
-        'Content-Type': `multipart/related; boundary=${boundary}`
-      },
-      body: multipartRequestBody
-    });
+    let res = await sendUpload(existingFileId);
+    if (existingFileId && res.status === 404) {
+      this.fileIdCache.delete(filename);
+      existingFileId = await this.findFileInAppData(filename, true);
+      res = await sendUpload(existingFileId);
+    }
 
     await this.handleResponseErrors(res, 'writing blob to appDataFolder');
+
+    try {
+      const resJson = await res.json();
+      if (resJson && typeof resJson.id === 'string' && resJson.id) {
+        this.fileIdCache.set(filename, resJson.id);
+      }
+    } catch {}
   }
 
   async deleteBlob(filename: string): Promise<void> {
     const fileId = await this.findFileInAppData(filename);
+    this.fileIdCache.delete(filename);
     if (!fileId) return;
 
     const headers = this.getAuthHeaders();

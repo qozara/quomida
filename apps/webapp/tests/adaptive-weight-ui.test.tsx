@@ -484,5 +484,140 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         );
       });
     });
+
+    it('reactively updates form fields when userSettings and weightLogs update after mount (e.g. after cloud sync)', async () => {
+      // 1. Mount with initial factory default settings
+      setupMockContext({
+        isSettingsOpen: false,
+        weightLogs: [],
+        userSettings: {
+          id: 'global_settings',
+          locale: 'en-US',
+          theme: 'dark',
+          daily_calorie_target: 2000,
+          custom_macros: { protein: 150, carbs: 200, fats: 65 },
+          target_mode: 'manual',
+          updatedAt: 0
+        }
+      });
+
+      const { rerender } = render(<SettingsModal />);
+
+      // 2. Simulate cloud sync completing and user opening SettingsModal
+      setupMockContext({
+        isSettingsOpen: true,
+        weightLogs: [
+          {
+            id: 'weight_2026-10-20',
+            date: '2026-10-20',
+            timestamp: '2026-10-20T08:00:00Z',
+            weight_kg: 63.4,
+            trend_weight_kg: 63.4,
+            updatedAt: 5000
+          }
+        ],
+        userSettings: {
+          id: 'global_settings',
+          locale: 'en-US',
+          theme: 'dark',
+          daily_calorie_target: 2150,
+          custom_macros: { protein: 120, carbs: 240, fats: 72 },
+          target_mode: 'adaptive',
+          biometrics: {
+            sex: 'female',
+            birth_date: '1993-08-22',
+            height_cm: 166,
+            activity_multiplier: 1.55
+          },
+          goal_config: {
+            goal_type: 'maintain',
+            weekly_rate_pct: 0,
+            protein_g_per_kg: 1.9,
+            fat_calorie_pct: 0.3
+          },
+          updatedAt: 5000
+        }
+      });
+
+      rerender(<SettingsModal />);
+
+      await waitFor(() => {
+        const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
+        const heightInput = screen.getByTestId('input-biometrics-height') as HTMLInputElement;
+        const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
+        expect(sexSelect.value).toBe('female');
+        expect(heightInput.value).toBe('166');
+        expect(weightInput.value).toBe('63.4');
+      });
+    });
+
+    it('updates weight log on selectedDate when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
+      // Case A: log already exists on selectedDate (80.0 kg), user edits weight to 78.5 kg in SettingsModal
+      setupMockContext({
+        isSettingsOpen: true,
+        selectedDate: '2026-10-20',
+        weightLogs: sampleWeightLogs, // has 80.0 on 2026-10-20
+        userSettings: {
+          ...defaultMockUserSettings,
+          target_mode: 'adaptive',
+          biometrics: {
+            sex: 'male',
+            birth_date: '1990-01-01',
+            height_cm: 178,
+            activity_multiplier: 1.375
+          },
+          goal_config: {
+            goal_type: 'lose',
+            weekly_rate_pct: -0.5,
+            protein_g_per_kg: 2.2,
+            fat_calorie_pct: 0.25
+          }
+        }
+      });
+
+      const { unmount } = render(<SettingsModal />);
+
+      const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
+      fireEvent.change(weightInput, { target: { value: '78.5' } });
+      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+
+      await waitFor(() => {
+        expect(mockLogWeight).toHaveBeenCalledWith('2026-10-20', 78.5);
+      });
+
+      unmount();
+      vi.clearAllMocks();
+
+      // Case B: log exists on earlier date (2026-10-19, 80.2 kg), no log on selectedDate (2026-10-21), user does NOT change weight
+      setupMockContext({
+        isSettingsOpen: true,
+        selectedDate: '2026-10-21',
+        weightLogs: sampleWeightLogs.slice(0, 2), // latest is 2026-10-19 (80.2 kg)
+        userSettings: {
+          ...defaultMockUserSettings,
+          target_mode: 'adaptive',
+          biometrics: {
+            sex: 'male',
+            birth_date: '1990-01-01',
+            height_cm: 178,
+            activity_multiplier: 1.375
+          },
+          goal_config: {
+            goal_type: 'lose',
+            weekly_rate_pct: -0.5,
+            protein_g_per_kg: 2.2,
+            fat_calorie_pct: 0.25
+          }
+        }
+      });
+
+      render(<SettingsModal />);
+      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserSettings).toHaveBeenCalled();
+      });
+      expect(mockLogWeight).not.toHaveBeenCalled();
+    });
   });
 });

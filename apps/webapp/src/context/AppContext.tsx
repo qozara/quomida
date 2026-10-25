@@ -110,26 +110,56 @@ const defaultSettings: UserSettings = {
   theme: 'dark',
   daily_calorie_target: 2000,
   custom_macros: { protein: 150, carbs: 200, fats: 65 },
-  target_mode: 'manual'
+  target_mode: 'manual',
+  updatedAt: 0
 };
 
 export async function runWithSyncLock<T>(
   action: () => Promise<T>,
-  fallbackLock: React.MutableRefObject<boolean>
+  fallbackLock: React.MutableRefObject<boolean>,
+  pendingSync?: React.MutableRefObject<boolean>
 ): Promise<T | null> {
+  const executeWithTrailingQueue = async (): Promise<T> => {
+    let result = await action();
+    while (pendingSync?.current) {
+      pendingSync.current = false;
+      result = await action();
+    }
+    return result;
+  };
+
   if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+    if (fallbackLock.current) {
+      if (pendingSync) {
+        pendingSync.current = true;
+      }
+      return null;
+    }
     return navigator.locks.request('quomida_sync_lock', { ifAvailable: true }, async (lock) => {
       if (!lock) {
+        if (pendingSync) {
+          pendingSync.current = true;
+        }
         return null;
       }
-      return await action();
+      fallbackLock.current = true;
+      try {
+        return await executeWithTrailingQueue();
+      } finally {
+        fallbackLock.current = false;
+      }
     });
   }
 
-  if (fallbackLock.current) return null;
+  if (fallbackLock.current) {
+    if (pendingSync) {
+      pendingSync.current = true;
+    }
+    return null;
+  }
   fallbackLock.current = true;
   try {
-    return await action();
+    return await executeWithTrailingQueue();
   } finally {
     fallbackLock.current = false;
   }
@@ -174,6 +204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [catalogFileSizeBytes, setCatalogFileSizeBytes] = useState<number | null>(null);
   const [catalogItemCount, setCatalogItemCount] = useState<number | null>(null);
   const syncLock = React.useRef(false);
+  const pendingSyncRef = React.useRef(false);
   const hasBootHydratedRef = useRef(false);
   const { checkAndTriggerAutoDownload } = useCatalogDownload();
 
@@ -261,7 +292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Initialize LocalDBService & RxDB Adapters
-  // Subscribe to active adapter status changes
+  // Subscribe to active adapter status and credential changes
   useEffect(() => {
     if (!activeProvider) {
       setSyncStatus('disconnected');
@@ -269,14 +300,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setSyncStatus(activeProvider.getStatus());
     setLastSyncedTime(activeProvider.getLastSyncedTime());
-    if (activeProvider.onStatusChange) {
-      const unsub = activeProvider.onStatusChange((newStatus) => {
-        setSyncStatus(newStatus);
-        setLastSyncedTime(activeProvider.getLastSyncedTime());
-      });
-      return unsub;
-    }
-  }, [activeProvider]);
+    const unsubStatus = activeProvider.onStatusChange
+      ? activeProvider.onStatusChange((newStatus) => {
+          setSyncStatus(newStatus);
+          setLastSyncedTime(activeProvider.getLastSyncedTime());
+        })
+      : undefined;
+    const unsubCreds = activeProvider.onCredentialsChange
+      ? activeProvider.onCredentialsChange((newCredentials) => {
+          dbService
+            .saveSettings({
+              active_cloud_provider: {
+                id: activeProvider.id,
+                credentials: newCredentials
+              }
+            })
+            .then(() => dbService.getSettings())
+            .then((updated) => {
+              setUserSettings(updated);
+            })
+            .catch(console.error);
+        })
+      : undefined;
+    return () => {
+      unsubStatus?.();
+      unsubCreds?.();
+    };
+  }, [activeProvider, dbService]);
 
   // Online/Offline & Heartbeat connectivity monitoring
   useEffect(() => {
@@ -340,19 +390,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const settings = await dbService.getSettings();
       setUserSettings(settings);
       if (settings.locale?.startsWith('en')) setLocaleState('en');
+      else if (settings.locale?.startsWith('es')) setLocaleState('es');
       if (settings.theme) setThemeState(settings.theme as any);
 
-      // Adaptive calibration check on boot
-      dbService.runAdaptiveCalibrationIfNeeded(selectedDate).then((calibratedSettings) => {
-        if (calibratedSettings) {
-          setUserSettings(calibratedSettings);
-        }
-      }).catch((err) => {
-        console.warn('[AppContext] Boot adaptive calibration notice:', err);
-      });
-
-      // Check if we need to auto-connect
+      // Check if we need to auto-connect before running boot adaptive calibration
       const activeProviderSettings = settings.active_cloud_provider;
+      let autoConnectedAndSynced = false;
       if (activeProviderSettings) {
         const factory = providerFactories.find((f: any) => f.id === activeProviderSettings.id);
         if (factory && !adapter) {
@@ -361,6 +404,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             dbService.setCloudSyncProvider(newAdapter);
             setActiveAdapter(newAdapter);
             if (navigator.onLine) {
+              autoConnectedAndSynced = true;
               setSyncStatus(newAdapter.getStatus());
               runWithSyncLock(async () => {
                 setSyncStatus('syncing');
@@ -369,16 +413,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
                   const updated = await dbService.getSettings();
                   setUserSettings(updated);
+                  if (updated.locale?.startsWith('en')) setLocaleState('en');
+                  else if (updated.locale?.startsWith('es')) setLocaleState('es');
+                  if (updated.theme) setThemeState(updated.theme as any);
                 } finally {
                   setSyncStatus(newAdapter.getStatus());
                   setLastSyncedTime(newAdapter.getLastSyncedTime() || new Date().toLocaleTimeString());
                 }
-              }, syncLock).catch(console.error);
+              }, syncLock, pendingSyncRef).catch(console.error);
             }
           } catch (err) {
             console.error('Failed to restore adapter', err);
           }
         }
+      }
+
+      // Adaptive calibration check on boot (only immediately if not already syncing with remote on boot)
+      if (!autoConnectedAndSynced) {
+        dbService.runAdaptiveCalibrationIfNeeded(selectedDate).then((calibratedSettings) => {
+          if (calibratedSettings) {
+            setUserSettings(calibratedSettings);
+          }
+        }).catch((err) => {
+          console.warn('[AppContext] Boot adaptive calibration notice:', err);
+        });
       }
 
 
@@ -410,7 +468,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (doc) {
               const json: UserSettings = doc.toJSON ? doc.toJSON() : doc;
               setUserSettings((prev) => {
-                if (prev.updatedAt === json.updatedAt) return prev;
+                if (
+                  prev.updatedAt === json.updatedAt &&
+                  JSON.stringify(prev.active_cloud_provider) === JSON.stringify(json.active_cloud_provider)
+                ) {
+                  return prev;
+                }
                 return json;
               });
               if (json.locale?.startsWith('en')) {
@@ -492,6 +555,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [selectedDate, dbService]);
 
+  const forceSync = useCallback(async () => {
+    if (!activeProvider || !isOnline) return;
+
+    await runWithSyncLock(async () => {
+      setSyncStatus('syncing');
+      try {
+        if (db) {
+          await syncDatabaseWithRemote(db, activeProvider);
+          await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+          const updated = await dbService.getSettings();
+          setUserSettings(updated);
+        }
+      } finally {
+        setSyncStatus(activeProvider.getStatus());
+        setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
+      }
+    }, syncLock, pendingSyncRef);
+  }, [activeProvider, isOnline, db, dbService, selectedDate]);
+
   // Recalibrate adaptive targets when opening analytics modal using effective latest horizon
   useEffect(() => {
     if (isAnalyticsOpen && db) {
@@ -502,15 +584,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userSettings.adaptive_state?.last_calibrated_date
       ].filter(Boolean).reduce((max, d) => (d! > max! ? d : max), selectedDate);
 
+      const prevUpdatedAt = userSettings.updatedAt;
       dbService.runAdaptiveCalibrationIfNeeded(effectiveDate).then((calibratedSettings) => {
         if (calibratedSettings) {
           setUserSettings(calibratedSettings);
+          if (calibratedSettings.updatedAt !== prevUpdatedAt) {
+            forceSync().catch(console.error);
+          }
         }
       }).catch((err) => {
         console.warn('[AppContext] Analytics open adaptive calibration notice:', err);
       });
     }
-  }, [isAnalyticsOpen, selectedDate, weightLogs, userSettings.adaptive_state?.last_calibrated_date, db, dbService]);
+  }, [isAnalyticsOpen, selectedDate, weightLogs, userSettings.adaptive_state?.last_calibrated_date, userSettings.updatedAt, db, dbService, forceSync]);
 
   // Update item counts for storage settings panel
   const updateItemCounts = useCallback(async () => {
@@ -540,22 +626,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setLocale = useCallback((lang: LocaleKey) => {
     setLocaleState((prev) => (prev !== lang ? lang : prev));
-    dbService.getSettings().then((current) => {
+    dbService.getSettings().then(async (current) => {
       const targetLocale = lang === 'es' ? 'es-AR' : 'en-US';
       if (current.locale !== targetLocale) {
-        dbService.saveSettings({ locale: targetLocale });
+        await dbService.saveSettings({ locale: targetLocale });
+        const updated = await dbService.getSettings();
+        setUserSettings(updated);
+        forceSync().catch(console.error);
       }
     });
-  }, [dbService]);
+  }, [dbService, forceSync]);
 
   const setTheme = useCallback((t: 'dark' | 'light' | 'system') => {
     setThemeState((prev) => (prev !== t ? t : prev));
-    dbService.getSettings().then((current) => {
+    dbService.getSettings().then(async (current) => {
       if (current.theme !== t) {
-        dbService.saveSettings({ theme: t });
+        await dbService.saveSettings({ theme: t });
+        const updated = await dbService.getSettings();
+        setUserSettings(updated);
+        forceSync().catch(console.error);
       }
     });
-  }, [dbService]);
+  }, [dbService, forceSync]);
 
   const updateUserSettings = async (newSettings: Partial<UserSettings>) => {
     await dbService.saveSettings(newSettings);
@@ -565,25 +657,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Background sync - do not await to keep UI responsive
     forceSync().catch(console.error);
   };
-
-  const forceSync = useCallback(async () => {
-    if (!activeProvider || !isOnline) return;
-
-    await runWithSyncLock(async () => {
-      setSyncStatus('syncing');
-      try {
-        if (db) {
-          await syncDatabaseWithRemote(db, activeProvider);
-          await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
-          const updated = await dbService.getSettings();
-          setUserSettings(updated);
-        }
-      } finally {
-        setSyncStatus(activeProvider.getStatus());
-        setLastSyncedTime(activeProvider.getLastSyncedTime() || new Date().toLocaleTimeString());
-      }
-    }, syncLock);
-  }, [activeProvider, isOnline, db, dbService, selectedDate]);
 
 
   // Transparent Background Sync: Polling and Visibility focus
@@ -650,11 +723,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveAdapter(null);
     setSyncStatus('disconnected');
     
-    // Clear cloud tokens
+    // Clear cloud tokens locally without bumping updatedAt or triggering remote push
     if (userSettings) {
-      await updateUserSettings({
+      await dbService.saveSettings({
         active_cloud_provider: undefined
       });
+      const updated = await dbService.getSettings();
+      setUserSettings(updated);
     }
   };
 
@@ -664,9 +739,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     const { adapter, credentials } = await factory.connect();
     
-    await updateUserSettings({
+    // Persist credentials locally without bumping updatedAt or pushing local factory defaults before pulling remote
+    await dbService.saveSettings({
       active_cloud_provider: { id: adapterId, credentials }
     });
+    const localWithCreds = await dbService.getSettings();
+    setUserSettings(localWithCreds);
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('quomida_onboarding_dismissed', 'true');
@@ -679,18 +757,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Immediately trigger initial bidirectional sync to pull existing cloud data
     if (db && isOnline) {
-      runWithSyncLock(async () => {
+      await runWithSyncLock(async () => {
         setSyncStatus('syncing');
         try {
           await syncDatabaseWithRemote(db, adapter);
           await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
           const updated = await dbService.getSettings();
           setUserSettings(updated);
+          if (updated.locale?.startsWith('en')) setLocaleState('en');
+          else if (updated.locale?.startsWith('es')) setLocaleState('es');
+          if (updated.theme) setThemeState(updated.theme as any);
         } finally {
           setSyncStatus(adapter.getStatus());
           setLastSyncedTime(adapter.getLastSyncedTime() || new Date().toLocaleTimeString());
         }
-      }, syncLock).catch(console.error);
+      }, syncLock, pendingSyncRef).catch(console.error);
     }
   };
 

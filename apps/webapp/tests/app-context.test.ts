@@ -71,4 +71,59 @@ describe('AppContext auto-connect logic (Issue 1)', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('persists refreshed credentials locally when activeProvider emits onCredentialsChange', async () => {
+    const saveSettingsSpy = vi.spyOn(LocalDBService.prototype, 'saveSettings').mockResolvedValue(undefined);
+    vi.spyOn(LocalDBService.prototype, 'getSettings').mockResolvedValue({
+      id: 'global_settings',
+      locale: 'es-AR',
+      theme: 'dark',
+      daily_calorie_target: 2100,
+      custom_macros: { protein: 160, carbs: 210, fats: 70 },
+      target_mode: 'manual',
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: {
+          accessToken: 'initial-token',
+          userEmail: 'alice@qozara.org'
+        }
+      },
+      updatedAt: 12345
+    } as any);
+
+    let capturedProvider: any = null;
+    const TestComponent = () => {
+      const { activeProvider } = useApp();
+      capturedProvider = activeProvider;
+      return React.createElement('div', { 'data-testid': 'adapter-id' }, activeProvider?.id || 'none');
+    };
+
+    render(
+      React.createElement(GoogleOAuthProvider as any, { clientId: 'test-client-id' },
+        React.createElement(AppProvider, null, React.createElement(TestComponent))
+      )
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(capturedProvider?.id).toBe('google-drive-sheets');
+
+    // Simulate silent token refresh notification from provider
+    capturedProvider.notifyCredentialsChange({
+      accessToken: 'refreshed-token-xyz',
+      userEmail: 'alice@qozara.org'
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(saveSettingsSpy).toHaveBeenCalledWith({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: {
+          accessToken: 'refreshed-token-xyz',
+          userEmail: 'alice@qozara.org'
+        }
+      }
+    });
+
+    vi.restoreAllMocks();
+  });
 });

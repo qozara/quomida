@@ -34,4 +34,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0027: Open Food Facts Catalog Reduction and Cross-Language Deduplication](./0027-off-catalog-reduction-and-cross-language-deduplication.md)
 * [ADR 0028: Adaptive Background Auto-Download and Zero-Friction Catalog Synchronization](./0028-adaptive-background-auto-download-and-zero-friction-catalog-sync.md)
 * [ADR 0029: Unified Catalog Download State and Real-Time Settings Synchronization](./0029-unified-catalog-download-state-and-real-time-settings-synchronization.md)
+* [ADR 0030: Multi-Device User Settings Synchronization, Zero-Epoch Seed & Credential Isolation](./0030-multi-device-settings-sync-and-credential-isolation.md)
 

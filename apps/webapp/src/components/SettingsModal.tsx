@@ -238,11 +238,53 @@ export const SettingsModal: React.FC = () => {
   const [isEncryptingKey, setIsEncryptingKey] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
+  const settingsSignature = useMemo(() => {
+    if (!userSettings) return '';
+    const { active_cloud_provider: _creds, ...domainSettings } = userSettings;
+    return JSON.stringify(domainSettings);
+  }, [userSettings]);
+
   useEffect(() => {
-    if (userSettings?.ai_settings?.enabled !== undefined) {
-      setAiEnabled(userSettings.ai_settings.enabled !== false);
+    if (!userSettings) return;
+    setCalorieTarget(userSettings.daily_calorie_target || 2000);
+    setProteinTarget(userSettings.custom_macros?.protein || 150);
+    setCarbsTarget(userSettings.custom_macros?.carbs || 200);
+    setFatsTarget(userSettings.custom_macros?.fats || 65);
+    setTargetMode(userSettings.target_mode === 'manual' ? 'manual' : 'smart');
+    setIsAdaptive(userSettings.target_mode === 'adaptive');
+    if (userSettings.biometrics) {
+      setSex(userSettings.biometrics.sex || 'male');
+      setBirthDate(userSettings.biometrics.birth_date || '1990-01-01');
+      setHeightCm(userSettings.biometrics.height_cm || 170);
+      setActivityMultiplier(userSettings.biometrics.activity_multiplier || 1.375);
     }
-  }, [userSettings?.ai_settings?.enabled]);
+    if (userSettings.goal_config) {
+      setGoalType(userSettings.goal_config.goal_type || 'lose');
+      setWeeklyRatePct(
+        userSettings.goal_config.weekly_rate_pct !== undefined
+          ? userSettings.goal_config.weekly_rate_pct
+          : -0.5
+      );
+      setProteinGPerKg(userSettings.goal_config.protein_g_per_kg || 2.2);
+      setFatCaloriePct(userSettings.goal_config.fat_calorie_pct || 0.25);
+    }
+    if (userSettings.ai_settings) {
+      setAiEnabled(userSettings.ai_settings.enabled !== false);
+      if (userSettings.ai_settings.provider) {
+        setAiProvider(userSettings.ai_settings.provider);
+      }
+      if (userSettings.ai_settings.ollama_base_url) {
+        setOllamaUrl(userSettings.ai_settings.ollama_base_url);
+      }
+      if (userSettings.ai_settings.ollama_model) {
+        setOllamaModel(userSettings.ai_settings.ollama_model);
+      }
+    }
+  }, [settingsSignature, isSettingsOpen]);
+
+  useEffect(() => {
+    setCurrentWeightKg(initialWeight);
+  }, [initialWeight, isSettingsOpen]);
 
   // Extract User Info
   const connectedAccount = activeProvider?.getConnectedAccount?.();
@@ -356,7 +398,10 @@ export const SettingsModal: React.FC = () => {
       });
     } else {
       const existingLog = weightLogs.find((w) => w.date === selectedDate);
-      if (!existingLog || weightLogs.length === 0) {
+      const hasWeightChangedFromInitial = Math.abs(currentWeightKg - initialWeight) > 1e-4;
+      const hasWeightChangedOnSelectedDate =
+        existingLog !== undefined && Math.abs(existingLog.weight_kg - currentWeightKg) > 1e-4;
+      if (weightLogs.length === 0 || hasWeightChangedFromInitial || hasWeightChangedOnSelectedDate) {
         await logWeight(selectedDate, currentWeightKg);
       }
 

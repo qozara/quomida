@@ -1,4 +1,4 @@
-import { type QuomidaDatabase, prepareQuery, runAdaptiveCalibrationOnDatabase } from './rxdb.js';
+import { type QuomidaDatabase, prepareQuery, runAdaptiveCalibrationOnDatabaseWithMeta } from './rxdb.js';
 import type { CloudSyncProvider } from '@quomida/cloud-providers';
 import { recalculateEWMAWeightTrend, type WeightLog } from '@quomida/domain-core';
 
@@ -10,6 +10,28 @@ export const SYNCABLE_COLLECTIONS = new Set([
   'user_settings',
   'weight_logs'
 ]);
+
+function sanitizeDocumentForPush(collectionName: string, doc: any): any {
+  if (collectionName === 'user_settings' && doc && typeof doc === 'object' && 'active_cloud_provider' in doc) {
+    const copy = { ...doc };
+    delete copy.active_cloud_provider;
+    return copy;
+  }
+  return doc;
+}
+
+function mergeRemoteDocumentForLocalUpsert(collectionName: string, remoteDoc: any, localDoc?: any): any {
+  const cleanRemote = { ...remoteDoc };
+  delete cleanRemote._deleted;
+  if (collectionName === 'user_settings') {
+    if (localDoc && (localDoc as any).active_cloud_provider !== undefined) {
+      cleanRemote.active_cloud_provider = (localDoc as any).active_cloud_provider;
+    } else {
+      delete cleanRemote.active_cloud_provider;
+    }
+  }
+  return cleanRemote;
+}
 
 export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: CloudSyncProvider) {
   if (!adapter.isInitialized()) return;
@@ -89,14 +111,13 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
               await collection.findOne(remoteDoc.id).remove().catch(() => {});
               collectionsWithRemoteChanges.add(collectionName);
             } else {
-              const cleanRemote = { ...remoteDoc };
-              delete cleanRemote._deleted;
+              const cleanRemote = mergeRemoteDocumentForLocalUpsert(collectionName, remoteDoc, localDoc);
               upserts.push(cleanRemote);
               collectionsWithRemoteChanges.add(collectionName);
             }
           } else if (localTime > remoteTime) {
             // Local is newer, remote needs update
-            pushBacks.push(localDoc);
+            pushBacks.push(sanitizeDocumentForPush(collectionName, localDoc));
           } else {
             // Identical time, if one is deleted, prefer deleted
             if (remoteDoc._deleted !== (localDoc as any)._deleted) {
@@ -106,7 +127,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
                 collectionsWithRemoteChanges.add(collectionName);
               } else {
                 // Local is deleted, remote is active -> push local tombstone to remote
-                pushBacks.push(localDoc);
+                pushBacks.push(sanitizeDocumentForPush(collectionName, localDoc));
               }
             }
           }
@@ -116,8 +137,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
             // It's a remote tombstone, and we don't have it locally. Do nothing.
           } else {
             // It's a new active remote document
-            const cleanRemote = { ...remoteDoc };
-            delete cleanRemote._deleted;
+            const cleanRemote = mergeRemoteDocumentForLocalUpsert(collectionName, remoteDoc, undefined);
             upserts.push(cleanRemote);
             collectionsWithRemoteChanges.add(collectionName);
           }
@@ -134,7 +154,11 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
         if (isCustomOnlyCollection && docObj.source && docObj.source !== 'custom') {
           continue;
         }
-        pushBacks.push(localDoc);
+        // Skip untouched factory default user_settings (updatedAt: 0)
+        if (collectionName === 'user_settings' && (docObj.updatedAt || 0) === 0) {
+          continue;
+        }
+        pushBacks.push(sanitizeDocumentForPush(collectionName, localDoc));
       }
 
       // 4. Apply changes
@@ -181,7 +205,7 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
             healedLogs.push({
               ...orig,
               trend_weight_kg: recTrend,
-              updatedAt: now
+              updatedAt: Math.max(now, (orig.updatedAt || 0) + 1)
             });
           }
         }
@@ -204,11 +228,11 @@ export async function syncDatabaseWithRemote(db: QuomidaDatabase, adapter: Cloud
       collectionsWithRemoteChanges.has('user_settings');
 
     if (shouldRecalibrate && db.collections.user_settings) {
-      const updatedSettings = await runAdaptiveCalibrationOnDatabase(db, undefined, true);
-      if (updatedSettings) {
+      const { settings: updatedSettings, didChange } = await runAdaptiveCalibrationOnDatabaseWithMeta(db, undefined, true);
+      if (didChange && updatedSettings) {
         await adapter.push({
           collection: 'user_settings',
-          documents: [updatedSettings]
+          documents: [sanitizeDocumentForPush('user_settings', updatedSettings)]
         });
       }
     }

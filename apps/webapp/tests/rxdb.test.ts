@@ -30,7 +30,47 @@ describe('RxDB Engine & Local Persistence Layer (APP-101 to APP-104)', () => {
 
     const settings = await db.user_settings.findOne('global_settings').exec();
     expect(settings).not.toBeNull();
-    expect(settings?.toJSON().updatedAt).toBeDefined();
+    expect(settings?.toJSON().updatedAt).toBe(0);
+  });
+
+  it('preserves updatedAt when only active_cloud_provider changes in saveSettings, and updates it on domain changes', async () => {
+    const dbName = `test_db_creds_${Date.now()}`;
+    const service = new LocalDBService({ storage: getRxStorageMemory(), name: dbName });
+    await service.init();
+
+    const initial = await service.getSettings();
+    expect(initial.updatedAt).toBe(0);
+
+    // Updating only active_cloud_provider must NOT bump updatedAt above 0
+    await service.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive',
+        credentials: { accessToken: 'local-device-token', expiresAt: 999999 }
+      }
+    });
+
+    const afterCreds = await service.getSettings();
+    expect(afterCreds.active_cloud_provider?.id).toBe('google-drive');
+    expect(afterCreds.updatedAt).toBe(0);
+
+    // Updating a domain setting MUST bump updatedAt > 0
+    await service.saveSettings({ daily_calorie_target: 2350 });
+    const afterDomain = await service.getSettings();
+    expect(afterDomain.daily_calorie_target).toBe(2350);
+    expect(afterDomain.updatedAt).toBeGreaterThan(0);
+
+    const domainTimestamp = afterDomain.updatedAt!;
+
+    // Subsequent credential refresh must preserve the existing domainTimestamp
+    await service.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive',
+        credentials: { accessToken: 'refreshed-local-token', expiresAt: 1999999 }
+      }
+    });
+    const afterRefresh = await service.getSettings();
+    expect(afterRefresh.active_cloud_provider?.credentials.accessToken).toBe('refreshed-local-token');
+    expect(afterRefresh.updatedAt).toBe(domainTimestamp);
   });
 
   it('[APP-103] initializes with MockCloudSyncProvider decoupling UI thread from background sync lifecycle', async () => {
