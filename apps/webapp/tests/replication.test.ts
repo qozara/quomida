@@ -58,6 +58,23 @@ describe('syncDatabaseWithRemote', () => {
           },
           required: ['key', 'value']
         }
+      },
+      user_settings: {
+        schema: {
+          version: 0,
+          primaryKey: 'id',
+          type: 'object',
+          properties: {
+            id: { type: 'string', maxLength: 100 },
+            locale: { type: 'string' },
+            theme: { type: 'string' },
+            daily_calorie_target: { type: 'number' },
+            target_mode: { type: 'string' },
+            active_cloud_provider: { type: 'object', additionalProperties: true },
+            updatedAt: { type: 'number', minimum: 0 }
+          },
+          required: ['id']
+        }
       }
     });
     return db;
@@ -193,6 +210,96 @@ describe('syncDatabaseWithRemote', () => {
     expect(ingPush[0].documents.length).toBe(1);
     expect(ingPush[0].documents[0].id).toBe('cust_1');
     expect(ingPush[0].documents.some((d: any) => d.id === 'sys_1')).toBe(false);
+
+    await db.remove();
+  });
+
+  it('preserves local active_cloud_provider when pulling newer remote user_settings and does not push untouched factory defaults (updatedAt: 0)', async () => {
+    const db = await createTestDb();
+    const mockCloudSyncProvider = createMockAdapter();
+
+    // Device B has untouched factory defaults (updatedAt: 0) + local OAuth credentials
+    await db.user_settings.insert({
+      id: 'global_settings',
+      locale: 'es-AR',
+      theme: 'dark',
+      daily_calorie_target: 2000,
+      target_mode: 'manual',
+      active_cloud_provider: {
+        id: 'google-drive',
+        credentials: { accessToken: 'device-b-token' }
+      },
+      updatedAt: 0
+    });
+
+    // Remote has Device A's configured settings (updatedAt: 5000) without credentials (or with stale Device A credentials)
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
+      {
+        collection: 'user_settings',
+        documents: [
+          {
+            id: 'global_settings',
+            locale: 'en-US',
+            theme: 'light',
+            daily_calorie_target: 2750,
+            target_mode: 'manual',
+            active_cloud_provider: {
+              id: 'google-drive',
+              credentials: { accessToken: 'leaked-device-a-token' }
+            },
+            updatedAt: 5000
+          }
+        ]
+      }
+    ]);
+
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
+
+    const localSettings = (await db.user_settings.findOne('global_settings').exec()).toJSON();
+    expect(localSettings.daily_calorie_target).toBe(2750);
+    expect(localSettings.locale).toBe('en-US');
+    expect(localSettings.theme).toBe('light');
+    // Device B's local token MUST be preserved!
+    expect(localSettings.active_cloud_provider).toEqual({
+      id: 'google-drive',
+      credentials: { accessToken: 'device-b-token' }
+    });
+
+    // Furthermore, since manual mode did not recalibrate anything in Step B, push should NOT have been called for user_settings
+    const pushCalls = (mockCloudSyncProvider.push as any).mock.calls;
+    const settingsPush = pushCalls.find((c: any[]) => c[0].collection === 'user_settings');
+    expect(settingsPush).toBeUndefined();
+
+    await db.remove();
+  });
+
+  it('strips active_cloud_provider when pushing newer local user_settings to remote', async () => {
+    const db = await createTestDb();
+    const mockCloudSyncProvider = createMockAdapter();
+    mockCloudSyncProvider.pull = vi.fn().mockResolvedValue([
+      { collection: 'user_settings', documents: [] }
+    ]);
+
+    await db.user_settings.insert({
+      id: 'global_settings',
+      locale: 'en-US',
+      theme: 'dark',
+      daily_calorie_target: 2400,
+      target_mode: 'manual',
+      active_cloud_provider: {
+        id: 'google-drive',
+        credentials: { accessToken: 'secret-local-token' }
+      },
+      updatedAt: 3000
+    });
+
+    await syncDatabaseWithRemote(db as any, mockCloudSyncProvider);
+
+    const pushCalls = (mockCloudSyncProvider.push as any).mock.calls;
+    const settingsPush = pushCalls.find((c: any[]) => c[0].collection === 'user_settings');
+    expect(settingsPush).toBeDefined();
+    expect(settingsPush[0].documents[0].daily_calorie_target).toBe(2400);
+    expect(settingsPush[0].documents[0].active_cloud_provider).toBeUndefined();
 
     await db.remove();
   });

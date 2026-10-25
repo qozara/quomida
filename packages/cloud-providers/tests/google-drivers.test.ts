@@ -86,6 +86,118 @@ describe('GoogleDriveBlobDriver', () => {
 
     await expect(driver.readBlob('settings.json')).rejects.toThrow(/auth|unauthorized|401/i);
   });
+
+  it('caches fileId from POST creation to avoid eventual consistency duplicate files on rapid consecutive writes', async () => {
+    const mockCalls: { url: string; method?: string; body?: any }[] = [];
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method, body: init?.body });
+
+        // Simulate eventual consistency lag: files.list ALWAYS returns empty
+        if (url.includes('/drive/v3/files?') && init?.method === 'GET') {
+          return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+        // First write creates file via POST and returns id
+        if (url.includes('/upload/drive/v3/files') && init?.method === 'POST') {
+          return new Response(JSON.stringify({ id: 'created_file_id_777', name: 'settings.json' }), { status: 200 });
+        }
+        // Second write must PATCH the cached created_file_id_777 without creating a duplicate POST
+        if (url.includes('/upload/drive/v3/files/created_file_id_777') && init?.method === 'PATCH') {
+          return new Response(JSON.stringify({ id: 'created_file_id_777', name: 'settings.json' }), { status: 200 });
+        }
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleDriveBlobDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    await driver.writeBlob('settings.json', [{ id: 'global_settings', daily_calorie_target: 2000 }]);
+    await driver.writeBlob('settings.json', [{ id: 'global_settings', daily_calorie_target: 2400 }]);
+
+    const postCalls = mockCalls.filter(c => c.method === 'POST');
+    const patchCalls = mockCalls.filter(c => c.method === 'PATCH');
+    expect(postCalls.length).toBe(1);
+    expect(patchCalls.length).toBe(1);
+    expect(patchCalls[0].url).toContain('created_file_id_777');
+  });
+
+  it('queries appDataFolder with orderBy=modifiedTime desc and cleans up duplicate files', async () => {
+    const mockCalls: { url: string; method?: string }[] = [];
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method });
+
+        if (url.includes('/drive/v3/files?') && init?.method === 'GET') {
+          return new Response(
+            JSON.stringify({
+              files: [
+                { id: 'newest_file_id', name: 'settings.json', modifiedTime: '2026-10-24T20:00:00Z' },
+                { id: 'stale_dup_id_1', name: 'settings.json', modifiedTime: '2026-10-24T19:00:00Z' }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+        if (url.includes('/drive/v3/files/newest_file_id?alt=media') && init?.method === 'GET') {
+          return new Response(JSON.stringify([{ id: 'global_settings', daily_calorie_target: 2500 }]), { status: 200 });
+        }
+        if (url.includes('/drive/v3/files/stale_dup_id_1') && init?.method === 'DELETE') {
+          return new Response('', { status: 204 });
+        }
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleDriveBlobDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    const data = await driver.readBlob('settings.json');
+    expect(data).toEqual([{ id: 'global_settings', daily_calorie_target: 2500 }]);
+
+    const searchCall = mockCalls.find(c => c.url.includes('/drive/v3/files?') && c.method === 'GET');
+    expect(searchCall?.url).toContain('orderBy=');
+    expect(decodeURIComponent(searchCall!.url)).toContain('modifiedTime desc');
+
+    const deleteCall = mockCalls.find(c => c.method === 'DELETE' && c.url.includes('stale_dup_id_1'));
+    expect(deleteCall).toBeDefined();
+  });
+
+  it('self-heals when cached fileId returns 404 on readBlob or writeBlob', async () => {
+    let firstRead404 = true;
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/drive/v3/files?') && init?.method === 'GET') {
+          return new Response(
+            JSON.stringify({ files: [{ id: firstRead404 ? 'stale_deleted_id' : 'fresh_id', name: 'settings.json' }] }),
+            { status: 200 }
+          );
+        }
+        if (url.includes('/drive/v3/files/stale_deleted_id?alt=media')) {
+          firstRead404 = false;
+          return new Response('Not Found', { status: 404 });
+        }
+        if (url.includes('/drive/v3/files/fresh_id?alt=media')) {
+          return new Response(JSON.stringify([{ id: 'global_settings', daily_calorie_target: 2300 }]), { status: 200 });
+        }
+        return new Response('Not Found', { status: 404 });
+      })
+    };
+
+    const driver = new GoogleDriveBlobDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    const data = await driver.readBlob('settings.json');
+    expect(data).toEqual([{ id: 'global_settings', daily_calorie_target: 2300 }]);
+  });
 });
 
 describe('GoogleSheetsTabularDriver', () => {

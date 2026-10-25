@@ -41,6 +41,31 @@ export function isEntityNotFoundError(err: any): boolean {
   );
 }
 
+export function shouldAcceptIncomingDoc(
+  existing: Record<string, any> | undefined,
+  incoming: Record<string, any>
+): boolean {
+  if (!existing) return true;
+  const existingTime = typeof existing.updatedAt === 'number' ? existing.updatedAt : 0;
+  const incomingTime = typeof incoming.updatedAt === 'number' ? incoming.updatedAt : 0;
+  if (incomingTime > existingTime) return true;
+  if (incomingTime < existingTime) return false;
+  if (existing._deleted && !incoming._deleted) return false;
+  return true;
+}
+
+export function sanitizeRemoteDocument(
+  collection: string,
+  doc: Record<string, any>
+): Record<string, any> {
+  if (collection === 'user_settings' && doc && typeof doc === 'object' && 'active_cloud_provider' in doc) {
+    const copy = { ...doc };
+    delete copy.active_cloud_provider;
+    return copy;
+  }
+  return doc;
+}
+
 export const DEFAULT_COLLECTION_ROUTES: Record<string, CollectionRoute> = {
   user_settings: {
     target: 'blob',
@@ -320,12 +345,16 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
         if (!this.blobDriver) {
           throw new Error(`BlobStorageDriver is required for collection "${payload.collection}"`);
         }
-        // Read existing blob to merge or upsert
+        // Read existing blob to merge or upsert with LWW timestamp validation
         const existingDocs = (await this.blobDriver.readBlob<Record<string, any>[]>(route.filename)) || [];
-        const docMap = new Map(existingDocs.map(d => [d.id, d]));
+        const docMap = new Map(existingDocs.map(d => [d.id, sanitizeRemoteDocument(payload.collection, d)]));
         for (const doc of payload.documents) {
           if (doc.id) {
-            docMap.set(doc.id, doc);
+            const sanitized = sanitizeRemoteDocument(payload.collection, doc);
+            const current = docMap.get(doc.id);
+            if (shouldAcceptIncomingDoc(current, sanitized)) {
+              docMap.set(doc.id, sanitized);
+            }
           }
         }
         await this.blobDriver.writeBlob(route.filename, Array.from(docMap.values()));
@@ -373,7 +402,10 @@ export class CompositeCloudSyncProvider implements CloudSyncProvider {
             if ((payload.collection === 'base_ingredients' || payload.collection === 'portions') && doc.source === 'system') {
               continue;
             }
-            docMap.set(doc.id, doc);
+            const current = docMap.get(doc.id);
+            if (shouldAcceptIncomingDoc(current, doc)) {
+              docMap.set(doc.id, doc);
+            }
           }
         }
 

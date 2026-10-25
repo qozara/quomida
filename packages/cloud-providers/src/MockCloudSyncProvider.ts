@@ -1,4 +1,5 @@
 import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from './types.js';
+import { shouldAcceptIncomingDoc, sanitizeRemoteDocument } from './strategy/CompositeCloudSyncProvider.js';
 
 export class MockCloudSyncProvider implements CloudSyncProvider {
   id = 'mock-sync-adapter';
@@ -112,14 +113,18 @@ export class MockCloudSyncProvider implements CloudSyncProvider {
     this.setStatus('syncing');
     const existing = this.storage.get(payload.collection) || [];
     
-    // Upsert items by id
-    const map = new Map(existing.map(doc => [doc.id, doc]));
+    // Upsert items by id with LWW validation and credential sanitization
+    const map = new Map(existing.map(doc => [doc.id, sanitizeRemoteDocument(payload.collection, doc)]));
     for (const doc of payload.documents) {
       if (doc.id) {
         if ((payload.collection === 'base_ingredients' || payload.collection === 'portions') && doc.source === 'system') {
           continue;
         }
-        map.set(doc.id, doc);
+        const sanitized = sanitizeRemoteDocument(payload.collection, doc);
+        const current = map.get(doc.id);
+        if (shouldAcceptIncomingDoc(current, sanitized)) {
+          map.set(doc.id, sanitized);
+        }
       }
     }
 

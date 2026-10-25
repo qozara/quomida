@@ -72,4 +72,46 @@ describe('runWithSyncLock (Cross-Tab Web Locks)', () => {
     expect(action).not.toHaveBeenCalled();
     expect(result).toBeNull();
   });
+
+  it('queues and executes a trailing sync when concurrent calls arrive while lock is held', async () => {
+    vi.stubGlobal('navigator', {});
+
+    const fallbackLock = { current: false };
+    const pendingSync = { current: false };
+
+    let resolveFirstRun!: () => void;
+    const firstRunBarrier = new Promise<void>((r) => {
+      resolveFirstRun = r;
+    });
+
+    let callCount = 0;
+    const action = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        await firstRunBarrier;
+      }
+      return `run-${callCount}`;
+    });
+
+    // Start first sync (holds lock until resolveFirstRun is called)
+    const p1 = runWithSyncLock(action, fallbackLock, pendingSync);
+
+    // While first sync is in-flight, two rapid mutations request sync
+    const p2 = await runWithSyncLock(action, fallbackLock, pendingSync);
+    const p3 = await runWithSyncLock(action, fallbackLock, pendingSync);
+
+    expect(p2).toBeNull();
+    expect(p3).toBeNull();
+    expect(pendingSync.current).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+
+    // Finish first sync -> should automatically drain pendingSync and run action a 2nd time
+    resolveFirstRun();
+    const res1 = await p1;
+
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(res1).toBe('run-2');
+    expect(pendingSync.current).toBe(false);
+    expect(fallbackLock.current).toBe(false);
+  });
 });

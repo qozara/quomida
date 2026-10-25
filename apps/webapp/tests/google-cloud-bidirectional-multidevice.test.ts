@@ -797,4 +797,198 @@ describe('Google Drive Cloud Connector — Multi-Device Bi-Directional Synchroni
     await dbA.remove();
     await dbB.remove();
   });
+
+  it('seamlessly hands off all user_settings (biometrics, goals, adaptive_state, locale, theme, AI) from Device A to a fresh Device B booting later while isolating OAuth credentials', async () => {
+    // 1. Device A initializes, connects Google Drive, and configures full profile & adaptive goals
+    const serviceA = new LocalDBService({
+      name: `db_handoff_A_${Math.random().toString(36).substring(7)}`,
+      storage: getRxStorageMemory()
+    });
+    const dbA = await serviceA.init();
+    const providerA = new GoogleDriveSheetsCloudSyncProvider({
+      httpClient: backend.httpClient
+    });
+    await providerA.initialize({ accessToken: 'token-device-A', userEmail: 'user@gmail.com' });
+    serviceA.setCloudSyncProvider(providerA);
+
+    await serviceA.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: { accessToken: 'token-device-A', userEmail: 'user@gmail.com' }
+      }
+    });
+
+    await serviceA.saveWeightLog({ date: '2026-10-18', weight_kg: 64.2 });
+    await serviceA.saveSettings({
+      locale: 'en-US',
+      theme: 'light',
+      target_mode: 'adaptive',
+      daily_calorie_target: 2480,
+      custom_macros: { protein: 175, carbs: 265, fats: 80 },
+      biometrics: {
+        sex: 'female',
+        birth_date: '1992-04-15',
+        height_cm: 168,
+        activity_multiplier: 1.55
+      },
+      goal_config: {
+        goal_type: 'lose',
+        weekly_rate_pct: -0.5,
+        protein_g_per_kg: 2.1,
+        fat_calorie_pct: 0.28
+      },
+      adaptive_state: {
+        estimated_tdee: 2880,
+        prior_tdee: 2850,
+        calibration_status: 'ready',
+        last_calibrated_date: '2026-10-18'
+      },
+      ai_settings: {
+        provider: 'ollama',
+        enabled: true,
+        ollama_base_url: 'http://localhost:11434',
+        ollama_model: 'llama3'
+      }
+    });
+
+    await syncDatabaseWithRemote(dbA, providerA);
+
+    // Wait 25ms so wall-clock Date.now() is strictly later when fresh Device B boots and connects
+    await new Promise((r) => setTimeout(r, 25));
+
+    // 2. Fresh Device B boots later, saves its own OAuth credentials (as connectProvider does), and syncs
+    const serviceB = new LocalDBService({
+      name: `db_handoff_B_${Math.random().toString(36).substring(7)}`,
+      storage: getRxStorageMemory()
+    });
+    const dbB = await serviceB.init();
+    const providerB = new GoogleDriveSheetsCloudSyncProvider({
+      httpClient: backend.httpClient
+    });
+    await providerB.initialize({ accessToken: 'token-device-B', userEmail: 'user@gmail.com' });
+    serviceB.setCloudSyncProvider(providerB);
+
+    // Simulate connectProvider saving Device B's OAuth credentials BEFORE initial syncDatabaseWithRemote
+    await serviceB.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: { accessToken: 'token-device-B', userEmail: 'user@gmail.com' }
+      }
+    });
+
+    await syncDatabaseWithRemote(dbB, providerB);
+
+    // 3. Verify Device B seamlessly received ALL of Device A's settings without overwriting them
+    const settingsB = await serviceB.getSettings();
+    expect(settingsB.locale).toBe('en-US');
+    expect(settingsB.theme).toBe('light');
+    expect(settingsB.target_mode).toBe('adaptive');
+    expect(settingsB.biometrics).toEqual({
+      sex: 'female',
+      birth_date: '1992-04-15',
+      height_cm: 168,
+      activity_multiplier: 1.55
+    });
+    expect(settingsB.goal_config).toEqual({
+      goal_type: 'lose',
+      weekly_rate_pct: -0.5,
+      protein_g_per_kg: 2.1,
+      fat_calorie_pct: 0.28
+    });
+    expect(settingsB.ai_settings).toEqual({
+      provider: 'ollama',
+      enabled: true,
+      ollama_base_url: 'http://localhost:11434',
+      ollama_model: 'llama3'
+    });
+
+    // Verify Device B kept its own OAuth credentials and remote settings.json has no leaked credentials
+    expect(settingsB.active_cloud_provider?.credentials.accessToken).toBe('token-device-B');
+    const settingsFiles = Array.from(backend.files.values()).filter(
+      (f) => f.spaces?.includes('appDataFolder') && f.name === 'settings.json'
+    );
+    expect(settingsFiles.length).toBe(1);
+    const remoteDoc = Array.isArray(settingsFiles[0].content)
+      ? settingsFiles[0].content[0]
+      : settingsFiles[0].content;
+    expect(remoteDoc.active_cloud_provider).toBeUndefined();
+
+    await dbA.remove();
+    await dbB.remove();
+  });
+
+  it('converges deterministically via Last-Write-Wins when both Device A and Device B remain open concurrently', async () => {
+    const serviceA = new LocalDBService({
+      name: `db_concurrent_A_${Math.random().toString(36).substring(7)}`,
+      storage: getRxStorageMemory()
+    });
+    const dbA = await serviceA.init();
+    const providerA = new GoogleDriveSheetsCloudSyncProvider({
+      httpClient: backend.httpClient
+    });
+    await providerA.initialize({ accessToken: 'token-concurrent-A', userEmail: 'user@gmail.com' });
+    serviceA.setCloudSyncProvider(providerA);
+    await serviceA.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: { accessToken: 'token-concurrent-A' }
+      },
+      daily_calorie_target: 2100,
+      theme: 'dark'
+    });
+    await syncDatabaseWithRemote(dbA, providerA);
+
+    const serviceB = new LocalDBService({
+      name: `db_concurrent_B_${Math.random().toString(36).substring(7)}`,
+      storage: getRxStorageMemory()
+    });
+    const dbB = await serviceB.init();
+    const providerB = new GoogleDriveSheetsCloudSyncProvider({
+      httpClient: backend.httpClient
+    });
+    await providerB.initialize({ accessToken: 'token-concurrent-B', userEmail: 'user@gmail.com' });
+    serviceB.setCloudSyncProvider(providerB);
+    await serviceB.saveSettings({
+      active_cloud_provider: {
+        id: 'google-drive-sheets',
+        credentials: { accessToken: 'token-concurrent-B' }
+      }
+    });
+    await syncDatabaseWithRemote(dbB, providerB);
+
+    // Both devices are now open and synced at 2100 kcal.
+    // Device A makes an edit first (earlier timestamp)
+    await serviceA.saveSettings({
+      daily_calorie_target: 2300,
+      theme: 'light'
+    });
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Device B makes an edit second (later timestamp -> LWW winner)
+    await serviceB.saveSettings({
+      daily_calorie_target: 2650,
+      custom_macros: { protein: 190, carbs: 290, fats: 82 },
+      theme: 'dark'
+    });
+
+    // Device B syncs first, then Device A syncs second
+    await syncDatabaseWithRemote(dbB, providerB);
+    await syncDatabaseWithRemote(dbA, providerA);
+
+    const finalA = await serviceA.getSettings();
+    const finalB = await serviceB.getSettings();
+
+    expect(finalA.daily_calorie_target).toBe(2650);
+    expect(finalA.custom_macros).toEqual({ protein: 190, carbs: 290, fats: 82 });
+    expect(finalA.theme).toBe('dark');
+    expect(finalA.active_cloud_provider?.credentials.accessToken).toBe('token-concurrent-A');
+
+    expect(finalB.daily_calorie_target).toBe(2650);
+    expect(finalB.custom_macros).toEqual({ protein: 190, carbs: 290, fats: 82 });
+    expect(finalB.theme).toBe('dark');
+    expect(finalB.active_cloud_provider?.credentials.accessToken).toBe('token-concurrent-B');
+
+    await dbA.remove();
+    await dbB.remove();
+  });
 });

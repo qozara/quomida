@@ -118,15 +118,24 @@ export interface InitDBOptions {
 
 let dbInstance: QuomidaDatabase | null = null;
 let dbPromise: Promise<QuomidaDatabase> | null = null;
+let currentDbName: string | null = null;
 
 export function getDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
-  if (!dbPromise) {
+  const requestedName = options?.name || 'quomidadb_v1';
+  if (dbInstance && (dbInstance as any).destroyed) {
+    dbInstance = null;
+    dbPromise = null;
+    currentDbName = null;
+  }
+  if (!dbPromise || (currentDbName !== null && currentDbName !== requestedName)) {
+    currentDbName = requestedName;
     dbPromise = initDatabase(options).then((db) => {
       dbInstance = db;
       return db;
     }).catch((err) => {
       // Clear cached promise on failure so subsequent attempts or resets can retry cleanly
       dbPromise = null;
+      currentDbName = null;
       throw err;
     });
   }
@@ -143,6 +152,7 @@ export async function destroyDatabase(): Promise<void> {
     dbInstance = null;
   }
   dbPromise = null;
+  currentDbName = null;
 }
 
 export async function clearLocalDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
@@ -265,8 +275,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   }
 
 
-  // Hydrate global user settings if empty
-  const now = Date.now();
+  // Hydrate global user settings if empty with epoch 0 so a fresh device never outranks synced cloud settings
   const existingSettings = await db.user_settings.findOne('global_settings').exec();
   if (!existingSettings) {
     await db.user_settings.insert({
@@ -280,7 +289,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
         fats: 65
       },
       target_mode: 'manual',
-      updatedAt: now
+      updatedAt: 0
     });
   }
 
@@ -354,7 +363,7 @@ export class LocalDBService {
       daily_calorie_target: 2000,
       custom_macros: { protein: 150, carbs: 200, fats: 65 },
       target_mode: 'manual',
-      updatedAt: Date.now()
+      updatedAt: 0
     };
     await this.db!.user_settings.insert(fallback);
     return fallback;
@@ -364,17 +373,20 @@ export class LocalDBService {
     if (!this.db) await this.init();
     const current = await this.getSettings();
     let hasChanges = false;
+    let hasDomainChanges = false;
     for (const [key, val] of Object.entries(settings)) {
       if (JSON.stringify((current as any)[key]) !== JSON.stringify(val)) {
         hasChanges = true;
-        break;
+        if (key !== 'active_cloud_provider') {
+          hasDomainChanges = true;
+        }
       }
     }
     if (!hasChanges) return;
     const updated: UserSettings = {
       ...current,
       ...settings,
-      updatedAt: Date.now()
+      updatedAt: hasDomainChanges ? Date.now() : (current.updatedAt ?? 0)
     };
     await this.db!.user_settings.upsert(updated);
   }
@@ -701,18 +713,27 @@ export async function runAdaptiveCalibrationOnDatabase(
   today?: string,
   force?: boolean
 ): Promise<UserSettings | null> {
-  if (!db || !db.collections.user_settings) return null;
+  const res = await runAdaptiveCalibrationOnDatabaseWithMeta(db, today, force);
+  return res.settings;
+}
+
+export async function runAdaptiveCalibrationOnDatabaseWithMeta(
+  db: QuomidaDatabase,
+  today?: string,
+  force?: boolean
+): Promise<{ settings: UserSettings | null; didChange: boolean }> {
+  if (!db || !db.collections.user_settings) return { settings: null, didChange: false };
 
   const settingsDoc = await db.collections.user_settings.findOne('global_settings').exec();
-  if (!settingsDoc) return null;
+  if (!settingsDoc) return { settings: null, didChange: false };
   const settings: UserSettings = settingsDoc.toJSON ? settingsDoc.toJSON() : settingsDoc;
 
   if (settings.target_mode !== 'adaptive' && settings.target_mode !== 'deterministic_seed') {
-    return settings;
+    return { settings, didChange: false };
   }
 
   if (!settings.biometrics || !settings.goal_config) {
-    return settings;
+    return { settings, didChange: false };
   }
 
   let weightLogs: WeightLog[] = [];
@@ -774,7 +795,7 @@ export async function runAdaptiveCalibrationOnDatabase(
       const hasMacroChanged = JSON.stringify(updates.custom_macros) !== JSON.stringify(settings.custom_macros);
       const hasTdeeChanged = settings.adaptive_state?.estimated_tdee !== seed.seed_tdee;
       if (!hasCalTargetChanged && !hasMacroChanged && !hasTdeeChanged) {
-        return settings;
+        return { settings, didChange: false };
       }
       const updated: UserSettings = {
         ...settings,
@@ -782,9 +803,9 @@ export async function runAdaptiveCalibrationOnDatabase(
         updatedAt: now
       };
       await db.collections.user_settings.upsert(updated);
-      return updated;
+      return { settings: updated, didChange: true };
     }
-    return settings;
+    return { settings, didChange: false };
   }
 
   const isCalibrated = settings.adaptive_state?.calibration_status === 'ready';
@@ -792,7 +813,7 @@ export async function runAdaptiveCalibrationOnDatabase(
   const isDue = !isCalibrated || !lastCalibrated || daysBetween(lastCalibrated, todayDate) >= 7;
 
   if (!isDue && !force) {
-    return settings;
+    return { settings, didChange: false };
   }
 
   const windowStart = addDaysToDate(todayDate, -13);
@@ -894,7 +915,7 @@ export async function runAdaptiveCalibrationOnDatabase(
     hasTargetChanged || hasStatusChanged || hasTdeeChanged || hasCalDateChanged || hasMacrosChanged;
 
   if (!hasChanged) {
-    return settings;
+    return { settings, didChange: false };
   }
 
   const updated: UserSettings = {
@@ -903,5 +924,5 @@ export async function runAdaptiveCalibrationOnDatabase(
     updatedAt: now
   };
   await db.collections.user_settings.upsert(updated);
-  return updated;
+  return { settings: updated, didChange: true };
 }

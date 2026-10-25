@@ -478,6 +478,53 @@ describe('CompositeCloudSyncProvider & Strategy Pattern', () => {
     expect(logsPayload).toBeDefined();
     expect(logsPayload?.documents).toEqual([]);
   });
+
+  it('enforces LWW timestamp validation in push() and strips active_cloud_provider from user_settings', async () => {
+    // 1. Push newer settings (updatedAt: 5000) with local active_cloud_provider credentials
+    await adapter.push({
+      collection: 'user_settings',
+      documents: [
+        {
+          id: 'global_settings',
+          locale: 'en-US',
+          theme: 'light',
+          daily_calorie_target: 2550,
+          custom_macros: { protein: 180, carbs: 260, fats: 85 },
+          active_cloud_provider: {
+            id: 'google-drive-sheets',
+            credentials: { accessToken: 'secret-local-oauth-token' }
+          },
+          updatedAt: 5000
+        }
+      ]
+    });
+
+    let savedBlob = await blobDriver.readBlob('settings.json');
+    expect(savedBlob[0].daily_calorie_target).toBe(2550);
+    // Security & isolation invariant: OAuth credentials must NEVER be stored in remote settings.json
+    expect(savedBlob[0].active_cloud_provider).toBeUndefined();
+
+    // 2. Attempt to push stale settings (updatedAt: 2000 < 5000)
+    await adapter.push({
+      collection: 'user_settings',
+      documents: [
+        {
+          id: 'global_settings',
+          locale: 'es-AR',
+          theme: 'dark',
+          daily_calorie_target: 2000,
+          custom_macros: { protein: 150, carbs: 200, fats: 65 },
+          updatedAt: 2000
+        }
+      ]
+    });
+
+    savedBlob = await blobDriver.readBlob('settings.json');
+    // Newer remote record (5000) must be preserved!
+    expect(savedBlob[0].daily_calorie_target).toBe(2550);
+    expect(savedBlob[0].locale).toBe('en-US');
+    expect(savedBlob[0].updatedAt).toBe(5000);
+  });
 });
 
 
