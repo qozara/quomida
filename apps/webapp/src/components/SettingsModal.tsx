@@ -519,7 +519,7 @@ export const SettingsModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-screen-title"
-      className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ease-out"
+      className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
     >
       {/* Modern Sticky Navigation Header */}
       <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
@@ -573,8 +573,8 @@ export const SettingsModal: React.FC = () => {
           </div>
         ) : (
           <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/80 border border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md shrink-0">
-              <Sparkles className="w-7 h-7" />
+            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-2.5 shadow-md shrink-0">
+              <img src="/favicon.svg" alt="Quomida" className="w-9 h-9 object-contain" />
             </div>
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">

@@ -64,7 +64,7 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
   });
 
   describe('Home Main Screen Top-Left Avatar Action', () => {
-    it('renders Quomida app icon (Sparkles) when user is not connected to cloud storage', () => {
+    it('renders Quomida app icon (/favicon.svg) when user is not connected to cloud storage', () => {
       vi.spyOn(AppContext, 'useApp').mockReturnValue({
         ...baseContext,
         activeProvider: null,
@@ -78,10 +78,9 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
 
       const avatarBtn = screen.getByTestId('btn-open-settings-avatar');
       expect(avatarBtn).toBeDefined();
-      // Should not have an img element when not connected
-      expect(avatarBtn.querySelector('img')).toBeNull();
-      // Should have SVG sparkle icon
-      expect(avatarBtn.querySelector('svg')).toBeDefined();
+      const img = avatarBtn.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('src')).toBe('/favicon.svg');
     });
 
     it('renders Google profile picture when user is connected with profile picture', () => {
@@ -143,7 +142,7 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
       const dialog = screen.getByRole('dialog');
       expect(dialog).toBeDefined();
       expect(dialog.className).toContain('fixed inset-0 z-50');
-      expect(dialog.className).toContain('slide-in-from-right');
+      expect(dialog.className).toContain('animate-slide-in-right');
 
       // Verify back button
       const backBtn = screen.getByTestId('btn-back-settings');

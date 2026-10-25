@@ -17,7 +17,7 @@ import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Cloud, X, Sparkles } from 'lucide-react';
+import { Cloud, X } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -84,17 +84,6 @@ export const DashboardContent: React.FC = () => {
   else if (isCatalogOpen) activeTab = 'catalog';
   else if (isAnalyticsOpen) activeTab = 'analytics';
 
-  // Cloud Connection & Profile Picture
-  const isCloudConnected = Boolean(
-    (activeProvider && activeProvider.getStatus() !== 'disconnected' && activeProvider.name !== 'Mock Storage') ||
-    (userSettings?.active_cloud_provider?.id && userSettings.active_cloud_provider.id !== 'mock')
-  );
-
-  const userPicture =
-    userSettings?.active_cloud_provider?.credentials?.userPicture ||
-    activeProvider?.getUserPicture?.() ||
-    null;
-
   const handleSelectTab = (tab: NavTab) => {
     if (tab === 'diary') {
       setIsSettingsOpen(false);
@@ -117,38 +106,18 @@ export const DashboardContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
-      {/* Floating Sync Status Badge (upper right corner, on top of all main screens) */}
-      <div className="fixed top-3 right-3 z-30">
-        <HeaderSyncTrigger />
-      </div>
-
-      {/* Floating App / User Profile Icon (upper left corner, on home main screen) */}
-      {activeTab === 'diary' && (
-        <div className="fixed top-3 left-3 z-30">
-          <button
-            id="btn-open-settings-avatar"
-            data-testid="btn-open-settings-avatar"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label={t.settings.title}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-300 hover:text-white transition-all active:scale-95 group focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-          >
-            {isCloudConnected && userPicture ? (
-              <img
-                src={userPicture}
-                alt="Profile"
-                className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500/50 group-hover:border-emerald-400 shadow-md transition-colors"
-                referrerPolicy="no-referrer"
-              />
-            ) : isCloudConnected ? (
-              <div className="w-9 h-9 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-sm shadow-md group-hover:bg-emerald-500/30 transition-colors">
-                <Cloud className="w-4 h-4" />
-              </div>
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md group-hover:bg-emerald-500/20 group-hover:border-emerald-400/50 transition-colors">
-                <Sparkles className="w-4 h-4" />
-              </div>
-            )}
-          </button>
+      {/* Sticky Header Navigation */}
+      {activeTab === 'diary' ? (
+        <DashboardDateBar />
+      ) : (
+        <div className="sticky top-0 z-30 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/40">
+          <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
+            <div className="w-10" />
+            <h1 className="text-sm font-bold text-white tracking-tight">{t.analytics?.title || 'Analytics'}</h1>
+            <div className="w-10 flex items-center justify-end">
+              <HeaderSyncTrigger />
+            </div>
+          </div>
         </div>
       )}
 
@@ -158,9 +127,6 @@ export const DashboardContent: React.FC = () => {
           <AnalyticsScreen />
         ) : (
           <>
-            {/* Thumb-friendly Date Navigation & Brand */}
-            <DashboardDateBar />
-
             {/* Onboarding Banner for Fresh Devices */}
             {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && !activeProvider && !userSettings?.active_cloud_provider && (
               <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">
