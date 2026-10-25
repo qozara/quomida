@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.js';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const DashboardDateBar: React.FC = () => {
   const {
@@ -30,20 +30,10 @@ export const DashboardDateBar: React.FC = () => {
   return (
     <div
       data-testid="dashboard-date-bar"
-      className="flex items-center justify-between gap-2 pr-12 py-1 animate-in fade-in duration-200"
+      className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-slate-950/85 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200"
     >
-      {/* Brand Identity on Dashboard */}
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-          <Sparkles className="w-4 h-4" />
-        </div>
-        <span className="font-extrabold text-white text-base tracking-tight">
-          Quomida
-        </span>
-      </div>
-
-      {/* Thumb-friendly Date Selector */}
-      <div className="flex items-center gap-1 bg-slate-900/90 px-2 py-0.5 rounded-full border border-slate-800 shadow-inner">
+      {/* Centered Thumb-friendly Date Selector */}
+      <div className="flex items-center gap-1 bg-slate-900/90 px-2 py-0.5 rounded-full border border-slate-800 shadow-lg backdrop-blur-md">
         <button
           onClick={handlePrevDay}
           aria-label="Previous day"
@@ -51,7 +41,7 @@ export const DashboardDateBar: React.FC = () => {
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-xs sm:text-sm font-semibold text-slate-100 capitalize min-w-[80px] sm:min-w-[90px] text-center">
+        <span className="text-xs sm:text-sm font-semibold text-slate-100 capitalize min-w-[85px] sm:min-w-[95px] text-center select-none">
           {formattedDate}
         </span>
         <button

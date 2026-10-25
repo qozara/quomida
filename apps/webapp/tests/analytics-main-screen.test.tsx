@@ -123,7 +123,7 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     expect(screen.queryByTestId('fab-add-food')).toBeNull();
   });
 
-  it('renders the diary widgets, date selector, and FAB button when on diary tab', () => {
+  it('renders the diary widgets and sticky centered date selector on diary tab (FAB button is removed)', () => {
     vi.spyOn(AppContextModule, 'useApp').mockReturnValue({
       ...baseMockContext,
       isAnalyticsOpen: false
@@ -140,8 +140,9 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     // Floating sync badge is also present on diary screen
     expect(screen.getByTestId('sync-status-badge')).toBeDefined();
 
-    // FAB add food button IS displayed on diary screen
-    expect(screen.getByLabelText('Add Food Log')).toBeDefined();
+    // FAB add food button is removed
+    expect(screen.queryByTestId('fab-add-food')).toBeNull();
+    expect(screen.queryByLabelText('Add Food Log')).toBeNull();
 
     // Meal sections are displayed on diary screen
     expect(screen.getByText(en.dashboard.meals.breakfast)).toBeDefined();

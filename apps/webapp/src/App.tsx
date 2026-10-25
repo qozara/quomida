@@ -17,7 +17,7 @@ import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Plus, Cloud, X } from 'lucide-react';
+import { Cloud, X } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -75,10 +75,6 @@ export const DashboardContent: React.FC = () => {
 
   const handleOpenAddModal = (mealType: MealType) => {
     setTargetMealType(mealType);
-    setIsAddFoodModalOpen(true);
-  };
-
-  const handleFabClick = () => {
     setIsAddFoodModalOpen(true);
   };
 
@@ -193,18 +189,6 @@ export const DashboardContent: React.FC = () => {
           </>
         )}
       </main>
-
-      {/* Floating Action Button (FAB "+") */}
-      {activeTab === 'diary' && (
-        <button
-          onClick={handleFabClick}
-          id="fab-add-food"
-          aria-label="Add Food Log"
-          className="fixed bottom-20 right-5 z-20 w-14 h-14 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white rounded-full shadow-2xl shadow-emerald-950/80 flex items-center justify-center transition-all duration-200 border border-emerald-400/40"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
-      )}
 
       {/* 4-Tab Bottom Navigation Bar */}
       <BottomNav activeTab={activeTab} onSelectTab={handleSelectTab} />
