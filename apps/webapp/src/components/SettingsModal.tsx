@@ -31,6 +31,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
+import { usePwaUpdate } from '../hooks/usePwaUpdate.js';
 import { SYSTEM_CATALOG_META } from '../services/RemoteCatalogService.js';
 import { AiKeyEncryptionService } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
@@ -87,6 +88,14 @@ export const SettingsModal: React.FC = () => {
     checkAndTriggerAutoDownload,
     refreshStatus
   } = useCatalogDownload();
+
+  const {
+    needRefresh: isAppUpdateReady,
+    isChecking: isCheckingAppUpdate,
+    lastCheckResult: appUpdateCheckResult,
+    checkForUpdate: handleCheckAppUpdate,
+    applyUpdate: handleApplyAppUpdate
+  } = usePwaUpdate();
 
   useEffect(() => {
     if (isSettingsOpen && typeof refreshStatus === 'function') {
@@ -1569,8 +1578,62 @@ export const SettingsModal: React.FC = () => {
                 <div className="text-[11px] text-slate-500">
                   © {new Date().getFullYear()} · {(t.settings as any).aboutCommunity || 'Built for the Open Source Community'}
                 </div>
-                <div className="text-[11px] text-slate-600 font-mono mt-1">
-                  Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}
+
+                {/* App Version & Manual Update Check */}
+                <div className="mt-2 pt-2.5 border-t border-slate-800/60 flex flex-col items-center gap-2">
+                  <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                    <span>
+                      {((t.settings as any).appVersionLabel || 'Version {{version}}').replace(
+                        '{{version}}',
+                        typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+                      )}
+                    </span>
+                    {appUpdateCheckResult === 'up_to_date' && !isAppUpdateReady && (
+                      <span className="text-emerald-400 font-sans font-medium flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        {(t.settings as any).appUpToDate || 'Quomida is up to date'}
+                      </span>
+                    )}
+                    {isAppUpdateReady && (
+                      <span className="text-emerald-400 font-sans font-bold flex items-center gap-1">
+                        {(t.settings as any).appUpdateAvailable || 'New version available!'}
+                      </span>
+                    )}
+                    {appUpdateCheckResult === 'error' && !isAppUpdateReady && (
+                      <span className="text-rose-400 font-sans">
+                        {(t.settings as any).appUpdateCheckError || 'Could not check for app updates'}
+                      </span>
+                    )}
+                  </div>
+
+                  {isAppUpdateReady ? (
+                    <button
+                      type="button"
+                      id="btn-install-app-update"
+                      data-testid="btn-install-app-update"
+                      onClick={() => handleApplyAppUpdate()}
+                      className="min-h-[44px] px-4 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>{(t.settings as any).appUpdateInstallNow || 'Update & Reload Now'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      id="btn-check-app-update"
+                      data-testid="btn-check-app-update"
+                      onClick={() => handleCheckAppUpdate()}
+                      disabled={isCheckingAppUpdate || !isOnline}
+                      className="min-h-[44px] px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-semibold rounded-xl text-xs inline-flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCheckingAppUpdate ? 'animate-spin' : ''}`} />
+                      <span>
+                        {isCheckingAppUpdate
+                          ? ((t.settings as any).checkingAppUpdate || 'Checking...')
+                          : ((t.settings as any).checkAppUpdate || 'Check for App Update')}
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

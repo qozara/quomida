@@ -15,6 +15,7 @@ import { StorageSettingsPanel, SchemaRemediationModal } from './components/sync/
 import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
 import { Plus, Cloud, X } from 'lucide-react';
 
@@ -196,6 +197,9 @@ const DashboardContent: React.FC = () => {
 
       {/* 4-Tab Bottom Navigation Bar */}
       <BottomNav activeTab={activeTab} onSelectTab={handleSelectTab} />
+
+      {/* Non-Disruptive PWA Update Prompt Toast */}
+      <PwaUpdatePrompt />
 
       {/* Modals & Bottom Sheets */}
       <AddFoodModal

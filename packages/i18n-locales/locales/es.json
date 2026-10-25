@@ -152,7 +152,20 @@
     "googleComplianceBadge": "Cumple con Uso Limitado de Google",
     "license": "Licencia de Código Abierto (Apache 2.0)",
     "aboutNotice": "Quomida es un proyecto de investigación de Qozara Lab",
-    "aboutCommunity": "Desarrollado para la comunidad de código abierto"
+    "aboutCommunity": "Desarrollado para la comunidad de código abierto",
+    "appVersionLabel": "Versión {{version}}",
+    "checkAppUpdate": "Buscar actualización",
+    "checkingAppUpdate": "Verificando...",
+    "appUpToDate": "Quomida está actualizado",
+    "appUpdateAvailable": "¡Nueva versión disponible!",
+    "appUpdateInstallNow": "Actualizar y recargar",
+    "appUpdateCheckError": "No se pudo verificar actualizaciones"
+  },
+  "pwaUpdate": {
+    "bannerTitle": "Actualización disponible",
+    "bannerDescription": "Una nueva versión de Quomida está lista para instalar.",
+    "reloadNow": "Actualizar y recargar",
+    "dismiss": "Más tarde"
   },
   "appStatus": {
     "offline": "Estado de la aplicación: Sin conexión. Los cambios se guardan localmente.",

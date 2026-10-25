@@ -152,7 +152,20 @@
     "googleComplianceBadge": "Google Limited Use Compliant",
     "license": "Open Source License (Apache 2.0)",
     "aboutNotice": "Quomida is a research project by Qozara Lab",
-    "aboutCommunity": "Built for the Open Source Community"
+    "aboutCommunity": "Built for the Open Source Community",
+    "appVersionLabel": "Version {{version}}",
+    "checkAppUpdate": "Check for App Update",
+    "checkingAppUpdate": "Checking...",
+    "appUpToDate": "Quomida is up to date",
+    "appUpdateAvailable": "New version available!",
+    "appUpdateInstallNow": "Update & Reload Now",
+    "appUpdateCheckError": "Could not check for app updates"
+  },
+  "pwaUpdate": {
+    "bannerTitle": "Update Available",
+    "bannerDescription": "A new version of Quomida is ready to install.",
+    "reloadNow": "Update & Reload",
+    "dismiss": "Later"
   },
   "appStatus": {
     "offline": "Application status: Offline. Changes are saved locally.",

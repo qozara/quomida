@@ -125,7 +125,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       sri(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       useCredentials: true,
       includeAssets: ['favicon.ico', 'favicon.svg', 'favicon-48x48.png', 'apple-touch-icon.png'],
       manifest: {
