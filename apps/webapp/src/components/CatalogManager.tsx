@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
-  validateMacroAlignment,
   CatalogSearchManager,
   type BaseIngredient,
   type FoodItem,
@@ -10,20 +9,18 @@ import {
 } from '@quomida/domain-core';
 import {
   Plus,
-  AlertCircle,
   Search,
   Trash2,
-  PlusCircle,
   ChefHat,
   ChevronDown,
   ChevronUp,
   MoreVertical,
-  Pencil,
-  X
+  Pencil
 } from 'lucide-react';
 import { dictionaries } from '@quomida/i18n-locales';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
+import { IngredientBuilder } from './IngredientBuilder.js';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 const EMPTY_ARRAY: any[] = [];
@@ -47,12 +44,11 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
 
   const dict = t || dictionaries.en;
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
+  const [isBuildingIngredient, setIsBuildingIngredient] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<FoodItem | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<RecipeFoodItem | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'ingredients' | 'recipes'>('all');
   const [expandedRecipeIds, setExpandedRecipeIds] = useState<Record<string, boolean>>({});
 
@@ -63,41 +59,6 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // New / Edit Ingredient Form State
-  const [name, setName] = useState('');
-  const [calories, setCalories] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fats, setFats] = useState('');
-  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>([]);
-  const [portionName, setPortionName] = useState('');
-  const [portionWeight, setPortionWeight] = useState('');
-
-  const resetIngredientForm = () => {
-    setName('');
-    setCalories('');
-    setProtein('');
-    setCarbs('');
-    setFats('');
-    setPortionName('');
-    setPortionWeight('');
-    setPortions([]);
-    setEditingIngredientId(null);
-    setErrorMsg(null);
-  };
-
-  const handleAddPortion = () => {
-    if (portionName && portionWeight) {
-      setPortions([...portions, { name: portionName, equivalent_weight_g: parseFloat(portionWeight) }]);
-      setPortionName('');
-      setPortionWeight('');
-    }
-  };
-
-  const handleRemovePortion = (index: number) => {
-    setPortions(portions.filter((_, i) => i !== index));
-  };
 
   const toggleRecipeExpand = (id: string) => {
     setExpandedRecipeIds(prev => ({
@@ -164,60 +125,35 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   if (!isCatalogOpen) return null;
 
   const handleEditIngredient = (item: FoodItem) => {
-    setEditingIngredientId(item.id);
-    setName(item.name);
-    setCalories(String(item.calories_100g));
-    setProtein(String(item.protein_100g));
-    setCarbs(String(item.carbs_100g));
-    setFats(String(item.fats_100g));
-    const itemPortions = (item as any).portions as Array<{ name: string; equivalent_weight_g: number }> | undefined;
-    setPortions(itemPortions ? itemPortions.map(p => ({ name: p.name, equivalent_weight_g: p.equivalent_weight_g })) : []);
-    setIsAdding(true);
+    setEditingIngredient(item);
+    setIsBuildingIngredient(true);
     setIsBuildingRecipe(false);
   };
 
   const handleEditRecipe = (recipeItem: FoodItem) => {
     setEditingRecipe(recipeItem as RecipeFoodItem);
     setIsBuildingRecipe(true);
-    setIsAdding(false);
+    setIsBuildingIngredient(false);
   };
 
-  const handleCreateOrUpdateIngredient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    if (!name || !calories) return;
-
-    const calNum = parseFloat(calories) || 0;
-    const pNum = parseFloat(protein) || 0;
-    const cNum = parseFloat(carbs) || 0;
-    const fNum = parseFloat(fats) || 0;
-
-    const validation = validateMacroAlignment(calNum, pNum, cNum, fNum);
-    if (!validation.valid) {
-      setErrorMsg(validation.reason || 'Invalid macro values');
-      return;
-    }
-
-    const finalPortions = [...portions];
-    if (portionName.trim() && portionWeight.trim() && !isNaN(parseFloat(portionWeight))) {
-      finalPortions.push({
-        name: portionName.trim(),
-        equivalent_weight_g: parseFloat(portionWeight)
-      });
-    }
-
+  const handleSaveIngredient = async (
+    ingredientData: {
+      id?: string;
+      name: string;
+      lang?: string;
+      calories_100g: number;
+      protein_100g: number;
+      carbs_100g: number;
+      fats_100g: number;
+    },
+    portions?: { name: string; equivalent_weight_g: number }[]
+  ) => {
     await addCustomIngredient({
-      id: editingIngredientId || undefined,
-      name,
-      lang: 'es',
-      calories_100g: calNum,
-      protein_100g: pNum,
-      carbs_100g: cNum,
-      fats_100g: fNum
-    }, finalPortions);
-
-    resetIngredientForm();
-    setIsAdding(false);
+      ...ingredientData,
+      lang: ingredientData.lang || 'es'
+    }, portions);
+    setIsBuildingIngredient(false);
+    setEditingIngredient(null);
   };
 
   const handleRemoveIngredient = async (id: string) => {
@@ -261,14 +197,9 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
 
           <button
             onClick={() => {
-              if (isAdding) {
-                setIsAdding(false);
-                resetIngredientForm();
-              } else {
-                resetIngredientForm();
-                setIsAdding(true);
-                setIsBuildingRecipe(false);
-              }
+              setEditingIngredient(null);
+              setIsBuildingIngredient(true);
+              setIsBuildingRecipe(false);
             }}
             className="p-2 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
           >
@@ -280,7 +211,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
             onClick={() => {
               setEditingRecipe(null);
               setIsBuildingRecipe(true);
-              setIsAdding(false);
+              setIsBuildingIngredient(false);
             }}
             className="p-2 px-3 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
           >
@@ -331,150 +262,6 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
         {isSearching ? 'Searching...' : `Found ${searchResults.length} foods`}
       </div>
 
-      {/* Create / Edit Custom Ingredient Form */}
-      {isAdding && (
-        <form onSubmit={handleCreateOrUpdateIngredient} className="bg-slate-900 p-4 rounded-2xl border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-              {editingIngredientId ? (dict.catalog.editCustomIngredient || 'Edit Single Food (100g base)') : dict.catalog.newCustomIngredient}
-            </h3>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                resetIngredientForm();
-              }}
-              className="p-1 rounded-full text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          
-          {errorMsg && (
-            <div className="p-2.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-          
-          <div>
-            <label className="text-[11px] text-slate-400 block mb-1">Food Name</label>
-            <input
-              type="text"
-              placeholder="e.g. Milanesa de soya casera"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-            />
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Calories</label>
-              <input
-                type="number"
-                placeholder="kcal"
-                value={calories}
-                onChange={(e) => setCalories(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 text-center font-bold min-h-[44px]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-rose-400 block mb-1">Protein</label>
-              <input
-                type="number"
-                placeholder="g"
-                value={protein}
-                onChange={(e) => setProtein(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 text-center font-bold min-h-[44px]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-amber-400 block mb-1">Carbs</label>
-              <input
-                type="number"
-                placeholder="g"
-                value={carbs}
-                onChange={(e) => setCarbs(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 text-center font-bold min-h-[44px]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-cyan-400 block mb-1">Fats</label>
-              <input
-                type="number"
-                placeholder="g"
-                value={fats}
-                onChange={(e) => setFats(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 text-center font-bold min-h-[44px]"
-              />
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <label className="text-xs text-slate-400 font-semibold mb-2 block">Custom Portions (Optional)</label>
-            
-            <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
-              {portions.map((p, i) => (
-                <div key={i} className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg p-2 px-3">
-                  <span className="text-sm font-medium text-white">{p.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400">{p.equivalent_weight_g}g</span>
-                    <button type="button" onClick={() => handleRemovePortion(i)} className="text-rose-400 hover:text-rose-300 min-h-[32px] min-w-[32px] flex items-center justify-center">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="E.g., Slice, Cup, Tbsp"
-                value={portionName}
-                onChange={(e) => setPortionName(e.target.value)}
-                className="flex-[2] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-              />
-              <input
-                type="number"
-                placeholder="Grams"
-                value={portionWeight}
-                onChange={(e) => setPortionWeight(e.target.value)}
-                className="flex-[1] bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 text-center min-h-[44px]"
-              />
-              <button
-                type="button"
-                onClick={handleAddPortion}
-                disabled={!portionName || !portionWeight}
-                className="px-3 bg-slate-850 hover:bg-slate-750 disabled:opacity-50 text-emerald-400 font-bold rounded-xl flex items-center justify-center min-h-[44px]"
-              >
-                <PlusCircle className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              className="flex-1 py-2 bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-md min-h-[44px]"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                resetIngredientForm();
-              }}
-              className="py-2 px-3 bg-slate-800 text-slate-400 hover:text-white font-semibold text-sm rounded-xl min-h-[44px]"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
 
       {/* Backdrop for closing open context menu */}
       {openMenuId !== null && (
@@ -657,6 +444,22 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
             setEditingRecipe(null);
           }}
           onSave={handleSaveRecipe}
+        />
+      )}
+
+      {/* Custom Ingredient Builder Modal */}
+      {isBuildingIngredient && (
+        <IngredientBuilder
+          initialIngredient={editingIngredient}
+          onBack={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+          }}
+          onClose={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+          }}
+          onSave={handleSaveIngredient}
         />
       )}
     </section>

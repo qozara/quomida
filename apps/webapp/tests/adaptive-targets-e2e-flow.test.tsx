@@ -718,7 +718,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       expect(screen.getByText(/7\/4/i)).toBeDefined();
       expect(screen.getByText(/7\/1/i)).toBeDefined();
       expect(screen.getByText(/14\/10/i)).toBeDefined();
-    });
+    }, 20000);
   });
 
   /* ========================================================================

@@ -29,16 +29,20 @@ describe('CatalogManager - Custom Portions UI', () => {
   });
 
   it('allows user to define custom portions via Plus button and passes them to addCustomIngredient', async () => {
-    const { container } = render(<CatalogManager />);
+    render(<CatalogManager />);
 
     // Click "New" button to open the form
     const addBtn = screen.getByText('New');
     fireEvent.click(addBtn);
 
+    // Verify slide-over dialog is open
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(screen.getByTestId('btn-back-ingredient-builder')).toBeDefined();
+
     // Fill macro fields
     fireEvent.change(screen.getByPlaceholderText('e.g. Milanesa de soya casera'), { target: { value: 'My Chicken' } });
     fireEvent.change(screen.getByPlaceholderText('kcal'), { target: { value: '165' } });
-    const numberInputs = container.querySelectorAll('input[type="number"]');
+    const numberInputs = document.querySelectorAll('input[type="number"]');
     // 0: calories, 1: protein, 2: carbs, 3: fats, 4: portionWeight
     fireEvent.change(numberInputs[1], { target: { value: '31' } }); // protein
     fireEvent.change(numberInputs[2], { target: { value: '0' } }); // carbs
@@ -49,8 +53,8 @@ describe('CatalogManager - Custom Portions UI', () => {
     fireEvent.change(screen.getByPlaceholderText('Grams'), { target: { value: '200' } });
     
     // Find Add Portion Button
-    const buttons = container.querySelectorAll('button');
-    const addPortionBtn = Array.from(buttons).find(b => b.innerHTML.includes('lucide-circle-plus'));
+    const buttons = document.querySelectorAll('button');
+    const addPortionBtn = Array.from(buttons).find(b => b.innerHTML.includes('lucide-circle-plus') || b.getAttribute('aria-label') === 'Add custom portion');
     if (addPortionBtn) fireEvent.click(addPortionBtn);
 
     // Check if it was added to the list visually
@@ -80,14 +84,14 @@ describe('CatalogManager - Custom Portions UI', () => {
   });
 
   it('automatically includes pending typed portion if user clicks Save without clicking Plus button', async () => {
-    const { container } = render(<CatalogManager />);
+    render(<CatalogManager />);
 
     const addBtn = screen.getByText('New');
     fireEvent.click(addBtn);
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Milanesa de soya casera'), { target: { value: 'Beef Steak' } });
     fireEvent.change(screen.getByPlaceholderText('kcal'), { target: { value: '250' } });
-    const numberInputs = container.querySelectorAll('input[type="number"]');
+    const numberInputs = document.querySelectorAll('input[type="number"]');
     fireEvent.change(numberInputs[1], { target: { value: '26' } }); // protein
     fireEvent.change(numberInputs[2], { target: { value: '0' } }); // carbs
     fireEvent.change(numberInputs[3], { target: { value: '15' } }); // fats
@@ -117,6 +121,64 @@ describe('CatalogManager - Custom Portions UI', () => {
     expect(callArgs[1]).toEqual([
       { name: '1 bife', equivalent_weight_g: 180 }
     ]);
+  });
+
+  it('closes IngredientBuilder when back button is clicked in the header', async () => {
+    render(<CatalogManager />);
+
+    const addBtn = screen.getByText('New');
+    fireEvent.click(addBtn);
+
+    const backBtn = screen.getByTestId('btn-back-ingredient-builder');
+    expect(backBtn).toBeDefined();
+
+    fireEvent.click(backBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('btn-back-ingredient-builder')).toBeNull();
+    });
+  });
+
+  it('opens IngredientBuilder prefilled when edit option in context menu of custom ingredient is clicked', async () => {
+    const sampleIngredient: any = {
+      id: 'custom_tofu',
+      name: 'Organic Tofu',
+      kind: 'ingredient',
+      source: 'custom',
+      calories_100g: 80,
+      protein_100g: 8.5,
+      carbs_100g: 1.5,
+      fats_100g: 4.5,
+      portions: [{ name: 'Half block', equivalent_weight_g: 150 }]
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      isCatalogOpen: true,
+      ingredients: [sampleIngredient],
+      recipeFoods: [],
+      recipes: [],
+      addCustomIngredient: addCustomIngredientMock,
+      removeCustomIngredient: vi.fn(),
+      setIsCatalogOpen: vi.fn(),
+      db: {}
+    } as any);
+
+    render(<CatalogManager />);
+
+    // Open context menu for the ingredient
+    const optionsBtn = screen.getByLabelText('Item options');
+    fireEvent.click(optionsBtn);
+
+    const editBtn = screen.getByLabelText('Edit custom ingredient');
+    fireEvent.click(editBtn);
+
+    // Verify IngredientBuilder is open prefilled
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(screen.getByTestId('btn-back-ingredient-builder')).toBeDefined();
+    expect(screen.getByDisplayValue('Organic Tofu')).toBeDefined();
+    expect(screen.getByDisplayValue('80')).toBeDefined();
+    expect(screen.getByDisplayValue('8.5')).toBeDefined();
+    expect(screen.getByText('Half block')).toBeDefined();
   });
 });
 
