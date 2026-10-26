@@ -88,8 +88,7 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     const screenRegion = screen.getByTestId('analytics-screen');
     expect(screenRegion).toBeDefined();
     expect(screenRegion.getAttribute('role')).toBe('region');
-    expect(screen.getByText(en.analytics.title)).toBeDefined();
-    expect(screen.getByText(en.analytics.subtitle)).toBeDefined();
+    expect(screenRegion.getAttribute('aria-label')).toBe(en.analytics.title);
     expect(screen.getByText('2450')).toBeDefined();
   });
 

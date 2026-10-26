@@ -17,22 +17,35 @@ import { X, Search, Plus, AlertCircle, Sparkles, ChefHat, Scale } from 'lucide-r
 interface RecipeBuilderProps {
   onClose: () => void;
   onSave: (recipe: Recipe, portions?: { name: string; equivalent_weight_g: number }[]) => Promise<void>;
+  initialRecipe?: any;
 }
 
-export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave }) => {
+export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave, initialRecipe }) => {
   const { ingredients = [], recipeFoods = [], db, t } = useApp();
   const dict = t || dictionaries.en;
   const [recipeManager] = useState(() => new RecipeManager());
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
 
+  const initialComponents = useMemo(() => {
+    if (!initialRecipe) return [];
+    return initialRecipe.recipe?.ingredients || initialRecipe.ingredients || [];
+  }, [initialRecipe]);
+
   // Form State
-  const [recipeName, setRecipeName] = useState('');
-  const [components, setComponents] = useState<RecipeComponent[]>([]);
+  const [recipeName, setRecipeName] = useState(() => initialRecipe?.name || '');
+  const [components, setComponents] = useState<RecipeComponent[]>(initialComponents);
   const [rawWeightSum, setRawWeightSum] = useState<number>(0);
-  const [cookedWeight, setCookedWeight] = useState<string>('');
-  const [isCookedWeightManual, setIsCookedWeightManual] = useState(false);
-  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>([]);
+  const [cookedWeight, setCookedWeight] = useState<string>(() => {
+    if (initialRecipe?.cooked_weight_g) return String(initialRecipe.cooked_weight_g);
+    return '';
+  });
+  const [isCookedWeightManual, setIsCookedWeightManual] = useState(() => {
+    return Boolean(initialRecipe?.cooked_weight_g && initialRecipe.cooked_weight_g !== initialRecipe.raw_weight_g);
+  });
+  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>(() => {
+    return initialRecipe?.portions || [];
+  });
   const [servingsCount, setServingsCount] = useState<number>(4);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -201,6 +214,10 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
         ingredients: components,
         yield_factor: yieldFactor
       });
+
+      if (initialRecipe && initialRecipe.id) {
+        newRecipe.id = initialRecipe.id;
+      }
 
       await onSave(newRecipe, portions);
       onClose();

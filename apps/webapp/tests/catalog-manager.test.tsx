@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CatalogManager } from '../src/components/CatalogManager.js';
 import * as AppContext from '../src/context/AppContext.js';
+import { CatalogSearchManager } from '@quomida/domain-core';
 
 describe('CatalogManager - Custom Portions UI', () => {
   let addCustomIngredientMock: any;
@@ -207,17 +208,46 @@ describe('CatalogManager - Recipes Integration', () => {
     // Breakdown is now visible
     expect(screen.getByText('Dry Lentils')).toBeDefined();
     expect(screen.getByText('Carrots')).toBeDefined();
+    // Redundant total nutrition details at bottom are omitted
+    expect(screen.queryByText('Nutrition per 100g:')).toBeNull();
   });
 
-  it('calls removeRecipe when delete recipe button is clicked and confirmed', () => {
+  it('calls removeRecipe when delete option in context menu is clicked and confirmed', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<CatalogManager />);
+
+    // Open context menu
+    const optionsBtn = screen.getByLabelText('Item options');
+    fireEvent.click(optionsBtn);
 
     const deleteBtn = screen.getByLabelText('Delete recipe');
     fireEvent.click(deleteBtn);
 
     expect(window.confirm).toHaveBeenCalled();
     expect(removeRecipeMock).toHaveBeenCalledWith('recipe_lentil_stew');
+  });
+
+  it('triggers onSelectFood when plus button is clicked on an item card', () => {
+    const onSelectFoodMock = vi.fn();
+    render(<CatalogManager onSelectFood={onSelectFoodMock} />);
+
+    const addBtn = screen.getByLabelText('Add recipe to log');
+    fireEvent.click(addBtn);
+
+    expect(onSelectFoodMock).toHaveBeenCalledWith(sampleRecipeFood);
+  });
+
+  it('opens RecipeBuilder prefilled when edit option in context menu is clicked', () => {
+    render(<CatalogManager />);
+
+    const optionsBtn = screen.getByLabelText('Item options');
+    fireEvent.click(optionsBtn);
+
+    const editBtn = screen.getByLabelText('Edit recipe');
+    fireEvent.click(editBtn);
+
+    expect(screen.getByText('Combine Foods (Recipe)')).toBeDefined();
+    expect(screen.getByDisplayValue('Lentil Stew')).toBeDefined();
   });
 
   it('opens RecipeBuilder when Recipe button is clicked', () => {
@@ -230,6 +260,45 @@ describe('CatalogManager - Recipes Integration', () => {
 
     // RecipeBuilder header should now appear
     expect(screen.getByText('Combine Foods (Recipe)')).toBeDefined();
+  });
+
+  it('only shows plus button and does not display context menu (3-dots) for system catalog search results', async () => {
+    const onSelectFoodMock = vi.fn();
+    const systemFood: any = {
+      id: 'sys_apple',
+      name: 'System Apple',
+      kind: 'ingredient',
+      source: 'system',
+      calories_100g: 52,
+      protein_100g: 0.3,
+      carbs_100g: 14,
+      fats_100g: 0.2
+    };
+
+    vi.spyOn(CatalogSearchManager.prototype, 'search').mockResolvedValue({
+      items: [systemFood],
+      total: 1
+    } as any);
+
+    render(<CatalogManager onSelectFood={onSelectFoodMock} />);
+
+    // Type in search box
+    const searchInput = screen.getByPlaceholderText('Search catalog...');
+    fireEvent.change(searchInput, { target: { value: 'Apple' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('System Apple')).toBeDefined();
+    });
+
+    // Verify context menu (3-dots) is NOT rendered for system item
+    expect(screen.queryByLabelText('Item options')).toBeNull();
+
+    // Verify plus button IS rendered and clickable
+    const plusBtn = screen.getByLabelText('Add food to log');
+    expect(plusBtn).toBeDefined();
+    fireEvent.click(plusBtn);
+
+    expect(onSelectFoodMock).toHaveBeenCalledWith(systemFood);
   });
 });
 

@@ -297,12 +297,14 @@
     "breakdownTitle": "Desglose de Ingredientes de la Receta",
     "cooked": "cocido",
     "raw": "crudo",
-    "totalDish": "Total Receta"
+    "totalDish": "Total Receta",
+    "editRecipe": "Editar Receta"
   },
   "catalog": {
     "title": "Administrador de Catálogo de Alimentos",
     "newFood": "Nuevo",
     "newCustomIngredient": "Nuevo Alimento Simple (base 100g)",
+    "editCustomIngredient": "Editar Alimento Simple (base 100g)",
     "combineFoods": "Combinar Alimentos (Receta)",
     "searchPlaceholder": "Buscar en el catálogo...",
     "filterAll": "Todos",
@@ -311,7 +313,10 @@
     "deleteCustomConfirm": "¿Estás seguro de que deseas eliminar este alimento personalizado?",
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
-    "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas"
+    "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
+    "addToLog": "Añadir al diario",
+    "edit": "Editar",
+    "delete": "Eliminar"
   },
   "ai": {
     "title": "Inteligencia y Edge AI",

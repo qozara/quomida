@@ -233,19 +233,6 @@ const AnalyticsScreenContent: React.FC = () => {
       data-testid="analytics-screen"
       className="space-y-4 animate-in fade-in duration-200"
     >
-      {/* Screen Header Bar */}
-      <div className="flex items-center gap-3 px-1 pr-12">
-        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-          <TrendingUp className="w-5 h-5" />
-        </div>
-        <div>
-          <h1 id="analytics-screen-title" className="text-xl font-extrabold text-white tracking-tight">
-            {t.analytics.title}
-          </h1>
-          <p className="text-xs text-slate-400">{t.analytics.subtitle}</p>
-        </div>
-      </div>
-
       {/* Metabolic Status Banner (2 Metric Cards) */}
       <div className="grid grid-cols-2 gap-3">
         {/* Estimated TDEE */}

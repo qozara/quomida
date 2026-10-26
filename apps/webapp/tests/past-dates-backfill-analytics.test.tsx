@@ -233,7 +233,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // recognize calibration is ready (or reflect the user's active baseline),
     // and NOT say 1/4 weigh-ins and 1/10 food days (collecting data)!
     await waitFor(() => {
-      expect(screen.getByText(en.analytics.title)).toBeDefined();
+      expect(screen.getByRole('region', { name: new RegExp(en.analytics.title, 'i') })).toBeDefined();
     });
 
     // Check what the compliance pane shows:

@@ -3,7 +3,6 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProvider, useApp } from './context/AppContext.js';
 import { DashboardDateBar } from './components/DashboardDateBar.js';
 import { MacroRings } from './components/MacroRings.js';
-import { FoodLogger } from './components/FoodLogger.js';
 import { MealSection } from './components/MealSection.js';
 import { PortionBottomSheet } from './components/PortionBottomSheet.js';
 import { SettingsModal } from './components/SettingsModal.js';
@@ -113,7 +112,11 @@ export const DashboardContent: React.FC = () => {
         <div className="sticky top-0 z-30 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/40">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
             <div className="w-10" />
-            <h1 className="text-sm font-bold text-white tracking-tight">{t.analytics?.title || 'Analytics'}</h1>
+            <h1 className="text-sm font-bold text-white tracking-tight">
+              {activeTab === 'analytics'
+                ? (t.analytics?.title || 'Analytics')
+                : (t.catalog?.title || t.nav?.catalog || 'Catalog')}
+            </h1>
             <div className="w-10 flex items-center justify-end">
               <HeaderSyncTrigger />
             </div>
@@ -125,6 +128,8 @@ export const DashboardContent: React.FC = () => {
       <main className="max-w-md mx-auto px-4 pt-4 space-y-5">
         {activeTab === 'analytics' ? (
           <AnalyticsScreen />
+        ) : activeTab === 'catalog' ? (
+          <CatalogManager onSelectFood={(item) => handleOpenPortionModal(item, 'meal_lunch')} />
         ) : (
           <>
             {/* Onboarding Banner for Fresh Devices */}
@@ -162,9 +167,6 @@ export const DashboardContent: React.FC = () => {
 
             {/* Quick Weight Entry Widget */}
             <DashboardWeightPill />
-
-            {/* Search & Natural Language Input Switcher */}
-            <FoodLogger onSelectIngredient={handleOpenPortionModal} />
 
             {/* Meal Categories Accordion */}
             <div className="space-y-3">
@@ -216,7 +218,6 @@ export const DashboardContent: React.FC = () => {
         onClose={() => setSelectedIngredient(null)}
       />
       <SettingsModal />
-      <CatalogManager />
       <WeightQuickLogModal />
       <StorageSettingsPanel
         isOpen={isStorageSettingsOpen}

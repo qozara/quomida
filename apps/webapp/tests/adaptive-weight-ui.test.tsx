@@ -298,7 +298,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       render(<AnalyticsModal />);
 
       expect(screen.getByRole('region', { name: new RegExp(en.analytics.title, 'i') })).toBeDefined();
-      expect(screen.getByText(en.analytics.title)).toBeDefined();
 
       // Check estimated TDEE display
       expect(screen.getByText('2450')).toBeDefined();

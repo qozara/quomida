@@ -77,7 +77,7 @@ interface AppContextType {
     mealType: MealType
   ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
-  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
+  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
   removeCustomIngredient: (id: string) => Promise<void>;
   addRecipe: (recipe: Recipe, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<string>;
   removeRecipe: (id: string) => Promise<void>;
@@ -941,7 +941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     forceSync().catch(console.error);
   };
 
-  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => {
+  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }, portions?: { name: string, equivalent_weight_g: number }[]) => {
     await dbService.saveCustomFood(ingData, portions);
     forceSync().catch(console.error);
   };
