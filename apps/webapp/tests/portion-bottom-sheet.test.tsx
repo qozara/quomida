@@ -245,5 +245,58 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     expect(callArgs[3]).toBe('Whole recipe');
     expect(onCloseMock).toHaveBeenCalled();
   });
+
+  it('renders as a modern full-screen slide-over modal with accessible back button', async () => {
+    const mockDb = {
+      portions: {
+        find: vi.fn().mockReturnValue({
+          exec: vi.fn().mockResolvedValue([])
+        })
+      }
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      db: mockDb as any,
+      logFoodItem: logFoodItemMock,
+      t: dictionaries.es
+    } as any);
+
+    const testIngredient = {
+      id: 'custom_apple',
+      name: 'Manzana Fuji',
+      source: 'custom' as const,
+      lang: 'es',
+      calories_100g: 52,
+      protein_100g: 0.3,
+      carbs_100g: 14,
+      fats_100g: 0.2
+    };
+
+    render(
+      <PortionBottomSheet
+        ingredient={testIngredient}
+        defaultMealType="meal_snack"
+        onClose={onCloseMock}
+      />
+    );
+
+    // Dialog container
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeDefined();
+    expect(dialog.className).toContain('fixed inset-0');
+    expect(dialog.className).toContain('animate-slide-in-right');
+
+    // Title
+    expect(screen.getByText(dictionaries.es.portionModal.title)).toBeDefined();
+
+    // Back button
+    const backBtn = screen.getByRole('button', { name: 'Back' });
+    expect(backBtn).toBeDefined();
+    expect(backBtn.className).toContain('min-w-[44px]');
+    expect(backBtn.className).toContain('min-h-[44px]');
+
+    fireEvent.click(backBtn);
+    expect(onCloseMock).toHaveBeenCalled();
+  });
 });
 

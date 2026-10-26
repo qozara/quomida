@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext.js';
 import { dictionaries } from '@quomida/i18n-locales';
 import type { BaseIngredient, FoodItem, RecipeFoodItem, MealType, Portion, TaggedPortion } from '@quomida/domain-core';
 import { calculateItemMacros, convertPortionToGrams, PortionManager } from '@quomida/domain-core';
-import { X, Minus, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
 
 interface PortionBottomSheetProps {
@@ -91,58 +91,63 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      
-      {/* Click outside to dismiss */}
-      <div className="absolute inset-0" onClick={onClose} />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="portion-modal-title"
+      className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
+    >
+      {/* Modern Sticky Navigation Header */}
+      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
+        <button
+          id="btn-close-portion"
+          data-testid="btn-close-portion"
+          onClick={onClose}
+          aria-label="Back"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 id="portion-modal-title" className="text-base sm:text-lg font-bold text-white tracking-wide">
+          {dict.portionModal.title}
+        </h1>
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
 
-      {/* Bottom Sheet Container */}
-      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-6 shadow-2xl z-10 space-y-5 animate-in slide-in-from-bottom duration-300">
-        
-        {/* Top Drag Handle Bar */}
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-2 mb-2" />
-
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block">{dict.portionModal.title}</span>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white">{ingredient.name}</h2>
-              {'kind' in ingredient && ingredient.kind === 'recipe' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                  {dict.recipes?.recipeBadge || 'Recipe'}
-                </span>
-              )}
-            </div>
-            {'kind' in ingredient && ingredient.kind === 'recipe' ? (
-              <p className="text-xs text-slate-400 mt-0.5">
-                <span className="font-semibold text-slate-200">
-                  {dict.recipes?.totalDish || 'Total'}: {Math.round((ingredient as RecipeFoodItem).total_macros.calories)} kcal ({(ingredient as RecipeFoodItem).cooked_weight_g}g {dict.recipes?.cooked || 'cooked'})
-                </span>
-                <span className="text-slate-600"> • </span>
-                <span>{Math.round(ingredient.calories_100g * 10) / 10} kcal/100g</span>
-              </p>
-            ) : (
-              <p className="text-xs text-slate-400 mt-0.5">
-                100g base: {ingredient.calories_100g} kcal | P: {ingredient.protein_100g}g | C: {ingredient.carbs_100g}g | F: {ingredient.fats_100g}g
-              </p>
+      {/* Main Container */}
+      <div className="max-w-md mx-auto w-full px-4 py-4 space-y-5 flex-1">
+        {/* Food Hero Card */}
+        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">{ingredient.name}</h2>
+            {'kind' in ingredient && ingredient.kind === 'recipe' && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                {dict.recipes?.recipeBadge || 'Recipe'}
+              </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {'kind' in ingredient && ingredient.kind === 'recipe' ? (
+            <p className="text-xs text-slate-400">
+              <span className="font-semibold text-slate-200">
+                {dict.recipes?.totalDish || 'Total'}: {Math.round((ingredient as RecipeFoodItem).total_macros.calories)} kcal ({(ingredient as RecipeFoodItem).cooked_weight_g}g {dict.recipes?.cooked || 'cooked'})
+              </span>
+              <span className="text-slate-600"> • </span>
+              <span>{Math.round(ingredient.calories_100g * 10) / 10} kcal/100g</span>
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400">
+              100g base: {ingredient.calories_100g} kcal | P: {ingredient.protein_100g}g | C: {ingredient.carbs_100g}g | F: {ingredient.fats_100g}g
+            </p>
+          )}
         </div>
 
         {/* If Recipe: Ingredients Breakdown Collapsible */}
         {'kind' in ingredient && ingredient.kind === 'recipe' && (
-          <div className="bg-slate-950/80 rounded-2xl border border-purple-500/30 overflow-hidden">
+          <div className="bg-slate-900/90 rounded-2xl border border-purple-500/30 overflow-hidden shadow-lg">
             <button
               type="button"
               onClick={() => setIsBreakdownOpen(!isBreakdownOpen)}
-              className="w-full p-3 flex items-center justify-between text-left text-xs font-bold text-purple-400 hover:bg-slate-900/50 transition-colors min-h-[44px]"
+              className="w-full p-3.5 flex items-center justify-between text-left text-xs font-bold text-purple-400 hover:bg-slate-850 transition-colors min-h-[44px]"
             >
               <span>{dict.recipes?.breakdownTitle || 'Recipe Ingredients Breakdown'}</span>
               {isBreakdownOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -153,6 +158,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
                   components={(ingredient as RecipeFoodItem).recipe?.ingredients || (ingredient as any).ingredients || []}
                   cookedWeightGrams={(ingredient as RecipeFoodItem).cooked_weight_g}
                   totalMacros={(ingredient as RecipeFoodItem).total_macros}
+                  showSummary={false}
                 />
               </div>
             )}
@@ -160,9 +166,9 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         )}
 
         {/* Meal Category Switcher */}
-        <div>
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-            Meal
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+            {dict.ai?.selectMeal || 'Meal'}
           </label>
           <div className="grid grid-cols-4 gap-2">
             {(['meal_breakfast', 'meal_lunch', 'meal_dinner', 'meal_snack'] as MealType[]).map((m) => (
@@ -173,7 +179,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
                 className={`py-2 px-1 text-xs font-semibold rounded-xl border transition-all min-h-[44px] ${
                   mealType === m
                     ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-sm'
-                    : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
                 {dict.dashboard.meals[m.replace('meal_', '') as keyof typeof dict.dashboard.meals]}
@@ -183,11 +189,10 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         </div>
 
         {/* Portion Selector & Stepper */}
-        <div className="grid grid-cols-2 gap-4">
-          
+        <div className="grid grid-cols-2 gap-3">
           {/* Portion Unit */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
               {dict.portionModal.unitLabel}
             </label>
             <select
@@ -198,7 +203,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
                   setQuantity(100);
                 }
               }}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm font-medium text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
             >
               {availablePortions.map((p) => (
                 <option key={p.id} value={p.name}>
@@ -211,14 +216,15 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
 
           {/* Quantity Stepper */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
               {dict.portionModal.quantityLabel}
             </label>
-            <div className="flex items-center bg-slate-800 border border-slate-700 rounded-xl p-1">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 min-h-[44px]">
               <button
                 type="button"
                 onClick={() => setQuantity(Math.max(selectedPortionName === 'g' ? 1 : 0.5, quantity - (selectedPortionName === 'g' ? 10 : 0.5)))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700/60 hover:bg-slate-600 text-white font-bold transition-colors active:scale-95 min-w-[44px] min-h-[44px]"
+                aria-label="Decrease quantity"
+                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors active:scale-95 min-w-[44px] min-h-[44px]"
               >
                 <Minus className="w-4 h-4" />
               </button>
@@ -227,42 +233,42 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
                 step="any"
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                className="w-full text-center bg-transparent font-bold text-white text-base focus:outline-none"
+                className="w-full text-center bg-transparent font-bold text-white text-base focus:outline-none min-h-[44px]"
               />
               <button
                 type="button"
                 onClick={() => setQuantity(quantity + (selectedPortionName === 'g' ? 10 : 0.5))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700/60 hover:bg-slate-600 text-white font-bold transition-colors active:scale-95 min-w-[44px] min-h-[44px]"
+                aria-label="Increase quantity"
+                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors active:scale-95 min-w-[44px] min-h-[44px]"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
           </div>
-
         </div>
 
         {/* Calculated Nutrition Summary Card */}
-        <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 space-y-2">
-          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
             <span className="text-xs text-slate-400 font-semibold">{dict.portionModal.calculatedMacros}</span>
-            <span className="text-sm font-bold text-white">~{Math.round(weightGrams)}g edible</span>
+            <span className="text-sm font-bold text-emerald-400 font-mono">~{Math.round(weightGrams)}g</span>
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center pt-1">
-            <div>
-              <div className="text-xs text-slate-400">{dict.dashboard.calories}</div>
-              <div className="text-base font-extrabold text-emerald-400">{calculated.calories}</div>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{dict.dashboard.calories}</div>
+              <div className="text-base font-extrabold text-emerald-400 font-mono mt-0.5">{calculated.calories}</div>
             </div>
-            <div>
-              <div className="text-xs text-slate-400">{dict.dashboard.protein}</div>
-              <div className="text-sm font-bold text-rose-400">{calculated.protein}g</div>
+            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <div className="text-[10px] text-rose-400 uppercase tracking-wider">{dict.dashboard.protein}</div>
+              <div className="text-sm font-bold text-rose-400 font-mono mt-0.5">{calculated.protein}g</div>
             </div>
-            <div>
-              <div className="text-xs text-slate-400">{dict.dashboard.carbs}</div>
-              <div className="text-sm font-bold text-amber-400">{calculated.carbs}g</div>
+            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <div className="text-[10px] text-amber-400 uppercase tracking-wider">{dict.dashboard.carbs}</div>
+              <div className="text-sm font-bold text-amber-400 font-mono mt-0.5">{calculated.carbs}g</div>
             </div>
-            <div>
-              <div className="text-xs text-slate-400">{dict.dashboard.fats}</div>
-              <div className="text-sm font-bold text-cyan-400">{calculated.fats}g</div>
+            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <div className="text-[10px] text-cyan-400 uppercase tracking-wider">{dict.dashboard.fats}</div>
+              <div className="text-sm font-bold text-cyan-400 font-mono mt-0.5">{calculated.fats}g</div>
             </div>
           </div>
         </div>
@@ -271,12 +277,11 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         <button
           onClick={handleLog}
           id="btn-log-item"
-          className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white font-bold rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all min-h-[44px]"
+          className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-slate-950 font-bold rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all min-h-[48px]"
         >
           <Check className="w-5 h-5" />
           <span>{dict.portionModal.logAction}</span>
         </button>
-
       </div>
     </div>
   );
