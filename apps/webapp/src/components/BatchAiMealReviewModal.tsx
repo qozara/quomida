@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext.js';
 import type {
   MealType,
@@ -557,12 +558,12 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
 
   if (!isOpen || !batchMeal) return null;
 
-  return (
+  const modalNode = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="batch-review-title"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-in slide-in-from-right duration-300 ease-out overflow-y-auto"
+      className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right slide-in-from-right overflow-y-auto"
     >
       {/* Top Sticky Navigation Bar with Back Button */}
       <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
@@ -1023,4 +1024,10 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalNode, document.body);
+  }
+
+  return modalNode;
 };

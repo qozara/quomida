@@ -359,4 +359,78 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     fireEvent.click(backBtn);
     expect(onBackMock).toHaveBeenCalledTimes(1);
   });
+
+  it('Journey 9: opening AI meal review from within AddFoodModal results in two stacked slide-over panes, where Back button in AI review pane closes it and restores AddFoodModal', async () => {
+    const { MealService } = await import('@quomida/domain-core');
+    const sampleBatchMeal: any = {
+      rawInput: 'Apple pie with ice cream',
+      detectedMealType: 'meal_lunch',
+      items: [
+        {
+          id: 'item-pie',
+          rawQuery: 'apple pie',
+          food: { id: 'apple-pie', name: 'Apple Pie', calories_100g: 237, protein_100g: 1.9, carbs_100g: 34, fats_100g: 11 },
+          quantity: 1,
+          selectedPortionName: 'g',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 237, protein: 1.9, carbs: 34, fats: 11 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 237, protein: 1.9, carbs: 34, fats: 11 }
+    };
+
+    vi.spyOn(MealService.prototype, 'processMeal').mockResolvedValue(sampleBatchMeal);
+
+    renderWithProviders(<DashboardContent />);
+
+    // 1. Open AddFoodModal by clicking Add food in lunch section
+    const addLunchBtn = screen.getByLabelText(en.dashboard.meals.addFoodToMealAria.replace('{{meal}}', en.dashboard.meals.lunch));
+    fireEvent.click(addLunchBtn);
+
+    const addFoodDialog = screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') });
+    expect(addFoodDialog).toBeDefined();
+
+    // 2. Type query in search input
+    const searchInput = screen.getByPlaceholderText(en.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'Apple pie' } });
+
+    // 3. Find more button appears in dropdown
+    const findMoreBtn = await screen.findByRole('button', { name: /find more or compose dish/i });
+    expect(findMoreBtn).toBeDefined();
+
+    // 4. Click Find More to trigger AI review
+    fireEvent.click(findMoreBtn);
+
+    // 5. Verify BatchAiMealReviewModal is open as a top-level slide-over on top of AddFoodModal
+    const aiReviewDialog = await screen.findByRole('dialog', { name: 'Apple pie with ice cream' });
+    expect(aiReviewDialog).toBeDefined();
+    expect(aiReviewDialog.className).toContain('z-[60]');
+    expect(aiReviewDialog.parentElement).toBe(document.body);
+
+    // Both slide-overs are simultaneously open in the DOM
+    expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
+    expect(screen.getByRole('dialog', { name: 'Apple pie with ice cream' })).toBeDefined();
+
+    // 6. Click Back in BatchAiMealReviewModal
+    const aiBackBtn = screen.getByTestId('btn-back-batch-review');
+    fireEvent.click(aiBackBtn);
+
+    // AI Review dialog unmounts, while AddFoodModal is still open!
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Apple pie with ice cream' })).toBeNull();
+    });
+    expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
+
+    // 7. Click Back in AddFoodModal
+    const addFoodBackBtn = screen.getByTestId('btn-close-add-food');
+    fireEvent.click(addFoodBackBtn);
+
+    // AddFoodModal closes and user is back on dashboard
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeNull();
+    });
+  });
 });
