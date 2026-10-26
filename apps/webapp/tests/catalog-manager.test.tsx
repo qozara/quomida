@@ -362,5 +362,102 @@ describe('CatalogManager - Recipes Integration', () => {
 
     expect(onSelectFoodMock).toHaveBeenCalledWith(systemFood);
   });
+
+  it('renders AI compose card when typing a search query, and clicking it opens BatchAiMealReviewModal in catalog mode without meal selector and saves recipe without logging to daily', async () => {
+    const { MealService } = await import('@quomida/domain-core');
+    const logBatchFoodItemsMock = vi.fn();
+
+    const sampleResolvedMeal: any = {
+      rawInput: 'Tofu stir fry with veggies',
+      detectedMealType: 'meal_lunch',
+      compositeDishName: 'Tofu stir fry with veggies',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'tofu',
+          food: { id: 'tofu', name: 'Firm Tofu', calories_100g: 80, protein_100g: 10, carbs_100g: 2, fats_100g: 4 },
+          quantity: 1,
+          selectedPortionName: 'g',
+          availablePortions: [],
+          calculatedWeightGrams: 150,
+          macros: { calories: 120, protein: 15, carbs: 3, fats: 6 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-2',
+          rawQuery: 'broccoli',
+          food: { id: 'broccoli', name: 'Broccoli', calories_100g: 34, protein_100g: 2.8, carbs_100g: 7, fats_100g: 0.4 },
+          quantity: 1,
+          selectedPortionName: 'g',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 34, protein: 2.8, carbs: 7, fats: 0.4 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 154, protein: 17.8, carbs: 10, fats: 6.4 }
+    };
+
+    vi.spyOn(MealService.prototype, 'processMeal').mockResolvedValue(sampleResolvedMeal);
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      isCatalogOpen: true,
+      ingredients: [],
+      recipes: [],
+      recipeFoods: [],
+      addCustomIngredient: vi.fn(),
+      removeCustomIngredient: vi.fn(),
+      addRecipe: addRecipeMock,
+      removeRecipe: removeRecipeMock,
+      logBatchFoodItems: logBatchFoodItemsMock,
+      setIsCatalogOpen: vi.fn(),
+      db: {}
+    } as any);
+
+    render(<CatalogManager />);
+
+    // Type query in search input
+    const searchInput = screen.getByPlaceholderText('Search catalog...');
+    fireEvent.change(searchInput, { target: { value: 'Tofu stir fry' } });
+
+    // Verify AI Compose card appears
+    const composeBtn = await screen.findByTestId('btn-catalog-compose-ai');
+    expect(composeBtn).toBeDefined();
+    expect(composeBtn.textContent).toContain('Tofu stir fry');
+
+    // Click AI Compose card
+    fireEvent.click(composeBtn);
+
+    // Modal opens in catalog mode
+    const reviewDialog = await screen.findByRole('dialog', { name: /tofu stir fry with veggies/i });
+    expect(reviewDialog).toBeDefined();
+
+    // Meal Time selector should NOT be present in catalog mode
+    expect(screen.queryByText('Meal Time')).toBeNull();
+    expect(screen.queryByText('Momento del día')).toBeNull();
+
+    // Primary save button should say Save Recipe to Catalog
+    const saveCatalogBtn = screen.getByTestId('btn-save-catalog-ai');
+    expect(saveCatalogBtn).toBeDefined();
+    expect(saveCatalogBtn.textContent).toMatch(/save recipe to catalog/i);
+
+    // Click Save Recipe to Catalog
+    fireEvent.click(saveCatalogBtn);
+
+    // Verify addRecipe was called to save in catalog
+    await waitFor(() => {
+      expect(addRecipeMock).toHaveBeenCalled();
+    });
+
+    // Verify logBatchFoodItems was NOT called (does NOT log to daily diary)
+    expect(logBatchFoodItemsMock).not.toHaveBeenCalled();
+
+    // Verify modal is closed
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /tofu stir fry with veggies/i })).toBeNull();
+    });
+  });
 });
 

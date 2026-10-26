@@ -2,10 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
   CatalogSearchManager,
+  BatchMealResolver,
+  MealService,
   type BaseIngredient,
   type FoodItem,
   type RecipeFoodItem,
-  type Recipe
+  type Recipe,
+  type Portion,
+  type ResolvedBatchMeal
 } from '@quomida/domain-core';
 import {
   Plus,
@@ -15,13 +19,17 @@ import {
   ChevronDown,
   ChevronUp,
   MoreVertical,
-  Pencil
+  Pencil,
+  Sparkles
 } from 'lucide-react';
 import { dictionaries } from '@quomida/i18n-locales';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
+import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
+import { LlmRecipeDecomposer } from '@quomida/ai-services';
+import { AI_CONFIG } from '../config/ai.js';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -39,6 +47,9 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
     addRecipe,
     removeRecipe,
     isCatalogOpen,
+    db,
+    userSettings,
+    locale,
     t
   } = useApp();
 
@@ -54,11 +65,17 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
 
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Batch AI Composition State
+  const [batchMeal, setBatchMeal] = useState<ResolvedBatchMeal | null>(null);
+  const [isBatchReviewOpen, setIsBatchReviewOpen] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
 
   const toggleRecipeExpand = (id: string) => {
     setExpandedRecipeIds(prev => ({
@@ -172,6 +189,70 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
     await addRecipe(recipe, recipePortions);
     setIsBuildingRecipe(false);
     setEditingRecipe(null);
+  };
+
+  const handleAiParse = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    const query = searchQuery.trim();
+    if (!query || isParsing) return;
+
+    setIsParsing(true);
+    try {
+      const getAuthToken = async (): Promise<string | null> => {
+        const creds = userSettings?.active_cloud_provider?.credentials;
+        if (typeof creds === 'string' && creds.trim()) return creds.trim();
+        const token = creds?.accessToken || creds?.access_token || creds?.token;
+        if (typeof token === 'string' && token.trim()) return token.trim();
+        return null;
+      };
+
+      let customPortions: Portion[] = [];
+      if (db?.portions?.find) {
+        try {
+          const pdocs = await db.portions.find().exec();
+          customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+        } catch (e) {
+          console.warn('[CatalogManager] Failed to query local portions for batch:', e);
+        }
+      }
+
+      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
+
+      const decomposer = isAiEnabled
+        ? new LlmRecipeDecomposer({
+            proxyUrl: AI_CONFIG.proxyUrl,
+            provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+            ciphertext: userSettings?.ai_settings?.ciphertext,
+            ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+            ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+            getAuthToken
+          })
+        : undefined;
+
+      const mealService = new MealService({
+        decomposer,
+        searchManager,
+        batchResolver
+      });
+
+      const resolved = await mealService.processMeal({
+        input: query,
+        customIngredients: ingredients,
+        customRecipes: recipeFoods,
+        existingRecipes: recipes,
+        customPortions,
+        catalogProvider: remoteService,
+        locale,
+        aiEnabled: isAiEnabled
+      });
+
+      setIsParsing(false);
+      setBatchMeal(resolved);
+      setIsBatchReviewOpen(true);
+    } catch (err) {
+      console.error('[CatalogManager] AI Parse error:', err);
+      setIsParsing(false);
+    }
   };
 
   return (
@@ -429,6 +510,37 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
             </div>
           );
         })}
+
+        {/* At the bottom of search results, render the "✨ Compose dish or estimate with AI" action card */}
+        {searchQuery.trim().length > 0 && (
+          <button
+            type="button"
+            id="btn-catalog-compose-ai"
+            data-testid="btn-catalog-compose-ai"
+            onClick={handleAiParse}
+            disabled={isParsing}
+            className="w-full p-3.5 text-left bg-gradient-to-r from-emerald-950/30 to-purple-950/20 hover:from-emerald-950/50 hover:to-purple-950/40 border border-emerald-500/30 hover:border-emerald-500/60 rounded-xl transition-all flex items-center justify-between group min-h-[44px]"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-emerald-400 group-hover:text-emerald-300 transition-colors flex items-center gap-1.5">
+                  <span>
+                    {(dict.catalog?.composeDishAi || '✨ Compose dish or estimate with AI for "{query}"').replace('{query}', searchQuery.trim())}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {dict.catalog?.composeDishAiSubtitle || 'Decompose into ingredients and save as a new recipe in your catalog'}
+                </div>
+              </div>
+            </div>
+            {isParsing && (
+              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Recipe Builder Modal */}
@@ -460,6 +572,28 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
             setEditingIngredient(null);
           }}
           onSave={handleSaveIngredient}
+        />
+      )}
+
+      {/* Batch AI Composition Modal for Catalog */}
+      {isBatchReviewOpen && batchMeal && (
+        <BatchAiMealReviewModal
+          isOpen={isBatchReviewOpen}
+          batchMeal={batchMeal}
+          mode="catalog"
+          onBack={() => {
+            setIsBatchReviewOpen(false);
+            setBatchMeal(null);
+          }}
+          onClose={() => {
+            setIsBatchReviewOpen(false);
+            setBatchMeal(null);
+          }}
+          onSavedToCatalog={() => {
+            setIsBatchReviewOpen(false);
+            setBatchMeal(null);
+            setSearchQuery('');
+          }}
         />
       )}
     </section>

@@ -314,6 +314,8 @@
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
     "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
+    "composeDishAi": "✨ Componer plato o estimar con IA para \"{query}\"",
+    "composeDishAiSubtitle": "Descomponer en ingredientes y guardar como nueva receta en tu catálogo",
     "addToLog": "Añadir al diario",
     "edit": "Editar",
     "delete": "Eliminar"
@@ -363,6 +365,9 @@
     "noItemsParsed": "No se pudieron extraer alimentos de la descripción.",
     "batchReviewTitle": "Revisar Comida Detectada",
     "batchReviewSubtitle": "Revisa los alimentos y porciones detectadas antes de registrar",
+    "composeRecipeTitle": "Componer Receta",
+    "composeRecipeSubtitle": "Revisa los alimentos detectados y porciones antes de guardar en el catálogo",
+    "saveRecipeToCatalog": "Guardar Receta en Catálogo",
     "logBatchAction": "Registrar {count} Alimentos en Diario",
     "logSingleAction": "Registrar en Diario",
     "unmatchedNotice": "Alimento no encontrado en el catálogo",

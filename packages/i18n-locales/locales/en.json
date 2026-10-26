@@ -314,6 +314,8 @@
     "deleteRecipeConfirm": "Are you sure you want to delete this recipe?",
     "noFoodsFound": "No foods found",
     "noCustomFoodsYet": "No custom foods or recipes added yet",
+    "composeDishAi": "✨ Compose dish or estimate with AI for \"{query}\"",
+    "composeDishAiSubtitle": "Decompose into ingredients and save as a new recipe in your catalog",
     "addToLog": "Add to diary",
     "edit": "Edit",
     "delete": "Delete"
@@ -363,6 +365,9 @@
     "noItemsParsed": "Could not extract food items from description.",
     "batchReviewTitle": "Review Parsed Meal",
     "batchReviewSubtitle": "Review detected foods and portions before logging",
+    "composeRecipeTitle": "Compose Recipe",
+    "composeRecipeSubtitle": "Review detected foods and portions before saving to catalog",
+    "saveRecipeToCatalog": "Save Recipe to Catalog",
     "logBatchAction": "Log {count} Items to Diary",
     "logSingleAction": "Log to Diary",
     "unmatchedNotice": "Food not found in catalog",
