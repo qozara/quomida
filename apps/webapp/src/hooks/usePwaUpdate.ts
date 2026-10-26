@@ -9,6 +9,7 @@ export interface PwaUpdateState {
   needRefresh: boolean;
   offlineReady: boolean;
   isChecking: boolean;
+  isUpdating: boolean;
   isPromptDismissed: boolean;
   lastCheckResult: AppUpdateCheckResult | null;
 }
@@ -17,6 +18,7 @@ let sharedState: PwaUpdateState = {
   needRefresh: false,
   offlineReady: false,
   isChecking: false,
+  isUpdating: false,
   isPromptDismissed: false,
   lastCheckResult: null
 };
@@ -26,6 +28,7 @@ let swRegistration: ServiceWorkerRegistration | undefined;
 let updateSWFn: ((reloadPage?: boolean) => Promise<void>) | undefined;
 let lastVisibilityCheckTime = 0;
 let activeCleanupFn: (() => void) | null = null;
+let fallbackReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 function setSharedState(partial: Partial<PwaUpdateState>) {
   sharedState = { ...sharedState, ...partial };
@@ -43,10 +46,15 @@ export function resetSharedPwaUpdateState() {
     activeCleanupFn();
     activeCleanupFn = null;
   }
+  if (fallbackReloadTimer) {
+    clearTimeout(fallbackReloadTimer);
+    fallbackReloadTimer = null;
+  }
   sharedState = {
     needRefresh: false,
     offlineReady: false,
     isChecking: false,
+    isUpdating: false,
     isPromptDismissed: false,
     lastCheckResult: null
   };
@@ -91,6 +99,14 @@ export function registerPwaServiceWorker(
           needRefresh: true,
           isPromptDismissed: false,
           lastCheckResult: 'update_available'
+        });
+      }
+      if (registration && typeof registration.addEventListener === 'function') {
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            attachInstallingWorkerListener(installingWorker);
+          }
         });
       }
     },
@@ -238,15 +254,76 @@ export async function checkForPwaAppUpdate(): Promise<AppUpdateCheckResult> {
  * Triggers SKIP_WAITING on the waiting Service Worker and reloads the application.
  */
 export async function applyPwaAppUpdate(): Promise<void> {
+  setSharedState({ isUpdating: true });
+
+  let hasReloaded = false;
+  const triggerReload = () => {
+    if (!hasReloaded) {
+      hasReloaded = true;
+      if (fallbackReloadTimer) {
+        clearTimeout(fallbackReloadTimer);
+        fallbackReloadTimer = null;
+      }
+      if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+        try {
+          window.location.reload();
+        } catch {
+          // jsdom navigation guard
+        }
+      }
+    }
+  };
+
+  // 1. Listen for the new service worker to take control
+  if (
+    typeof navigator !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    typeof navigator.serviceWorker?.addEventListener === 'function'
+  ) {
+    navigator.serviceWorker.addEventListener('controllerchange', triggerReload, { once: true });
+  }
+
+  // 2. Post SKIP_WAITING message directly to known waiting worker
+  try {
+    if (swRegistration?.waiting && typeof swRegistration.waiting.postMessage === 'function') {
+      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+  } catch (err) {
+    console.warn('[PWA] Error posting SKIP_WAITING to swRegistration:', err);
+  }
+
+  // 3. Post SKIP_WAITING to any waiting worker discovered via navigator.serviceWorker
+  if (
+    typeof navigator !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    typeof navigator.serviceWorker?.getRegistration === 'function'
+  ) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg?.waiting && typeof reg.waiting.postMessage === 'function') {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    } catch (err) {
+      console.warn('[PWA] Error querying serviceWorker registration:', err);
+    }
+  }
+
+  // 4. Invoke vite-plugin-pwa's updateSWFn if present
   if (updateSWFn) {
-    await updateSWFn(true);
-    return;
+    try {
+      await updateSWFn(true);
+    } catch (err) {
+      console.warn('[PWA] Error executing updateSWFn:', err);
+    }
   }
-  if (swRegistration?.waiting) {
-    swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-  }
+
+  // 5. Fallback reload: If controllerchange does not fire within 500ms
+  // (e.g. dev mode, unservice-worker-controlled page, or already controlling worker),
+  // guarantee the reload happens.
   if (typeof window !== 'undefined') {
-    window.location.reload();
+    fallbackReloadTimer = setTimeout(() => {
+      triggerReload();
+    }, 500);
   }
 }
 
@@ -281,6 +358,7 @@ export function usePwaUpdate() {
     needRefresh: state.needRefresh,
     offlineReady: state.offlineReady,
     isChecking: state.isChecking,
+    isUpdating: state.isUpdating,
     isPromptDismissed: state.isPromptDismissed,
     lastCheckResult: state.lastCheckResult,
     checkForUpdate,

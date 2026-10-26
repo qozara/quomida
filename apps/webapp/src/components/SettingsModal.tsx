@@ -99,6 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
   const {
     needRefresh: isAppUpdateReady,
     isChecking: isCheckingAppUpdate,
+    isUpdating: isApplyingAppUpdate,
     lastCheckResult: appUpdateCheckResult,
     checkForUpdate: handleCheckAppUpdate,
     applyUpdate: handleApplyAppUpdate
@@ -1666,10 +1667,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       type="button"
                       id="btn-install-app-update"
                       data-testid="btn-install-app-update"
+                      disabled={isApplyingAppUpdate}
                       onClick={() => handleApplyAppUpdate()}
-                      className="min-h-[44px] px-4 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                      className="min-h-[44px] px-4 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-75"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <RefreshCw className={`w-3.5 h-3.5 ${isApplyingAppUpdate ? 'animate-spin' : ''}`} />
                       <span>{(t.settings as any).appUpdateInstallNow || 'Update & Reload Now'}</span>
                     </button>
                   ) : (
