@@ -194,6 +194,11 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
       expect(screen.queryByText('Manzana Roja')).toBeNull();
     });
 
+    // The single remaining item must have its remove button disabled so user cannot delete all foods
+    const remainingDeleteButtons = screen.getAllByLabelText('Remove item from meal');
+    expect(remainingDeleteButtons).toHaveLength(1);
+    expect((remainingDeleteButtons[0] as HTMLButtonElement).disabled).toBe(true);
+
     // Button should now say "Log to Diary" (single item)
     const logButton = screen.getByRole('button', { name: /Log to Diary/i });
     expect(logButton).toBeDefined();
@@ -243,6 +248,13 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(screen.getByText('Unmatched')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'comida extraterrestre xyz' })).toBeDefined();
     expect(screen.getByText('Food not found in catalog')).toBeDefined();
+
+    // Verify per-item meal time selector is NOT rendered next to unmatched food
+    expect(screen.queryByLabelText('Item Meal Time')).toBeNull();
+
+    // Verify delete button is disabled when only this 1 food item is listed
+    const deleteBtn = screen.getByLabelText('Remove item from meal') as HTMLButtonElement;
+    expect(deleteBtn.disabled).toBe(true);
   });
 
   it('successfully processes "desayuné dos empanadas" with proxy food_items and food_name format', async () => {

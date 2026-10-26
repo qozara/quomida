@@ -408,8 +408,9 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
     );
   };
 
-  // Remove an individual item from batch
+  // Remove an individual item from batch (must keep at least one food)
   const handleRemoveItem = (itemId: string) => {
+    if (items.length <= 1) return;
     setItems((prev) => prev.filter((it) => it.id !== itemId));
     if (activeSubstituteId === itemId) {
       setActiveSubstituteId(null);
@@ -695,18 +696,20 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                       </span>
                     )}
 
-                    {/* Per-Item Meal Time Selector */}
-                    <select
-                      aria-label="Item Meal Time"
-                      value={(item as any).mealType || mealType}
-                      onChange={(e) => handleUpdateItemMealType(item.id, e.target.value as MealType)}
-                      className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium rounded-lg px-2 py-0.5 focus:outline-none focus:border-emerald-500 min-h-[30px] cursor-pointer"
-                    >
-                      <option value="meal_breakfast">{t.dashboard.meals.breakfast}</option>
-                      <option value="meal_lunch">{t.dashboard.meals.lunch}</option>
-                      <option value="meal_dinner">{t.dashboard.meals.dinner}</option>
-                      <option value="meal_snack">{t.dashboard.meals.snack}</option>
-                    </select>
+                    {/* Per-Item Meal Time Selector: only shown for multi-meal batches on matched foods */}
+                    {isMultiMeal && !item.unmatched && (
+                      <select
+                        aria-label="Item Meal Time"
+                        value={(item as any).mealType || mealType}
+                        onChange={(e) => handleUpdateItemMealType(item.id, e.target.value as MealType)}
+                        className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium rounded-lg px-2 py-0.5 focus:outline-none focus:border-emerald-500 min-h-[30px] cursor-pointer"
+                      >
+                        <option value="meal_breakfast">{t.dashboard.meals.breakfast}</option>
+                        <option value="meal_lunch">{t.dashboard.meals.lunch}</option>
+                        <option value="meal_dinner">{t.dashboard.meals.dinner}</option>
+                        <option value="meal_snack">{t.dashboard.meals.snack}</option>
+                      </select>
+                    )}
                   </div>
 
                   {!item.unmatched && item.food && (
@@ -747,12 +750,22 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
                     <Search className="w-4 h-4" />
                   </button>
 
-                  {/* Delete Item Button */}
+                  {/* Delete Item Button (disabled when only 1 item remains) */}
                   <button
                     type="button"
                     onClick={() => handleRemoveItem(item.id)}
+                    disabled={items.length <= 1}
                     aria-label={t.ai?.removeItemAria || 'Remove item from meal'}
-                    className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
+                    title={
+                      items.length <= 1
+                        ? (t.ai?.cannotRemoveLastItem || 'At least one food must remain in the meal')
+                        : (t.ai?.removeItemAria || 'Remove item from meal')
+                    }
+                    className={`p-2 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 ${
+                      items.length <= 1
+                        ? 'opacity-30 cursor-not-allowed text-slate-600'
+                        : 'text-slate-500 hover:text-rose-400 hover:bg-rose-950/30'
+                    }`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

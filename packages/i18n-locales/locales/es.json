@@ -369,6 +369,7 @@
     "unmatchedBadge": "No Encontrado",
     "mealTotal": "Macros Totales de la Comida",
     "removeItemAria": "Eliminar alimento de la comida",
+    "cannotRemoveLastItem": "Debe permanecer al menos un alimento en la comida",
     "searchSubstitute": "Buscar sustituto en el catálogo",
     "changeItem": "Cambiar alimento",
     "selectMeal": "Momento del día",
