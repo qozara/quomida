@@ -34,7 +34,8 @@ import {
   Moon,
   Apple,
   AlertTriangle,
-  Search
+  Search,
+  ArrowLeft
 } from 'lucide-react';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
@@ -42,6 +43,7 @@ interface BatchAiMealReviewModalProps {
   isOpen: boolean;
   batchMeal: ResolvedBatchMeal | null;
   onClose: () => void;
+  onBack?: () => void;
   onLoggedSuccess?: () => void;
   decomposer?: IRecipeDecomposer;
 }
@@ -57,6 +59,7 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   isOpen,
   batchMeal,
   onClose,
+  onBack,
   onLoggedSuccess,
   decomposer: propsDecomposer
 }) => {
@@ -559,42 +562,38 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="batch-review-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-in slide-in-from-right duration-300 ease-out overflow-y-auto"
     >
-      {/* Click outside to dismiss */}
-      <div className="absolute inset-0" onClick={onClose} />
-
-      {/* Bottom Sheet Container */}
-      <div className="relative w-full max-w-lg bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-5 sm:p-6 shadow-2xl z-10 max-h-[90vh] flex flex-col space-y-4 animate-in slide-in-from-bottom duration-300">
-        
-        {/* Drag handle */}
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-1 shrink-0" />
-
-        {/* Header */}
-        <div className="flex items-start justify-between shrink-0">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-emerald-400">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                {t.ai?.batchReviewTitle || 'Review Parsed Meal'}
-              </span>
-            </div>
-            <h2 id="batch-review-title" className="text-lg font-bold text-white">
-              {batchMeal.rawInput}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {t.ai?.batchReviewSubtitle || 'Review detected foods and portions before logging'}
-            </p>
+      {/* Top Sticky Navigation Bar with Back Button */}
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
+        <button
+          id="btn-back-batch-review"
+          data-testid="btn-back-batch-review"
+          onClick={onBack || onClose}
+          aria-label="Back"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="text-center flex-1 mx-2 min-w-0">
+          <div className="flex items-center justify-center gap-1.5 text-emerald-400">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">
+              {t.ai?.batchReviewTitle || 'Review Parsed Meal'}
+            </span>
           </div>
-
-          <button
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 id="batch-review-title" className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-md mx-auto">
+            {batchMeal.rawInput}
+          </h2>
         </div>
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
+
+      {/* Main Content Container */}
+      <div className="max-w-lg mx-auto w-full p-4 sm:p-6 space-y-4 flex-1">
+        <p className="text-xs text-slate-400">
+          {t.ai?.batchReviewSubtitle || 'Review detected foods and portions before logging'}
+        </p>
 
         {/* AI Recipe Decomposition Banner */}
         {(isAiDecomposedBanner || batchMeal.isAiDecomposed) && (

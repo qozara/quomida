@@ -648,6 +648,10 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
       {isBuildingRecipe && (
         <RecipeBuilder
           initialRecipe={editingRecipe}
+          onBack={() => {
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+          }}
           onClose={() => {
             setIsBuildingRecipe(false);
             setEditingRecipe(null);

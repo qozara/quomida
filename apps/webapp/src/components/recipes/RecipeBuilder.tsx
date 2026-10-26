@@ -12,15 +12,16 @@ import {
 import { dictionaries } from '@quomida/i18n-locales';
 import { RemoteCatalogService } from '../../services/RemoteCatalogService.js';
 import { RecipeComponentList } from './RecipeComponentList.js';
-import { X, Search, Plus, AlertCircle, Sparkles, ChefHat, Scale } from 'lucide-react';
+import { X, Search, Plus, AlertCircle, Sparkles, ChefHat, Scale, ArrowLeft } from 'lucide-react';
 
 interface RecipeBuilderProps {
   onClose: () => void;
+  onBack?: () => void;
   onSave: (recipe: Recipe, portions?: { name: string; equivalent_weight_g: number }[]) => Promise<void>;
   initialRecipe?: any;
 }
 
-export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave, initialRecipe }) => {
+export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onBack, onSave, initialRecipe }) => {
   const { ingredients = [], recipeFoods = [], db, t } = useApp();
   const dict = t || dictionaries.en;
   const [recipeManager] = useState(() => new RecipeManager());
@@ -229,23 +230,39 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave, i
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <ChefHat className="w-5 h-5 text-purple-400" />
-            <h2 className="text-xl font-extrabold text-white">{dict.recipes.newRecipe}</h2>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recipe-builder-title"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-in slide-in-from-right duration-300 ease-out overflow-y-auto"
+    >
+      {/* Top Sticky Navigation Bar with Back Button */}
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
+        <button
+          id="btn-close-recipe-builder"
+          data-testid="btn-back-recipe-builder"
+          onClick={onBack || onClose}
+          aria-label="Back"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="text-center flex-1 mx-2 min-w-0">
+          <div className="flex items-center justify-center gap-1.5 text-purple-400">
+            <ChefHat className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">
+              {initialRecipe ? (dict.catalog?.edit || 'Edit') : (dict.recipes?.recipeBadge || 'Recipe')}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 id="recipe-builder-title" className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs mx-auto">
+            {dict.recipes.newRecipe}
+          </h2>
         </div>
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
+
+      {/* Main Content Form Container */}
+      <div className="max-w-lg mx-auto w-full p-4 sm:p-6 space-y-5 flex-1">
 
         {errorMsg && (
           <div className="p-3 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
@@ -501,7 +518,7 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave, i
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={onBack || onClose}
               className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-semibold text-sm rounded-xl transition-colors min-h-[44px]"
             >
               {dict.recipes.cancel}

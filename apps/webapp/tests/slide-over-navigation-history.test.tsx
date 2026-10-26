@@ -281,4 +281,82 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
 
     expect(setIsStorageSettingsOpenMock).toHaveBeenCalledWith(false);
   });
+
+  it('Journey 7: opens RecipeBuilder as slide-over with Back button and returns to Catalog', async () => {
+    mockContext.isCatalogOpen = true;
+    renderWithProviders(<DashboardContent />);
+
+    // In Catalog, click Recipe button to build recipe
+    const recipeBtn = screen.getAllByText('Recipe').find(el => el.tagName === 'SPAN' && el.parentElement?.tagName === 'BUTTON');
+    expect(recipeBtn).toBeDefined();
+    fireEvent.click(recipeBtn!);
+
+    // RecipeBuilder slide-over modal opens
+    const recipeDialog = screen.getByRole('dialog', { name: en.recipes.newRecipe });
+    expect(recipeDialog).toBeDefined();
+    expect(recipeDialog.className).toContain('slide-in-from-right');
+
+    // Back button exists with >=44x44 touch target
+    const backBtn = screen.getByTestId('btn-back-recipe-builder');
+    expect(backBtn).toBeDefined();
+    expect(backBtn.className).toContain('min-w-[44px]');
+    expect(backBtn.className).toContain('min-h-[44px]');
+
+    // Click Back button
+    fireEvent.click(backBtn);
+
+    // RecipeBuilder is closed and user is back on Catalog screen
+    expect(screen.queryByRole('dialog', { name: en.recipes.newRecipe })).toBeNull();
+    expect(screen.getByTestId('catalog-screen')).toBeDefined();
+  });
+
+  it('Journey 8: renders BatchAiMealReviewModal as slide-over with Back button and onClose/onBack dismisses review pane', async () => {
+    const onBackMock = vi.fn();
+    const onCloseMock = vi.fn();
+    const sampleBatchMeal: any = {
+      rawInput: '2 eggs and toast',
+      detectedMealType: 'meal_breakfast',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: '2 eggs',
+          food: { id: 'egg', name: 'Egg', calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fats_100g: 11 },
+          quantity: 2,
+          selectedPortionName: 'g',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 155, protein: 13, carbs: 1.1, fats: 11 },
+          unmatched: false,
+          mealType: 'meal_breakfast'
+        }
+      ],
+      totalMacros: { calories: 155, protein: 13, carbs: 1.1, fats: 11 }
+    };
+
+    const { BatchAiMealReviewModal } = await import('../src/components/BatchAiMealReviewModal.js');
+    renderWithProviders(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleBatchMeal}
+        onBack={onBackMock}
+        onClose={onCloseMock}
+      />
+    );
+
+    // Dialog exists and has slide-over animation class
+    const reviewDialog = screen.getByRole('dialog', { name: '2 eggs and toast' });
+    expect(reviewDialog).toBeDefined();
+    expect(reviewDialog.className).toContain('slide-in-from-right');
+
+    // Back button exists with >=44x44 touch target
+    const backBtn = screen.getByTestId('btn-back-batch-review');
+    expect(backBtn).toBeDefined();
+    expect(backBtn.getAttribute('aria-label')).toBe('Back');
+    expect(backBtn.className).toContain('min-w-[44px]');
+    expect(backBtn.className).toContain('min-h-[44px]');
+
+    // Click Back
+    fireEvent.click(backBtn);
+    expect(onBackMock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -11,9 +11,10 @@ import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 interface FoodLoggerProps {
   onSelectIngredient: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
+  onClose?: () => void;
 }
 
-export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
+export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose }) => {
   const { ingredients, recipes = [], recipeFoods = [], t, locale, setIsSettingsOpen, userSettings, db } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
@@ -329,11 +330,13 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         <BatchAiMealReviewModal
           isOpen={isBatchReviewOpen}
           batchMeal={batchMeal}
+          onBack={() => setIsBatchReviewOpen(false)}
           onClose={() => setIsBatchReviewOpen(false)}
           onLoggedSuccess={() => {
             setSearchQuery('');
             setIsBatchReviewOpen(false);
             setBatchMeal(null);
+            onClose?.();
           }}
         />
       )}
