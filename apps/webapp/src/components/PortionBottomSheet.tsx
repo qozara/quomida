@@ -10,12 +10,14 @@ interface PortionBottomSheetProps {
   ingredient: FoodItem | BaseIngredient | null;
   defaultMealType: MealType;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   ingredient,
   defaultMealType,
-  onClose
+  onClose,
+  onBack
 }) => {
   const { db, logFoodItem, t } = useApp();
   const dict = t || dictionaries.es;
@@ -102,7 +104,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
         <button
           id="btn-close-portion"
           data-testid="btn-close-portion"
-          onClick={onClose}
+          onClick={onBack || onClose}
           aria-label="Back"
           className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
         >

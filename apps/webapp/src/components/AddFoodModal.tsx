@@ -51,7 +51,6 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
 
   const handleSelect = (ingredient: FoodItem | BaseIngredient) => {
     onSelectIngredient(ingredient, currentMeal);
-    onClose();
   };
 
   const activeTitle = getMealTitle(currentMeal);

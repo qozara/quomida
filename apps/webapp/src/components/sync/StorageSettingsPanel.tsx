@@ -35,7 +35,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
     .replace('{{foods}}', String(itemCounts.customFoods));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div
         role="dialog"
         aria-modal="true"

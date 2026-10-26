@@ -52,7 +52,12 @@ const tosUrl = `${legalBaseUrl}/legal/quomida/tos.html`;
 const privacyUrl = `${legalBaseUrl}/legal/quomida/privacy.html`;
 const licenseUrl = `${appWebsiteUrl}/LICENSE`;
 
-export const SettingsModal: React.FC = () => {
+interface SettingsModalProps {
+  onBack?: () => void;
+  onClose?: () => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose }) => {
   const {
     selectedDate,
     weightLogs,
@@ -514,6 +519,12 @@ export const SettingsModal: React.FC = () => {
 
   if (!isSettingsOpen) return null;
 
+  const handleBack = () => {
+    if (onBack) onBack();
+    else if (onClose) onClose();
+    else setIsSettingsOpen(false);
+  };
+
   return (
     <div
       role="dialog"
@@ -526,7 +537,7 @@ export const SettingsModal: React.FC = () => {
         <button
           id="btn-close-settings"
           data-testid="btn-back-settings"
-          onClick={() => setIsSettingsOpen(false)}
+          onClick={handleBack}
           aria-label="Back"
           className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
         >
@@ -1310,7 +1321,6 @@ export const SettingsModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setIsSettingsOpen(false);
                       setIsStorageSettingsOpen(true);
                     }}
                     className="text-emerald-400 hover:underline text-[11px] font-medium min-h-[44px] flex items-center"

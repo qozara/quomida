@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProvider, useApp } from './context/AppContext.js';
 import { DashboardDateBar } from './components/DashboardDateBar.js';
@@ -67,9 +67,64 @@ export const DashboardContent: React.FC = () => {
     setIsStorageSettingsOpen(true);
   };
 
-  const handleOpenPortionModal = (ingredient: FoodItem | BaseIngredient, mealType: MealType) => {
+  const [portionOrigin, setPortionOrigin] = useState<'add_food' | 'catalog' | 'diary'>('diary');
+  const [previousScreenBeforeSettings, setPreviousScreenBeforeSettings] = useState<'diary' | 'catalog' | 'analytics' | 'add_food'>('diary');
+
+  // Track the active screen before settings is opened
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      if (isAddFoodModalOpen) {
+        setPreviousScreenBeforeSettings('add_food');
+      } else if (isCatalogOpen) {
+        setPreviousScreenBeforeSettings('catalog');
+      } else if (isAnalyticsOpen) {
+        setPreviousScreenBeforeSettings('analytics');
+      } else {
+        setPreviousScreenBeforeSettings('diary');
+      }
+    }
+  }, [isSettingsOpen, isAddFoodModalOpen, isCatalogOpen, isAnalyticsOpen]);
+
+  const handleOpenPortionModal = (
+    ingredient: FoodItem | BaseIngredient,
+    mealType: MealType,
+    origin?: 'add_food' | 'catalog' | 'diary'
+  ) => {
+    const resolvedOrigin = origin || (isAddFoodModalOpen ? 'add_food' : isCatalogOpen ? 'catalog' : 'diary');
+    setPortionOrigin(resolvedOrigin);
     setSelectedIngredient(ingredient);
     setTargetMealType(mealType);
+  };
+
+  const handlePortionBack = () => {
+    setSelectedIngredient(null);
+    if (portionOrigin === 'add_food') {
+      setIsAddFoodModalOpen(true);
+    } else if (portionOrigin === 'catalog') {
+      setIsCatalogOpen(true);
+      setIsAnalyticsOpen(false);
+    }
+  };
+
+  const handlePortionClose = () => {
+    setSelectedIngredient(null);
+    setIsAddFoodModalOpen(false);
+  };
+
+  const handleSettingsBack = () => {
+    setIsSettingsOpen(false);
+    if (previousScreenBeforeSettings === 'catalog') {
+      setIsCatalogOpen(true);
+      setIsAnalyticsOpen(false);
+    } else if (previousScreenBeforeSettings === 'analytics') {
+      setIsAnalyticsOpen(true);
+      setIsCatalogOpen(false);
+    } else if (previousScreenBeforeSettings === 'add_food') {
+      setIsAddFoodModalOpen(true);
+    } else {
+      setIsCatalogOpen(false);
+      setIsAnalyticsOpen(false);
+    }
   };
 
   const handleOpenAddModal = (mealType: MealType) => {
@@ -88,15 +143,25 @@ export const DashboardContent: React.FC = () => {
       setIsSettingsOpen(false);
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(false);
+      setIsAddFoodModalOpen(false);
+      setSelectedIngredient(null);
     } else if (tab === 'analytics') {
       setIsSettingsOpen(false);
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(true);
+      setIsAddFoodModalOpen(false);
+      setSelectedIngredient(null);
     } else if (tab === 'catalog') {
       setIsSettingsOpen(false);
       setIsAnalyticsOpen(false);
       setIsCatalogOpen(true);
+      setIsAddFoodModalOpen(false);
+      setSelectedIngredient(null);
     } else if (tab === 'settings') {
+      if (isAddFoodModalOpen) setPreviousScreenBeforeSettings('add_food');
+      else if (isCatalogOpen) setPreviousScreenBeforeSettings('catalog');
+      else if (isAnalyticsOpen) setPreviousScreenBeforeSettings('analytics');
+      else setPreviousScreenBeforeSettings('diary');
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(false);
       setIsSettingsOpen(true);
@@ -129,7 +194,7 @@ export const DashboardContent: React.FC = () => {
         {activeTab === 'analytics' ? (
           <AnalyticsScreen />
         ) : activeTab === 'catalog' ? (
-          <CatalogManager onSelectFood={(item) => handleOpenPortionModal(item, 'meal_lunch')} />
+          <CatalogManager onSelectFood={(item) => handleOpenPortionModal(item, 'meal_lunch', 'catalog')} />
         ) : (
           <>
             {/* Onboarding Banner for Fresh Devices */}
@@ -210,14 +275,15 @@ export const DashboardContent: React.FC = () => {
         isOpen={isAddFoodModalOpen}
         targetMealType={targetMealType}
         onClose={() => setIsAddFoodModalOpen(false)}
-        onSelectIngredient={handleOpenPortionModal}
+        onSelectIngredient={(ingredient, mealType) => handleOpenPortionModal(ingredient, mealType, 'add_food')}
       />
       <PortionBottomSheet
         ingredient={selectedIngredient}
         defaultMealType={targetMealType}
-        onClose={() => setSelectedIngredient(null)}
+        onClose={handlePortionClose}
+        onBack={handlePortionBack}
       />
-      <SettingsModal />
+      <SettingsModal onBack={handleSettingsBack} />
       <WeightQuickLogModal />
       <StorageSettingsPanel
         isOpen={isStorageSettingsOpen}

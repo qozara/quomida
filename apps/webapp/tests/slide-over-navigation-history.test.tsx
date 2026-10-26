@@ -1,0 +1,284 @@
+/**
+ * @vitest-environment jsdom
+ */
+import React from 'react';
+import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { DashboardContent } from '../src/App.js';
+import * as AppContextModule from '../src/context/AppContext.js';
+import { dictionaries } from '@quomida/i18n-locales';
+
+describe('Slide-Over Navigation History & Contextual Back Button', () => {
+  const en = dictionaries.en;
+  let mockContext: any;
+  let logFoodItemMock: any;
+  let setIsSettingsOpenMock: any;
+  let setIsCatalogOpenMock: any;
+  let setIsAnalyticsOpenMock: any;
+  let setIsStorageSettingsOpenMock: any;
+
+  beforeEach(() => {
+    logFoodItemMock = vi.fn().mockResolvedValue(undefined);
+    setIsSettingsOpenMock = vi.fn();
+    setIsCatalogOpenMock = vi.fn();
+    setIsAnalyticsOpenMock = vi.fn();
+    setIsStorageSettingsOpenMock = vi.fn();
+
+    mockContext = {
+      t: en,
+      locale: 'en',
+      selectedDate: '2026-10-25',
+      dailyLogs: [],
+      weightLogs: [],
+      ingredients: [
+        {
+          id: 'apple_1',
+          name: 'Fresh Red Apple',
+          source: 'custom',
+          lang: 'en',
+          calories_100g: 52,
+          protein_100g: 0.3,
+          carbs_100g: 14,
+          fats_100g: 0.2
+        }
+      ],
+      recipes: [],
+      recipeFoods: [],
+      userSettings: {
+        target_mode: 'manual',
+        daily_calorie_target: 2000,
+        custom_macros: { protein: 150, carbs: 200, fats: 65 }
+      },
+      itemCounts: { logs: 1, customFoods: 1 },
+      uxSyncState: 'synced',
+      activeProvider: null,
+      isSettingsOpen: false,
+      setIsSettingsOpen: setIsSettingsOpenMock,
+      isCatalogOpen: false,
+      setIsCatalogOpen: setIsCatalogOpenMock,
+      isAnalyticsOpen: false,
+      setIsAnalyticsOpen: setIsAnalyticsOpenMock,
+      isStorageSettingsOpen: false,
+      setIsStorageSettingsOpen: setIsStorageSettingsOpenMock,
+      isWeightModalOpen: false,
+      setIsWeightModalOpen: vi.fn(),
+      db: {
+        portions: {
+          find: vi.fn().mockReturnValue({
+            exec: vi.fn().mockResolvedValue([])
+          })
+        }
+      },
+      logFoodItem: logFoodItemMock,
+      addCustomIngredient: vi.fn(),
+      removeCustomIngredient: vi.fn(),
+      addRecipe: vi.fn(),
+      removeRecipe: vi.fn(),
+      clearLocalDatabase: vi.fn(),
+      disconnectProvider: vi.fn(),
+      dbVersion: 6
+    };
+
+    vi.spyOn(AppContextModule, 'useApp').mockImplementation(() => mockContext);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  const renderWithProviders = (ui: React.ReactElement) => {
+    return render(
+      <GoogleOAuthProvider clientId="dummy_id">
+        {ui}
+      </GoogleOAuthProvider>
+    );
+  };
+
+  it('Journey 1: opens PortionModal from AddFoodModal, and Back button returns to AddFoodModal', async () => {
+    renderWithProviders(<DashboardContent />);
+
+    // 1. Open AddFoodModal by clicking Add food in lunch section
+    const addLunchBtn = screen.getByLabelText(en.dashboard.meals.addFoodToMealAria.replace('{{meal}}', en.dashboard.meals.lunch));
+    fireEvent.click(addLunchBtn);
+
+    // Verify AddFoodModal is open
+    expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
+
+    // 2. Type search query in AddFoodModal search input
+    const searchInput = screen.getByPlaceholderText(en.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'Apple' } });
+
+    // 3. Select a food item in AddFoodModal
+    const foodItem = await screen.findByText('Fresh Red Apple');
+    fireEvent.click(foodItem);
+
+    // 4. PortionModal (Portion & Quantity) opens
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: en.portionModal.title })).toBeDefined();
+    });
+
+    // 5. Click Back button in PortionModal
+    const backBtn = screen.getByTestId('btn-close-portion');
+    fireEvent.click(backBtn);
+
+    // 6. PortionModal closes, but AddFoodModal is still displayed
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: en.portionModal.title })).toBeNull();
+      expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
+    });
+
+    // 7. Click Back button in AddFoodModal -> AddFoodModal closes back to Dashboard
+    const closeAddFoodBtn = screen.getByTestId('btn-close-add-food');
+    fireEvent.click(closeAddFoodBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeNull();
+    });
+  });
+
+  it('Journey 2: opens PortionModal from AddFoodModal and confirming log closes both dialogs', async () => {
+    renderWithProviders(<DashboardContent />);
+
+    // Open AddFoodModal
+    const addLunchBtn = screen.getByLabelText(en.dashboard.meals.addFoodToMealAria.replace('{{meal}}', en.dashboard.meals.lunch));
+    fireEvent.click(addLunchBtn);
+
+    // Type search query
+    const searchInput = screen.getByPlaceholderText(en.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'Apple' } });
+
+    // Select food item
+    const foodItem = await screen.findByText('Fresh Red Apple');
+    fireEvent.click(foodItem);
+
+    // PortionModal opens
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: en.portionModal.title })).toBeDefined();
+    });
+
+    // Click confirm / log action button
+    const logBtn = screen.getByRole('button', { name: en.portionModal.logAction });
+    fireEvent.click(logBtn);
+
+    // Both PortionModal and AddFoodModal close to dashboard
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: en.portionModal.title })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeNull();
+    });
+  });
+
+  it('Journey 3: opens PortionModal from Catalog screen, and Back button returns to Catalog', async () => {
+    mockContext.isCatalogOpen = true;
+    renderWithProviders(<DashboardContent />);
+
+    // Catalog screen is active
+    expect(screen.getByTestId('catalog-screen')).toBeDefined();
+
+    // Click plus button on an item card in catalog
+    const addBtn = screen.getByLabelText('Add food to log');
+    fireEvent.click(addBtn);
+
+    // PortionModal opens
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: en.portionModal.title })).toBeDefined();
+    });
+
+    // Click Back button in PortionModal
+    const backBtn = screen.getByTestId('btn-close-portion');
+    fireEvent.click(backBtn);
+
+    // PortionModal closes, user returns to Catalog screen
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: en.portionModal.title })).toBeNull();
+      expect(screen.getByTestId('catalog-screen')).toBeDefined();
+    });
+  });
+
+  it('Journey 4: opens Settings from Analytics tab, and Back button returns to Analytics', async () => {
+    // Start on Analytics
+    mockContext.isAnalyticsOpen = true;
+    const { rerender } = renderWithProviders(<DashboardContent />);
+
+    // User taps Settings in BottomNav
+    const settingsNavBtn = screen.getByTestId('btn-open-settings');
+    fireEvent.click(settingsNavBtn);
+
+    // App state updates: isSettingsOpen becomes true, isAnalyticsOpen becomes false
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+    expect(setIsAnalyticsOpenMock).toHaveBeenCalledWith(false);
+
+    // Rerender with settings open
+    mockContext.isSettingsOpen = true;
+    mockContext.isAnalyticsOpen = false;
+    rerender(
+      <GoogleOAuthProvider clientId="dummy_id">
+        <DashboardContent />
+      </GoogleOAuthProvider>
+    );
+
+    // SettingsModal is displayed
+    const settingsDialog = screen.getByRole('dialog', { name: en.settings.title });
+    expect(settingsDialog).toBeDefined();
+
+    // Click Back button in SettingsModal
+    const backBtn = screen.getByTestId('btn-back-settings');
+    fireEvent.click(backBtn);
+
+    // Settings closes and Analytics is restored!
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(false);
+    expect(setIsAnalyticsOpenMock).toHaveBeenCalledWith(true);
+  });
+
+  it('Journey 5: opens Settings from Catalog tab, and Back button returns to Catalog', async () => {
+    // Start on Catalog
+    mockContext.isCatalogOpen = true;
+    const { rerender } = renderWithProviders(<DashboardContent />);
+
+    // User taps Settings in BottomNav
+    const settingsNavBtn = screen.getByTestId('btn-open-settings');
+    fireEvent.click(settingsNavBtn);
+
+    // App state updates: isSettingsOpen becomes true, isCatalogOpen becomes false
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+    expect(setIsCatalogOpenMock).toHaveBeenCalledWith(false);
+
+    // Rerender with settings open
+    mockContext.isSettingsOpen = true;
+    mockContext.isCatalogOpen = false;
+    rerender(
+      <GoogleOAuthProvider clientId="dummy_id">
+        <DashboardContent />
+      </GoogleOAuthProvider>
+    );
+
+    // SettingsModal is displayed
+    const settingsDialog = screen.getByRole('dialog', { name: en.settings.title });
+    expect(settingsDialog).toBeDefined();
+
+    // Click Back button in SettingsModal
+    const backBtn = screen.getByTestId('btn-back-settings');
+    fireEvent.click(backBtn);
+
+    // Settings closes and Catalog is restored!
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(false);
+    expect(setIsCatalogOpenMock).toHaveBeenCalledWith(true);
+  });
+
+  it('Journey 6: opens StorageSettingsPanel from Settings, and Back returns to Settings', async () => {
+    mockContext.isSettingsOpen = true;
+    mockContext.isStorageSettingsOpen = true;
+    renderWithProviders(<DashboardContent />);
+
+    // Both are open, StorageSettingsPanel is top-most
+    const storageDialog = screen.getByRole('dialog', { name: /Storage & Sync/i });
+    expect(storageDialog).toBeDefined();
+
+    // Click Back in StorageSettingsPanel
+    const backBtn = within(storageDialog).getByRole('button', { name: en.sync?.panel?.back || 'Back' });
+    fireEvent.click(backBtn);
+
+    expect(setIsStorageSettingsOpenMock).toHaveBeenCalledWith(false);
+  });
+});
