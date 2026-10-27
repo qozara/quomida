@@ -10,6 +10,7 @@ import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
 import { BottomNav } from '../src/components/navigation/BottomNav.js';
 import { SettingsModal } from '../src/components/SettingsModal.js';
+import { UserProfileGoalsScreen } from '../src/components/profile/UserProfileGoalsScreen.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { en } from '@quomida/i18n-locales';
 import type { WeightLog, UserSettings } from '@quomida/domain-core';
@@ -451,14 +452,13 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     });
   });
 
-  describe('6. SettingsModal Target Mode Selector (Manual vs Smart/Adaptive)', () => {
+  describe('6. Target Mode Selector (Manual vs Smart/Adaptive) in User Profile & Goals', () => {
     it('renders mode switcher and switches between manual and smart/adaptive', async () => {
       setupMockContext({
-        isSettingsOpen: true,
         userSettings: defaultMockUserSettings
       });
 
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       const manualTab = screen.getByTestId('btn-target-mode-manual');
       const smartTab = screen.getByTestId('btn-target-mode-smart');
@@ -485,12 +485,11 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
     it('saves biometrics, goal config, and logs initial weight when saving smart targets', async () => {
       setupMockContext({
-        isSettingsOpen: true,
         weightLogs: [], // No prior logs
         userSettings: defaultMockUserSettings
       });
 
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       // Switch to smart
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
@@ -517,7 +516,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     it('reactively updates form fields when userSettings and weightLogs update after mount (e.g. after cloud sync)', async () => {
       // 1. Mount with initial factory default settings
       setupMockContext({
-        isSettingsOpen: false,
         weightLogs: [],
         userSettings: {
           id: 'global_settings',
@@ -530,11 +528,10 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      const { rerender } = render(<SettingsModal />);
+      const { rerender } = render(<UserProfileGoalsScreen />);
 
-      // 2. Simulate cloud sync completing and user opening SettingsModal
+      // 2. Simulate cloud sync completing
       setupMockContext({
-        isSettingsOpen: true,
         weightLogs: [
           {
             id: 'weight_2026-10-20',
@@ -568,7 +565,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      rerender(<SettingsModal />);
+      rerender(<UserProfileGoalsScreen />);
 
       await waitFor(() => {
         const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -581,9 +578,8 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     });
 
     it('updates weight log on selectedDate when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
-      // Case A: log already exists on selectedDate (80.0 kg), user edits weight to 78.5 kg in SettingsModal
+      // Case A: log already exists on selectedDate (80.0 kg), user edits weight to 78.5 kg
       setupMockContext({
-        isSettingsOpen: true,
         selectedDate: '2026-10-20',
         weightLogs: sampleWeightLogs, // has 80.0 on 2026-10-20
         userSettings: {
@@ -604,7 +600,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      const { unmount } = render(<SettingsModal />);
+      const { unmount } = render(<UserProfileGoalsScreen />);
 
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
       fireEvent.change(weightInput, { target: { value: '78.5' } });
@@ -619,7 +615,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       // Case B: log exists on earlier date (2026-10-19, 80.2 kg), no log on selectedDate (2026-10-21), user does NOT change weight
       setupMockContext({
-        isSettingsOpen: true,
         selectedDate: '2026-10-21',
         weightLogs: sampleWeightLogs.slice(0, 2), // latest is 2026-10-19 (80.2 kg)
         userSettings: {
@@ -640,7 +635,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
       fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
 
       await waitFor(() => {

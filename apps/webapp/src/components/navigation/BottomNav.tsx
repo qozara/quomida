@@ -38,7 +38,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
     },
     {
       id: 'settings',
-      label: t.nav.settings,
+      label: (t.nav as any).profileGoals || (t.settings as any).accordionProfileGoals || t.nav.settings,
       icon: Settings,
       testId: 'btn-open-settings'
     }

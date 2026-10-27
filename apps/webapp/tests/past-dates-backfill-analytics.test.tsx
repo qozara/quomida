@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-libra
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppProvider, useApp } from '../src/context/AppContext.js';
 import { SettingsModal } from '../src/components/SettingsModal.js';
+import { UserProfileGoalsScreen } from '../src/components/profile/UserProfileGoalsScreen.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
 import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { destroyDatabase, clearLocalDatabase } from '../src/db/rxdb.js';
@@ -72,6 +73,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
         <span data-testid="weight-logs-count">{weightLogs.length}</span>
         <span data-testid="adaptive-status">{userSettings.adaptive_state?.calibration_status || 'none'}</span>
 
+        <UserProfileGoalsScreen />
         <SettingsModal />
         <AnalyticsModal />
 

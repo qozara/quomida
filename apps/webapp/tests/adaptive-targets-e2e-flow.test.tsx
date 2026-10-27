@@ -5,6 +5,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsModal } from '../src/components/SettingsModal.js';
+import { UserProfileGoalsScreen } from '../src/components/profile/UserProfileGoalsScreen.js';
 import { DashboardWeightPill } from '../src/components/DashboardWeightPill.js';
 import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
@@ -124,7 +125,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
 
     it('1.1 toggles between Manual Targets and Smart / Adaptive Targets segmented control', () => {
       setupSettingsContext();
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       const btnManual = screen.getByTestId('btn-target-mode-manual');
       const btnSmart = screen.getByTestId('btn-target-mode-smart');
@@ -155,7 +156,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       setupSettingsContext({
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       // Starts in Smart mode
       const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -191,7 +192,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       setupSettingsContext({
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       const birthInput = screen.getByTestId('input-biometrics-birthdate') as HTMLInputElement;
       const heightInput = screen.getByTestId('input-biometrics-height') as HTMLInputElement;
@@ -240,7 +241,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       setupSettingsContext({
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       const btnLose = screen.getByTestId('btn-goal-lose');
       const btnMaintain = screen.getByTestId('btn-goal-maintain');
@@ -308,7 +309,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       setupSettingsContext({
         userSettings: { ...baseUserSettings, target_mode: 'smart' }
       });
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       // Switch to smart
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
@@ -410,7 +411,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         return (
           <div>
             <MacroRings />
-            <SettingsModal />
+            <UserProfileGoalsScreen />
           </div>
         );
       };
@@ -498,6 +499,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
             <MacroRings />
             <DashboardWeightPill />
             <WeightQuickLogModal />
+            <UserProfileGoalsScreen />
             <SettingsModal />
             <AnalyticsModal />
 

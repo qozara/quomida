@@ -90,6 +90,8 @@ interface AppContextType {
   setIsStorageSettingsOpen: (open: boolean) => void;
   isAnalyticsOpen: boolean;
   setIsAnalyticsOpen: (open: boolean) => void;
+  isProfileOpen: boolean;
+  setIsProfileOpen: (open: boolean) => void;
   isWeightModalOpen: boolean;
   setIsWeightModalOpen: (open: boolean) => void;
   dbInitError: QuomidaDBError | null;
@@ -197,6 +199,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
@@ -1027,6 +1030,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsStorageSettingsOpen,
         isAnalyticsOpen,
         setIsAnalyticsOpen,
+        isProfileOpen,
+        setIsProfileOpen,
         isWeightModalOpen,
         setIsWeightModalOpen,
         dbInitError,

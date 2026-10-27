@@ -17,6 +17,7 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
   let setIsCatalogOpenMock: any;
   let setIsAnalyticsOpenMock: any;
   let setIsStorageSettingsOpenMock: any;
+  let setIsProfileOpenMock: any;
 
   beforeEach(() => {
     logFoodItemMock = vi.fn().mockResolvedValue(undefined);
@@ -24,6 +25,7 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     setIsCatalogOpenMock = vi.fn();
     setIsAnalyticsOpenMock = vi.fn();
     setIsStorageSettingsOpenMock = vi.fn();
+    setIsProfileOpenMock = vi.fn();
 
     mockContext = {
       t: en,
@@ -59,6 +61,8 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
       setIsCatalogOpen: setIsCatalogOpenMock,
       isAnalyticsOpen: false,
       setIsAnalyticsOpen: setIsAnalyticsOpenMock,
+      isProfileOpen: false,
+      setIsProfileOpen: setIsProfileOpenMock,
       isStorageSettingsOpen: false,
       setIsStorageSettingsOpen: setIsStorageSettingsOpenMock,
       isWeightModalOpen: false,
@@ -196,21 +200,21 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     });
   });
 
-  it('Journey 4: opens Settings from Analytics tab, and Back button returns to Analytics', async () => {
+  it('Journey 4: navigates to Profile & Goals tab from Analytics, opens Settings, and Back button returns to Profile & Goals', async () => {
     // Start on Analytics
     mockContext.isAnalyticsOpen = true;
     const { rerender } = renderWithProviders(<DashboardContent />);
 
-    // User taps Settings in BottomNav
+    // User taps Profile & Goals in BottomNav
     const settingsNavBtn = screen.getByTestId('btn-open-settings');
     fireEvent.click(settingsNavBtn);
 
-    // App state updates: isSettingsOpen becomes true, isAnalyticsOpen becomes false
-    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+    // App state updates: isProfileOpen becomes true, isAnalyticsOpen becomes false
+    expect(setIsProfileOpenMock).toHaveBeenCalledWith(true);
     expect(setIsAnalyticsOpenMock).toHaveBeenCalledWith(false);
 
-    // Rerender with settings open
-    mockContext.isSettingsOpen = true;
+    // Rerender with profile open
+    mockContext.isProfileOpen = true;
     mockContext.isAnalyticsOpen = false;
     rerender(
       <GoogleOAuthProvider clientId="dummy_id">
@@ -218,35 +222,16 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
       </GoogleOAuthProvider>
     );
 
-    // SettingsModal is displayed
-    const settingsDialog = screen.getByRole('dialog', { name: en.settings.title });
-    expect(settingsDialog).toBeDefined();
+    // Profile & Goals main screen is displayed with settings launcher button
+    const openSettingsBtn = screen.getByTestId('btn-profile-open-settings');
+    expect(openSettingsBtn).toBeDefined();
 
-    // Click Back button in SettingsModal
-    const backBtn = screen.getByTestId('btn-back-settings');
-    fireEvent.click(backBtn);
-
-    // Settings closes and Analytics is restored!
-    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(false);
-    expect(setIsAnalyticsOpenMock).toHaveBeenCalledWith(true);
-  });
-
-  it('Journey 5: opens Settings from Catalog tab, and Back button returns to Catalog', async () => {
-    // Start on Catalog
-    mockContext.isCatalogOpen = true;
-    const { rerender } = renderWithProviders(<DashboardContent />);
-
-    // User taps Settings in BottomNav
-    const settingsNavBtn = screen.getByTestId('btn-open-settings');
-    fireEvent.click(settingsNavBtn);
-
-    // App state updates: isSettingsOpen becomes true, isCatalogOpen becomes false
+    // User clicks Settings launcher
+    fireEvent.click(openSettingsBtn);
     expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
-    expect(setIsCatalogOpenMock).toHaveBeenCalledWith(false);
 
-    // Rerender with settings open
+    // Rerender with settings modal open
     mockContext.isSettingsOpen = true;
-    mockContext.isCatalogOpen = false;
     rerender(
       <GoogleOAuthProvider clientId="dummy_id">
         <DashboardContent />
@@ -261,9 +246,60 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     const backBtn = screen.getByTestId('btn-back-settings');
     fireEvent.click(backBtn);
 
-    // Settings closes and Catalog is restored!
+    // Settings closes and Profile & Goals screen is restored!
     expect(setIsSettingsOpenMock).toHaveBeenCalledWith(false);
-    expect(setIsCatalogOpenMock).toHaveBeenCalledWith(true);
+    expect(setIsProfileOpenMock).toHaveBeenCalledWith(true);
+  });
+
+  it('Journey 5: navigates to Profile & Goals tab from Catalog, opens Settings, and Back button returns to Profile & Goals', async () => {
+    // Start on Catalog
+    mockContext.isCatalogOpen = true;
+    const { rerender } = renderWithProviders(<DashboardContent />);
+
+    // User taps Profile & Goals in BottomNav
+    const settingsNavBtn = screen.getByTestId('btn-open-settings');
+    fireEvent.click(settingsNavBtn);
+
+    // App state updates: isProfileOpen becomes true, isCatalogOpen becomes false
+    expect(setIsProfileOpenMock).toHaveBeenCalledWith(true);
+    expect(setIsCatalogOpenMock).toHaveBeenCalledWith(false);
+
+    // Rerender with profile open
+    mockContext.isProfileOpen = true;
+    mockContext.isCatalogOpen = false;
+    rerender(
+      <GoogleOAuthProvider clientId="dummy_id">
+        <DashboardContent />
+      </GoogleOAuthProvider>
+    );
+
+    // Profile & Goals main screen is displayed with settings launcher button
+    const openSettingsBtn = screen.getByTestId('btn-profile-open-settings');
+    expect(openSettingsBtn).toBeDefined();
+
+    // User clicks Settings launcher
+    fireEvent.click(openSettingsBtn);
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(true);
+
+    // Rerender with settings open
+    mockContext.isSettingsOpen = true;
+    rerender(
+      <GoogleOAuthProvider clientId="dummy_id">
+        <DashboardContent />
+      </GoogleOAuthProvider>
+    );
+
+    // SettingsModal is displayed
+    const settingsDialog = screen.getByRole('dialog', { name: en.settings.title });
+    expect(settingsDialog).toBeDefined();
+
+    // Click Back button in SettingsModal
+    const backBtn = screen.getByTestId('btn-back-settings');
+    fireEvent.click(backBtn);
+
+    // Settings closes and Profile & Goals is restored!
+    expect(setIsSettingsOpenMock).toHaveBeenCalledWith(false);
+    expect(setIsProfileOpenMock).toHaveBeenCalledWith(true);
   });
 
   it('Journey 6: opens StorageSettingsPanel from Settings, and Back returns to Settings', async () => {

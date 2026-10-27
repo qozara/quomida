@@ -36,4 +36,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0029: Unified Catalog Download State and Real-Time Settings Synchronization](./0029-unified-catalog-download-state-and-real-time-settings-synchronization.md)
 * [ADR 0030: Multi-Device User Settings Synchronization, Zero-Epoch Seed & Credential Isolation](./0030-multi-device-settings-sync-and-credential-isolation.md)
 * [ADR 0031: Event-Driven PWA Service Worker Update Lifecycle, Prompt Toast & Manual Settings Check](./0031-pwa-service-worker-update-lifecycle-and-prompt-ux.md)
+* [ADR 0032: Dedicated Top-Level Profile & Goals Page and Settings Decoupling](./0032-dedicated-profile-and-goals-page-and-settings-decoupling.md)
 

@@ -7,7 +7,8 @@
     "dashboard": "Diario",
     "catalog": "Mis Alimentos",
     "analytics": "Analíticas",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "profileGoals": "Perfil y Metas"
   },
   "dashboard": {
     "title": "Resumen Diario",

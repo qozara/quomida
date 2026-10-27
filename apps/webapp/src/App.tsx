@@ -15,8 +15,9 @@ import { DatabaseRecoveryScreen } from './components/DatabaseRecoveryScreen.js';
 import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
+import { UserProfileGoalsScreen } from './components/profile/UserProfileGoalsScreen.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Cloud, X } from 'lucide-react';
+import { Cloud, X, Settings } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -27,6 +28,8 @@ export const DashboardContent: React.FC = () => {
     setIsCatalogOpen,
     isAnalyticsOpen,
     setIsAnalyticsOpen,
+    isProfileOpen,
+    setIsProfileOpen,
     isStorageSettingsOpen,
     setIsStorageSettingsOpen,
     dbInitError,
@@ -68,13 +71,15 @@ export const DashboardContent: React.FC = () => {
   };
 
   const [portionOrigin, setPortionOrigin] = useState<'add_food' | 'catalog' | 'diary'>('diary');
-  const [previousScreenBeforeSettings, setPreviousScreenBeforeSettings] = useState<'diary' | 'catalog' | 'analytics' | 'add_food'>('diary');
+  const [previousScreenBeforeSettings, setPreviousScreenBeforeSettings] = useState<'diary' | 'catalog' | 'analytics' | 'profile' | 'add_food'>('diary');
 
   // Track the active screen before settings is opened
   useEffect(() => {
     if (!isSettingsOpen) {
       if (isAddFoodModalOpen) {
         setPreviousScreenBeforeSettings('add_food');
+      } else if (isProfileOpen) {
+        setPreviousScreenBeforeSettings('profile');
       } else if (isCatalogOpen) {
         setPreviousScreenBeforeSettings('catalog');
       } else if (isAnalyticsOpen) {
@@ -83,7 +88,7 @@ export const DashboardContent: React.FC = () => {
         setPreviousScreenBeforeSettings('diary');
       }
     }
-  }, [isSettingsOpen, isAddFoodModalOpen, isCatalogOpen, isAnalyticsOpen]);
+  }, [isSettingsOpen, isAddFoodModalOpen, isProfileOpen, isCatalogOpen, isAnalyticsOpen]);
 
   const handleOpenPortionModal = (
     ingredient: FoodItem | BaseIngredient,
@@ -103,6 +108,7 @@ export const DashboardContent: React.FC = () => {
     } else if (portionOrigin === 'catalog') {
       setIsCatalogOpen(true);
       setIsAnalyticsOpen(false);
+      setIsProfileOpen(false);
     }
   };
 
@@ -113,17 +119,24 @@ export const DashboardContent: React.FC = () => {
 
   const handleSettingsBack = () => {
     setIsSettingsOpen(false);
-    if (previousScreenBeforeSettings === 'catalog') {
+    if (previousScreenBeforeSettings === 'profile') {
+      setIsProfileOpen(true);
+      setIsCatalogOpen(false);
+      setIsAnalyticsOpen(false);
+    } else if (previousScreenBeforeSettings === 'catalog') {
       setIsCatalogOpen(true);
       setIsAnalyticsOpen(false);
+      setIsProfileOpen(false);
     } else if (previousScreenBeforeSettings === 'analytics') {
       setIsAnalyticsOpen(true);
       setIsCatalogOpen(false);
+      setIsProfileOpen(false);
     } else if (previousScreenBeforeSettings === 'add_food') {
       setIsAddFoodModalOpen(true);
     } else {
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(false);
+      setIsProfileOpen(false);
     }
   };
 
@@ -134,7 +147,7 @@ export const DashboardContent: React.FC = () => {
 
   // 4-Tab Bottom Navigation State
   let activeTab: NavTab = 'diary';
-  if (isSettingsOpen) activeTab = 'settings';
+  if (isProfileOpen) activeTab = 'settings';
   else if (isCatalogOpen) activeTab = 'catalog';
   else if (isAnalyticsOpen) activeTab = 'analytics';
 
@@ -143,28 +156,30 @@ export const DashboardContent: React.FC = () => {
       setIsSettingsOpen(false);
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(false);
+      setIsProfileOpen(false);
       setIsAddFoodModalOpen(false);
       setSelectedIngredient(null);
     } else if (tab === 'analytics') {
       setIsSettingsOpen(false);
       setIsCatalogOpen(false);
+      setIsProfileOpen(false);
       setIsAnalyticsOpen(true);
       setIsAddFoodModalOpen(false);
       setSelectedIngredient(null);
     } else if (tab === 'catalog') {
       setIsSettingsOpen(false);
+      setIsProfileOpen(false);
       setIsAnalyticsOpen(false);
       setIsCatalogOpen(true);
       setIsAddFoodModalOpen(false);
       setSelectedIngredient(null);
     } else if (tab === 'settings') {
-      if (isAddFoodModalOpen) setPreviousScreenBeforeSettings('add_food');
-      else if (isCatalogOpen) setPreviousScreenBeforeSettings('catalog');
-      else if (isAnalyticsOpen) setPreviousScreenBeforeSettings('analytics');
-      else setPreviousScreenBeforeSettings('diary');
+      setIsSettingsOpen(false);
       setIsCatalogOpen(false);
       setIsAnalyticsOpen(false);
-      setIsSettingsOpen(true);
+      setIsProfileOpen(true);
+      setIsAddFoodModalOpen(false);
+      setSelectedIngredient(null);
     }
   };
 
@@ -176,11 +191,25 @@ export const DashboardContent: React.FC = () => {
       ) : (
         <div className="sticky top-0 z-30 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/40">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
-            <div className="w-10" />
+            <div className="w-10">
+              {activeTab === 'settings' && (
+                <button
+                  id="btn-profile-open-settings"
+                  data-testid="btn-profile-open-settings"
+                  onClick={() => setIsSettingsOpen(true)}
+                  aria-label={t.settings.title}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-full text-slate-400 hover:text-white transition-all active:scale-95"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              )}
+            </div>
             <h1 className="text-sm font-bold text-white tracking-tight">
               {activeTab === 'analytics'
                 ? (t.analytics?.title || 'Analytics')
-                : (t.catalog?.title || t.nav?.catalog || 'Catalog')}
+                : activeTab === 'catalog'
+                ? (t.catalog?.title || t.nav?.catalog || 'Catalog')
+                : (t.settings?.accordionProfileGoals || 'User Profile & Goals')}
             </h1>
             <div className="w-10 flex items-center justify-end">
               <HeaderSyncTrigger />
@@ -195,6 +224,8 @@ export const DashboardContent: React.FC = () => {
           <AnalyticsScreen />
         ) : activeTab === 'catalog' ? (
           <CatalogManager onSelectFood={(item) => handleOpenPortionModal(item, 'meal_lunch', 'catalog')} />
+        ) : activeTab === 'settings' ? (
+          <UserProfileGoalsScreen onOpenSettings={() => setIsSettingsOpen(true)} />
         ) : (
           <>
             {/* Onboarding Banner for Fresh Devices */}
