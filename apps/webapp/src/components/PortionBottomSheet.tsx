@@ -5,21 +5,24 @@ import type { BaseIngredient, FoodItem, RecipeFoodItem, MealType, Portion, Tagge
 import { calculateItemMacros, convertPortionToGrams, PortionManager } from '@quomida/domain-core';
 import { ArrowLeft, Minus, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
+import { DateSelector } from './DateSelector.js';
 
 interface PortionBottomSheetProps {
   ingredient: FoodItem | BaseIngredient | null;
   defaultMealType: MealType;
   onClose: () => void;
   onBack?: () => void;
+  initialDate?: string;
 }
 
 export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   ingredient,
   defaultMealType,
   onClose,
-  onBack
+  onBack,
+  initialDate
 }) => {
-  const { db, logFoodItem, t } = useApp();
+  const { db, logFoodItem, selectedDate, setSelectedDate, t } = useApp();
   const dict = t || dictionaries.es;
   const [portionManager] = useState(() => new PortionManager());
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
@@ -27,6 +30,16 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   const [selectedPortionName, setSelectedPortionName] = useState<string>('g');
   const [availablePortions, setAvailablePortions] = useState<TaggedPortion[]>([]);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [modalDate, setModalDate] = useState<string>(initialDate || selectedDate || todayStr);
+
+  useEffect(() => {
+    if (initialDate) {
+      setModalDate(initialDate);
+    } else if (selectedDate) {
+      setModalDate(selectedDate);
+    }
+  }, [initialDate, selectedDate]);
 
   // Fetch available portions dynamically using domain PortionManager
   useEffect(() => {
@@ -88,7 +101,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   const calculated = calculateItemMacros(ingredient, weightGrams);
 
   const handleLog = async () => {
-    await logFoodItem(ingredient, mealType, quantity, selectedPortionName, availablePortions);
+    await logFoodItem(ingredient, mealType, quantity, selectedPortionName, availablePortions, modalDate);
     onClose();
   };
 
@@ -118,6 +131,17 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
 
       {/* Main Container */}
       <div className="max-w-md mx-auto w-full px-4 py-4 space-y-5 flex-1">
+        {/* Date Selector at the top */}
+        <div className="flex justify-center pt-1">
+          <DateSelector
+            value={modalDate}
+            onChange={(d) => {
+              setModalDate(d);
+              setSelectedDate(d);
+            }}
+          />
+        </div>
+
         {/* Food Hero Card */}
         <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg space-y-2">
           <div className="flex items-center gap-2">

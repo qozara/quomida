@@ -64,7 +64,8 @@ interface AppContextType {
     mealType: MealType,
     quantity: number,
     portionName: string,
-    passedPortions?: Portion[]
+    passedPortions?: Portion[],
+    dateOverride?: string
   ) => Promise<void>;
   logBatchFoodItems: (
     items: Array<{
@@ -780,8 +781,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mealType: MealType,
     quantity: number,
     portionName: string,
-    passedPortions?: Portion[]
+    passedPortions?: Portion[],
+    dateOverride?: string
   ) => {
+    const targetDate = dateOverride || selectedDate;
     let relevantPortions: Portion[] = passedPortions || [];
     
     if (dbService) {
@@ -814,7 +817,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const macrosSnapshot = createMacroSnapshot(rawMacros);
 
     await dbService.logFood({
-      date: selectedDate,
+      date: targetDate,
       meal_type: mealType,
       food_reference_id: food.id,
       food_name: food.name,
@@ -824,7 +827,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     try {
-      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(targetDate, true);
       if (updatedSettings) {
         setUserSettings(updatedSettings);
       }

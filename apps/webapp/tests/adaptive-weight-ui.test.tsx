@@ -18,6 +18,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
   const mockLogWeight = vi.fn().mockResolvedValue(undefined);
   const mockDeleteWeightLog = vi.fn().mockResolvedValue(undefined);
   const mockSetIsWeightModalOpen = vi.fn();
+  const mockSetSelectedDate = vi.fn();
   const mockSetIsAnalyticsOpen = vi.fn();
   const mockSetIsSettingsOpen = vi.fn();
   const mockSetIsCatalogOpen = vi.fn();
@@ -64,7 +65,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
   const setupMockContext = (overrides: Partial<any> = {}) => {
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
       selectedDate: '2026-10-20',
-      setSelectedDate: vi.fn(),
+      setSelectedDate: mockSetSelectedDate,
       locale: 'en',
       setLocale: vi.fn(),
       theme: 'dark',
@@ -270,6 +271,38 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       await waitFor(() => {
         expect(mockDeleteWeightLog).toHaveBeenCalledWith('2026-10-20');
+        expect(mockSetIsWeightModalOpen).toHaveBeenCalledWith(false);
+      });
+    });
+
+    it('renders as slide-over with back button, and allows changing date via DateSelector to save weight to newly selected date', async () => {
+      setupMockContext({ isWeightModalOpen: true });
+      render(<WeightQuickLogModal />);
+
+      // Verify slide-over modal styling and accessible back arrow
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.className).toContain('fixed inset-0');
+      expect(dialog.className).toContain('animate-slide-in-right');
+
+      const backBtn = screen.getByTestId('btn-close-weight-modal');
+      expect(backBtn).toBeDefined();
+
+      // Verify date selector is present at top
+      const dateSelector = screen.getByTestId('date-selector');
+      expect(dateSelector).toBeDefined();
+
+      // Click Next Day button (advancing from 2026-10-20 to 2026-10-21)
+      const nextDayBtn = screen.getByTestId('btn-date-next');
+      fireEvent.click(nextDayBtn);
+
+      expect(mockSetSelectedDate).toHaveBeenCalledWith('2026-10-21');
+
+      // Save weight
+      const saveBtn = screen.getByTestId('btn-save-weight');
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(mockLogWeight).toHaveBeenCalledWith('2026-10-21', 80, undefined);
         expect(mockSetIsWeightModalOpen).toHaveBeenCalledWith(false);
       });
     });
