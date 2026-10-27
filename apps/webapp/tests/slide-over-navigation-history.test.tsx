@@ -163,7 +163,7 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     });
 
     // Click confirm / log action button
-    const logBtn = screen.getByRole('button', { name: en.portionModal.logAction });
+    const logBtn = screen.getByTestId('btn-log-item');
     fireEvent.click(logBtn);
 
     // Both PortionModal and AddFoodModal close to dashboard

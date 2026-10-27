@@ -56,6 +56,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
 
   afterEach(async () => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await destroyDatabase();
   });
@@ -541,6 +542,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         );
       };
 
+      vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
       render(
         <AppProvider>
           <FullJourneyHarness />
@@ -635,6 +637,7 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         const item = weightsByDay[i];
 
         // Advance date
+        vi.setSystemTime(new Date(`${item.day}T12:00:00Z`));
         act(() => {
           setDateBtn.setAttribute('data-next-date', item.day);
           setDateBtn.click();

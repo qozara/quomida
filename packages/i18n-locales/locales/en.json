@@ -50,13 +50,26 @@
     "downloadFullCatalog": "Download Full Catalog",
     "searchingLocal": "Searching catalog..."
   },
+  "date": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "back": "Back",
+    "jumpToToday": "Back to Today",
+    "previousDay": "Previous day",
+    "nextDay": "Next day"
+  },
   "portionModal": {
     "title": "Portion & Quantity",
     "unitLabel": "Portion Unit",
     "quantityLabel": "Quantity",
     "logAction": "Log to Diary",
     "calculatedMacros": "Calculated Nutrition",
-    "customGrams": "Grams (g)"
+    "customGrams": "Grams (g)",
+    "pastDateWarning": "Logging to past date: {{date}}",
+    "pastDateWarningWithCount": "Logging to past date: {{date}} ({{count}} foods already logged)",
+    "switchToToday": "Switch to Today",
+    "logToPastDate": "Log to {{date}}"
   },
   "settings": {
     "title": "Profile & Settings",
@@ -406,7 +419,12 @@
     "notePlaceholder": "e.g., post-barbecue, sodium retention...",
     "saveWeight": "Save Weight",
     "deleteWeight": "Delete Entry",
-    "unitKg": "kg"
+    "unitKg": "kg",
+    "pastDateWarning": "Logging weight to past date: {{date}}",
+    "pastDateOverwriteWarning": "A weight of {{weight}} kg is already logged for {{date}}. Saving will update it.",
+    "switchToToday": "Log to Today instead",
+    "saveWeightPast": "Save Weight for {{date}}",
+    "updateWeightPast": "Update Weight for {{date}}"
   },
   "goals": {
     "title": "Goals",

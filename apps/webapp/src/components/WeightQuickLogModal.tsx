@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
-import { ArrowLeft, Trash2, Check, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Trash2, Check, TrendingUp, AlertTriangle } from 'lucide-react';
 import { previewNextTrendWeight, roundTo2Decimals } from '@quomida/domain-core';
 import { DateSelector } from './DateSelector.js';
 
@@ -228,6 +228,38 @@ export const WeightQuickLogModal: React.FC = () => {
               />
             </div>
 
+            {/* Past Date Warning Banner */}
+            {modalDate < todayStr && (
+              <div
+                data-testid="banner-past-weight-warning"
+                className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 animate-in fade-in duration-200"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-xs text-amber-200 font-medium">
+                    {currentLog
+                      ? (t.weight.pastDateOverwriteWarning || 'A weight of {{weight}} kg is already logged for {{date}}. Saving will update it.')
+                          .replace('{{weight}}', String(currentLog.weight_kg))
+                          .replace('{{date}}', modalDate)
+                      : (t.weight.pastDateWarning || 'Logging weight to past date: {{date}}')
+                          .replace('{{date}}', modalDate)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="btn-switch-weight-today"
+                  data-testid="btn-switch-weight-today"
+                  onClick={() => {
+                    setModalDate(todayStr);
+                    setSelectedDate(todayStr);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg shrink-0 shadow-sm transition-all active:scale-95 min-h-[36px] flex items-center justify-center cursor-pointer"
+                >
+                  {t.weight.switchToToday || 'Log to Today instead'}
+                </button>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center gap-2 pt-2">
               {currentLog && (
@@ -249,10 +281,20 @@ export const WeightQuickLogModal: React.FC = () => {
                 id="btn-save-weight"
                 data-testid="btn-save-weight"
                 disabled={!isValidWeight || isSubmitting}
-                className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-95"
+                className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl disabled:opacity-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 ${
+                  modalDate < todayStr
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-950/40'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/40'
+                }`}
               >
                 <Check className="w-4 h-4" />
-                <span>{t.weight.saveWeight}</span>
+                <span>
+                  {modalDate < todayStr
+                    ? (currentLog
+                        ? (t.weight.updateWeightPast || 'Update Weight for {{date}}').replace('{{date}}', modalDate)
+                        : (t.weight.saveWeightPast || 'Save Weight for {{date}}').replace('{{date}}', modalDate))
+                    : t.weight.saveWeight}
+                </span>
               </button>
             </div>
           </form>

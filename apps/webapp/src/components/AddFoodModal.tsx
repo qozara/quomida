@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { FoodLogger } from './FoodLogger.js';
+import { DateSelector } from './DateSelector.js';
 import type { MealType, BaseIngredient, FoodItem } from '@quomida/domain-core';
 import { ArrowLeft, Utensils, Coffee, Moon, Apple } from 'lucide-react';
 
@@ -27,7 +28,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
   onClose,
   onSelectIngredient
 }) => {
-  const { t } = useApp();
+  const { t, selectedDate, setSelectedDate } = useApp();
   const [currentMeal, setCurrentMeal] = useState<MealType>(targetMealType);
 
   useEffect(() => {
@@ -84,6 +85,10 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
 
       {/* Main Container */}
       <div className="max-w-md mx-auto w-full px-4 py-4 space-y-4 flex-1">
+        <div className="flex justify-center pb-1">
+          <DateSelector value={selectedDate} onChange={setSelectedDate} />
+        </div>
+
         {/* Meal Type Quick Switcher Pills */}
         <div className="space-y-1.5">
           <span className="text-xs font-semibold text-slate-400">

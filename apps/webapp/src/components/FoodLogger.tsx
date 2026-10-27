@@ -18,9 +18,10 @@ interface FoodLoggerProps {
 
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType }) => {
   const {
-    ingredients,
+    ingredients = [],
     recipes = [],
     recipeFoods = [],
+    selectedDate,
     t,
     locale,
     setIsSettingsOpen,
@@ -405,6 +406,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
       {isBuildingRecipe && (
         <RecipeBuilder
           initialRecipe={editingRecipe}
+          initialDate={selectedDate}
           mode="diary"
           targetMealType={targetMealType || detectedMealType || 'meal_lunch'}
           onBack={() => {
@@ -423,7 +425,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
             setSearchQuery('');
             onClose?.();
           }}
-          onSaveAndLog={async (recipe, portions, meal) => {
+          onSaveAndLog={async (recipe, portions, meal, date) => {
             const savedRecipeId = await addRecipe(recipe, portions);
             const recipeWithId = { ...recipe, id: recipe.id || savedRecipeId };
             const recipeFood = recipeManager.toFoodItem(recipeWithId);
@@ -438,7 +440,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
               source: 'custom' as const
             }));
             if (logFoodItem) {
-              await logFoodItem(recipeFood, meal, quantity, portionName, portionsToUse);
+              await logFoodItem(recipeFood, meal, quantity, portionName, portionsToUse, date);
             } else if (logBatchFoodItems) {
               await logBatchFoodItems(
                 [{ food: recipeFood, quantity, portionName, availablePortions: portionsToUse, mealType: meal }],
@@ -457,6 +459,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
       {isBuildingIngredient && (
         <IngredientBuilder
           initialIngredient={editingIngredient}
+          initialDate={selectedDate}
           mode="diary"
           targetMealType={targetMealType || detectedMealType || 'meal_lunch'}
           onBack={() => {
@@ -475,7 +478,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
             setSearchQuery('');
             onClose?.();
           }}
-          onSaveAndLog={async (ingredient, portions, meal) => {
+          onSaveAndLog={async (ingredient, portions, meal, date) => {
             const savedId = await addCustomIngredient({ ...ingredient, lang: ingredient.lang || 'es' }, portions);
             const idToUse = ingredient.id || savedId || `custom_${Date.now()}`;
             const baseFood: BaseIngredient = {
@@ -495,7 +498,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
               source: 'custom' as const
             }));
             if (logFoodItem) {
-              await logFoodItem(baseFood, meal, quantity, portionName, portionsToUse);
+              await logFoodItem(baseFood, meal, quantity, portionName, portionsToUse, date);
             } else if (logBatchFoodItems) {
               await logBatchFoodItems(
                 [{ food: baseFood, quantity, portionName, availablePortions: portionsToUse, mealType: meal }],

@@ -62,7 +62,7 @@ describe('CatalogManager - Custom Portions UI', () => {
     expect(screen.getByText('200g')).toBeDefined();
 
     // Click Save
-    const saveBtn = screen.getByText('Save');
+    const saveBtn = screen.getByTestId('btn-save-ingredient');
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
@@ -101,7 +101,7 @@ describe('CatalogManager - Custom Portions UI', () => {
     fireEvent.change(screen.getByPlaceholderText('Grams'), { target: { value: '180' } });
 
     // Click Save directly
-    const saveBtn = screen.getByText('Save');
+    const saveBtn = screen.getByTestId('btn-save-ingredient');
     fireEvent.click(saveBtn);
 
     await waitFor(() => {

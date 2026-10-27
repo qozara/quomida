@@ -27,6 +27,8 @@ vi.mock('@react-oauth/google', () => ({
 
 describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pane', () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
     vi.clearAllMocks();
     vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
       status: 'idle',
@@ -43,6 +45,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
   afterEach(async () => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await clearLocalDatabase();
   });

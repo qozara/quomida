@@ -91,8 +91,8 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     const qtyInput = screen.getByRole('spinbutton') as HTMLInputElement;
     expect(qtyInput.value).toBe('1');
 
-    // Click "Registrar en Diario" button
-    const logButton = screen.getByText(dictionaries.es.portionModal.logAction);
+    // Click confirm / log action button
+    const logButton = screen.getByTestId('btn-log-item');
     fireEvent.click(logButton);
 
     expect(logFoodItemMock).toHaveBeenCalledWith(
@@ -363,8 +363,8 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     // Verify setSelectedDate was called with previous day (2026-10-19)
     expect(setSelectedDateMock).toHaveBeenCalledWith('2026-10-19');
 
-    // Click "Registrar en Diario"
-    const logButton = screen.getByText(dictionaries.es.portionModal.logAction);
+    // Click confirm / log action button
+    const logButton = screen.getByTestId('btn-log-item');
     fireEvent.click(logButton);
 
     expect(logFoodItemMock).toHaveBeenCalledWith(

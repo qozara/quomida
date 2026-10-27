@@ -14,8 +14,11 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
     updateUserSettings,
     weightLogs,
     logWeight,
-    selectedDate
+    selectedDate,
+    setSelectedDate
   } = useApp();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const [calorieTarget, setCalorieTarget] = useState(userSettings?.daily_calorie_target || 2000);
   const [proteinTarget, setProteinTarget] = useState(userSettings?.custom_macros?.protein || 150);
@@ -97,7 +100,7 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
         fat_calorie_pct: fatCaloriePct
       },
       currentWeightKg,
-      referenceDate: selectedDate
+      referenceDate: todayStr
     });
   }, [
     sex,
@@ -109,7 +112,7 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
     proteinGPerKg,
     fatCaloriePct,
     currentWeightKg,
-    selectedDate
+    todayStr
   ]);
 
   const settingsSignature = useMemo(() => {
@@ -163,12 +166,12 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
         }
       });
     } else {
-      const existingLog = weightLogs.find((w) => w.date === selectedDate);
+      const existingLog = weightLogs.find((w) => w.date === todayStr);
       const hasWeightChangedFromInitial = Math.abs(currentWeightKg - initialWeight) > 1e-4;
-      const hasWeightChangedOnSelectedDate =
+      const hasWeightChangedOnToday =
         existingLog !== undefined && Math.abs(existingLog.weight_kg - currentWeightKg) > 1e-4;
-      if (weightLogs.length === 0 || hasWeightChangedFromInitial || hasWeightChangedOnSelectedDate) {
-        await logWeight(selectedDate, currentWeightKg);
+      if (weightLogs.length === 0 || hasWeightChangedFromInitial || hasWeightChangedOnToday) {
+        await logWeight(todayStr, currentWeightKg);
       }
 
       const mode = isAdaptive ? 'adaptive' : 'deterministic_seed';
@@ -190,11 +193,12 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
           estimated_tdee: baselinePreview.seed_tdee,
           prior_tdee: baselinePreview.seed_tdee,
           calibration_status: 'collecting_data',
-          last_calibrated_date: selectedDate
+          last_calibrated_date: todayStr
         },
         daily_calorie_target: baselinePreview.daily_calorie_target,
         custom_macros: baselinePreview.custom_macros
       });
+      setSelectedDate(todayStr);
     }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);

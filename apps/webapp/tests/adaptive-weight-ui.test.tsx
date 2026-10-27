@@ -577,8 +577,9 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       });
     });
 
-    it('updates weight log on selectedDate when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
-      // Case A: log already exists on selectedDate (80.0 kg), user edits weight to 78.5 kg
+    it('updates weight log on today when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      // Case A: log already exists (80.0 kg), user edits weight to 78.5 kg
       setupMockContext({
         selectedDate: '2026-10-20',
         weightLogs: sampleWeightLogs, // has 80.0 on 2026-10-20
@@ -607,7 +608,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
 
       await waitFor(() => {
-        expect(mockLogWeight).toHaveBeenCalledWith('2026-10-20', 78.5);
+        expect(mockLogWeight).toHaveBeenCalledWith(todayStr, 78.5);
       });
 
       unmount();

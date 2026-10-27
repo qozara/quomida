@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext.js';
 import {
@@ -7,7 +7,8 @@ import {
   validateMacroAlignment
 } from '@quomida/domain-core';
 import { dictionaries } from '@quomida/i18n-locales';
-import { ArrowLeft, Sparkles, AlertCircle, PlusCircle, X, Check, Coffee, Utensils, Moon, Apple } from 'lucide-react';
+import { ArrowLeft, Sparkles, AlertCircle, PlusCircle, X, Check, Coffee, Utensils, Moon, Apple, AlertTriangle } from 'lucide-react';
+import { DateSelector } from './DateSelector.js';
 
 export interface IngredientBuilderProps {
   initialIngredient?: FoodItem | null;
@@ -27,6 +28,7 @@ export interface IngredientBuilderProps {
   ) => Promise<void | string>;
   mode?: 'catalog' | 'diary';
   targetMealType?: MealType;
+  initialDate?: string;
   onSaveAndLog?: (
     ingredient: {
       id?: string;
@@ -38,7 +40,8 @@ export interface IngredientBuilderProps {
       fats_100g: number;
     },
     portions: { name: string; equivalent_weight_g: number }[] | undefined,
-    mealType: MealType
+    mealType: MealType,
+    date?: string
   ) => Promise<void>;
 }
 
@@ -72,10 +75,20 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
   onSave,
   mode = 'catalog',
   targetMealType,
+  initialDate,
   onSaveAndLog
 }) => {
-  const { t } = useApp();
+  const { t, selectedDate, setSelectedDate, dailyLogs } = useApp();
   const dict = t || dictionaries.en;
+
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [modalDate, setModalDate] = useState<string>(initialDate || selectedDate || todayStr);
+
+  const isPastDate = modalDate < todayStr;
+  const logsOnModalDate = useMemo(() => {
+    return (dailyLogs || []).filter((l) => l.date === modalDate);
+  }, [dailyLogs, modalDate]);
+  const foodCountOnDate = logsOnModalDate.length;
 
   const [selectedMeal, setSelectedMeal] = useState<MealType>(() => targetMealType || 'meal_lunch');
   const [name, setName] = useState(() => initialIngredient?.name || '');
@@ -176,7 +189,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
     setIsSaving(true);
     try {
       if (andLog && onSaveAndLog) {
-        await onSaveAndLog(ingredientData, finalPortions, selectedMeal);
+        await onSaveAndLog(ingredientData, finalPortions, selectedMeal, modalDate);
       } else {
         await onSave(ingredientData, finalPortions);
       }
@@ -224,35 +237,78 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
 
       {/* Main Content Form Container */}
       <div className="max-w-lg mx-auto w-full p-4 sm:p-6 space-y-5 flex-1">
-        {/* In Diary Mode: Meal Type Quick Switcher Bar */}
+        {/* In Diary Mode: Date Selector & Meal Type Switcher */}
         {mode === 'diary' && (
-          <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
-            <span className="text-xs font-semibold text-slate-400">
-              {dict.ai?.selectMeal || 'Meal Time'}
-            </span>
-            <div className="grid grid-cols-4 gap-2">
-              {mealOptions.map((opt) => {
-                const Icon = opt.icon;
-                const isSelected = selectedMeal === opt.id;
-                const title = getMealTitle(opt.id, dict);
+          <div className="space-y-3 pb-3 border-b border-slate-800/80">
+            <div className="flex justify-center pt-1">
+              <DateSelector
+                value={modalDate}
+                onChange={(d) => {
+                  setModalDate(d);
+                  setSelectedDate(d);
+                }}
+              />
+            </div>
 
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setSelectedMeal(opt.id)}
-                    aria-pressed={isSelected}
-                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
-                      isSelected
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-700/80'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isSelected ? 'text-slate-950' : 'text-slate-400'}`} />
-                    <span className="truncate max-w-[70px] text-[11px]">{title}</span>
-                  </button>
-                );
-              })}
+            {isPastDate && (
+              <div
+                data-testid="banner-past-date-warning"
+                className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 animate-in fade-in duration-200"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-xs text-amber-200 font-medium">
+                    {foodCountOnDate > 0
+                      ? (dict.portionModal?.pastDateWarningWithCount || 'Logging to past date: {{date}} ({{count}} foods already logged)')
+                          .replace('{{date}}', modalDate)
+                          .replace('{{count}}', String(foodCountOnDate))
+                      : (dict.portionModal?.pastDateWarning || 'Logging to past date: {{date}}')
+                          .replace('{{date}}', modalDate)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="btn-switch-to-today"
+                  data-testid="btn-switch-to-today"
+                  onClick={() => {
+                    setModalDate(todayStr);
+                    setSelectedDate(todayStr);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg shrink-0 shadow-sm transition-all active:scale-95 min-h-[36px] flex items-center justify-center cursor-pointer"
+                >
+                  {dict.portionModal?.switchToToday || 'Switch to Today'}
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-1.5 pt-1">
+              <span className="text-xs font-semibold text-slate-400">
+                {dict.ai?.selectMeal || 'Meal Time'}
+              </span>
+              <div className="grid grid-cols-4 gap-2">
+                {mealOptions.map((opt) => {
+                  const Icon = opt.icon;
+                  const isSelected = selectedMeal === opt.id;
+                  const title = getMealTitle(opt.id, dict);
+
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedMeal(opt.id)}
+                      aria-pressed={isSelected}
+                      className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
+                        isSelected
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-700/80'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isSelected ? 'text-slate-950' : 'text-slate-400'}`} />
+                      <span className="truncate max-w-[70px] text-[11px]">{title}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

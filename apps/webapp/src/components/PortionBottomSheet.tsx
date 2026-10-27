@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { dictionaries } from '@quomida/i18n-locales';
 import type { BaseIngredient, FoodItem, RecipeFoodItem, MealType, Portion, TaggedPortion } from '@quomida/domain-core';
 import { calculateItemMacros, convertPortionToGrams, PortionManager } from '@quomida/domain-core';
-import { ArrowLeft, Minus, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Check, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
 import { DateSelector } from './DateSelector.js';
 
@@ -22,7 +22,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   onBack,
   initialDate
 }) => {
-  const { db, logFoodItem, selectedDate, setSelectedDate, t } = useApp();
+  const { db, logFoodItem, selectedDate, setSelectedDate, dailyLogs, t } = useApp();
   const dict = t || dictionaries.es;
   const [portionManager] = useState(() => new PortionManager());
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
@@ -30,8 +30,14 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   const [selectedPortionName, setSelectedPortionName] = useState<string>('g');
   const [availablePortions, setAvailablePortions] = useState<TaggedPortion[]>([]);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [modalDate, setModalDate] = useState<string>(initialDate || selectedDate || todayStr);
+
+  const isPastDate = modalDate < todayStr;
+  const logsOnModalDate = useMemo(() => {
+    return (dailyLogs || []).filter((l) => l.date === modalDate);
+  }, [dailyLogs, modalDate]);
+  const foodCountOnDate = logsOnModalDate.length;
 
   useEffect(() => {
     if (initialDate) {
@@ -299,14 +305,55 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
           </div>
         </div>
 
+        {/* Past Date Warning Banner (Approach A) */}
+        {isPastDate && (
+          <div
+            data-testid="banner-past-date-warning"
+            className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 animate-in fade-in duration-200"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs text-amber-200 font-medium">
+                {foodCountOnDate > 0
+                  ? (dict.portionModal.pastDateWarningWithCount || 'Logging to past date: {{date}} ({{count}} foods already logged)')
+                      .replace('{{date}}', modalDate)
+                      .replace('{{count}}', String(foodCountOnDate))
+                  : (dict.portionModal.pastDateWarning || 'Logging to past date: {{date}}')
+                      .replace('{{date}}', modalDate)}
+              </span>
+            </div>
+            <button
+              type="button"
+              id="btn-switch-to-today"
+              data-testid="btn-switch-to-today"
+              onClick={() => {
+                setModalDate(todayStr);
+                setSelectedDate(todayStr);
+              }}
+              className="px-2.5 py-1 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg shrink-0 shadow-sm transition-all active:scale-95 min-h-[36px] flex items-center justify-center cursor-pointer"
+            >
+              {dict.portionModal.switchToToday || 'Switch to Today'}
+            </button>
+          </div>
+        )}
+
         {/* Action Button */}
         <button
           onClick={handleLog}
           id="btn-log-item"
-          className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-slate-950 font-bold rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all min-h-[48px]"
+          data-testid="btn-log-item"
+          className={`w-full py-3.5 px-4 active:scale-[0.99] font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all min-h-[48px] ${
+            isPastDate
+              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-950/40'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50'
+          }`}
         >
           <Check className="w-5 h-5" />
-          <span>{dict.portionModal.logAction}</span>
+          <span>
+            {isPastDate
+              ? (dict.portionModal.logToPastDate || 'Log to {{date}}').replace('{{date}}', modalDate)
+              : dict.portionModal.logAction}
+          </span>
         </button>
       </div>
     </div>
