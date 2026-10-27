@@ -16,21 +16,21 @@ This structure presented several usability, architectural, and cognitive drawbac
 
 We promote **User Profile & Goals** to a top-level primary page within the main application shell, completely decoupling it from `SettingsModal.tsx`:
 
-1. **Top-Level Screen (`UserProfileGoalsScreen.tsx`)**:
+1. **Dedicated Goals Screen (`UserProfileGoalsScreen.tsx`)**:
    - Implemented at `apps/webapp/src/components/profile/UserProfileGoalsScreen.tsx`.
-   - Features a top-level profile card displaying the user avatar (with Google Cloud avatar or local default), user name, email, and connection badge.
+   - Stripped of redundant hero identity cards and secondary settings link panes to keep user focus strictly on caloric and macronutrient targets.
    - Provides an intuitive segmented toggle between **Manual Targets** (calories and macro gram inputs) and **Smart Targets** (biometrics, physical activity level, goal selection with weekly rates, and adaptive metabolism engine toggle).
    - Renders live BMR, TDEE, and daily target macro preview cards calculated reactively via `calculateBaselineSeed()`.
    - Automatically synchronizes initial or modified weight entries with the active date's weight log in RxDB.
-   - Provides direct access to technical system settings via a bottom shortcut card and the sticky header gear icon.
 
 2. **Decoupled Settings Modal (`SettingsModal.tsx`)**:
    - Removed the "User Profile & Goals" accordion segment, redundant local state, and calculation utilities from `SettingsModal.tsx`.
-   - `SettingsModal` now focuses purely on system preferences: General App Settings (Language, Theme), Edge AI Configuration (Gemini / Ollama), Data & Cloud Sync (Google Drive / Sheets, Offline Database, Cache Resets), and About & Legal.
+   - `SettingsModal` now focuses purely on system preferences: General App Settings (Theme, Language), Edge AI Configuration (Gemini / Ollama), Data & Cloud Sync (Google Drive / Sheets, Offline Database, Cache Resets), and About & Legal.
 
-3. **Bottom Navigation Integration (`BottomNav.tsx`)**:
-   - The 4th bottom navigation tab now directs to `UserProfileGoalsScreen` with the label `nav.profileGoals` ("Profile & Goals" / "Perfil y Metas").
-   - Maintains the backward-compatible `#btn-open-settings` test hook and touch target requirements (>= 44x44px).
+3. **Bottom Navigation & Icon Alignment (`BottomNav.tsx`)**:
+   - The 2nd bottom navigation tab is renamed to **"Progress"** (ES: "Progreso") with a column bar chart icon (`BarChart3`), replacing the previous line-going-up chart icon (`TrendingUp`) to avoid user confusion regarding weight direction.
+   - The 4th bottom navigation tab is renamed to **"Goals"** (ES: "Metas") with a target icon (`Target`).
+   - Maintains the backward-compatible `#btn-open-analytics` and `#btn-open-settings` test hooks and touch target requirements (>= 44x44px).
 
 4. **Bi-directional Navigation & Context State (`AppContext.tsx`, `App.tsx`)**:
    - `AppContext` provides `isProfileOpen` and `setIsProfileOpen` alongside existing page state flags.

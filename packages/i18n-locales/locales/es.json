@@ -6,9 +6,11 @@
   "nav": {
     "dashboard": "Diario",
     "catalog": "Mis Alimentos",
-    "analytics": "Analíticas",
+    "analytics": "Progreso",
+    "progress": "Progreso",
     "settings": "Ajustes",
-    "profileGoals": "Perfil y Metas"
+    "goals": "Metas",
+    "profileGoals": "Metas"
   },
   "dashboard": {
     "title": "Resumen Diario",
@@ -403,8 +405,14 @@
     "deleteWeight": "Eliminar Registro",
     "unitKg": "kg"
   },
+  "goals": {
+    "title": "Metas",
+    "subtitle": "Objetivos de calorías y macronutrientes"
+  },
   "analytics": {
-    "title": "Gasto Energético y Tendencia",
+    "title": "Progreso",
+    "navTitle": "Progreso",
+    "cardTitle": "Gasto Energético y Tendencia",
     "subtitle": "Balance energético adaptativo de 14 días y peso suavizado EWMA",
     "estimatedTdee": "TDEE Estimado",
     "kcalPerDay": "kcal/día",

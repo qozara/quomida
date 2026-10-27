@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.js';
-import { BookOpen, TrendingUp, FolderHeart, Settings, CalendarDays } from 'lucide-react';
+import { CalendarDays, BarChart3, FolderHeart, Target } from 'lucide-react';
 
 export type NavTab = 'diary' | 'analytics' | 'catalog' | 'settings';
 
@@ -27,7 +27,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
     {
       id: 'analytics',
       label: t.nav.analytics,
-      icon: TrendingUp,
+      icon: BarChart3,
       testId: 'btn-open-analytics'
     },
     {
@@ -38,8 +38,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
     },
     {
       id: 'settings',
-      label: (t.nav as any).profileGoals || (t.settings as any).accordionProfileGoals || t.nav.settings,
-      icon: Settings,
+      label: (t.nav as any).goals || (t.nav as any).profileGoals || 'Goals',
+      icon: Target,
       testId: 'btn-open-settings'
     }
   ];

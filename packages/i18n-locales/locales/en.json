@@ -6,9 +6,11 @@
   "nav": {
     "dashboard": "Dashboard",
     "catalog": "My Foods",
-    "analytics": "Analytics",
+    "analytics": "Progress",
+    "progress": "Progress",
     "settings": "Settings",
-    "profileGoals": "Profile & Goals"
+    "goals": "Goals",
+    "profileGoals": "Goals"
   },
   "dashboard": {
     "title": "Daily Summary",
@@ -403,8 +405,14 @@
     "deleteWeight": "Delete Entry",
     "unitKg": "kg"
   },
+  "goals": {
+    "title": "Goals",
+    "subtitle": "Calorie and macronutrient targets"
+  },
   "analytics": {
-    "title": "Expenditure & Weight Trend",
+    "title": "Progress",
+    "navTitle": "Progress",
+    "cardTitle": "Expenditure & Weight Trend",
     "subtitle": "14-day adaptive energy balance & EWMA smoothed weight",
     "estimatedTdee": "Estimated TDEE",
     "kcalPerDay": "kcal/day",

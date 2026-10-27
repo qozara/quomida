@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { calculateBaselineSeed, type UserSex, type GoalType } from '@quomida/domain-core';
-import { Target, Activity, Flame, Save, Settings, ChevronRight } from 'lucide-react';
+import { Target, Activity, Flame, Save } from 'lucide-react';
 
 interface UserProfileGoalsScreenProps {
   onOpenSettings?: () => void;
@@ -202,35 +202,6 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
 
   return (
     <div data-testid="user-profile-goals-screen" className="space-y-4">
-      {/* Hero Header Card */}
-      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60">
-            <Target className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-white">
-              {t.settings.accordionProfileGoals || 'User Profile & Goals'}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {t.settings.accordionProfileGoalsSubtitle || 'Biometrics, activity, and adaptive targets'}
-            </p>
-          </div>
-        </div>
-        {onOpenSettings && (
-          <button
-            type="button"
-            id="btn-profile-card-open-settings"
-            data-testid="btn-profile-card-open-settings"
-            onClick={onOpenSettings}
-            aria-label={t.settings.title}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
       {/* Main Form Body */}
       <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 shadow-sm">
         <form onSubmit={handleSaveGoals} className="space-y-4">
@@ -554,30 +525,6 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = ({ 
           </button>
         </form>
       </div>
-
-      {/* Link to Full Settings */}
-      {onOpenSettings && (
-        <div className="pt-1">
-          <button
-            type="button"
-            id="btn-open-more-settings"
-            data-testid="btn-open-more-settings"
-            onClick={onOpenSettings}
-            className="w-full min-h-[44px] py-3 px-4 bg-slate-900/60 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white rounded-2xl flex items-center justify-between transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/60">
-                <Settings className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <span className="text-xs font-bold text-white block">{t.settings.title || 'Settings'}</span>
-                <span className="text-[11px] text-slate-400 block">{t.settings.accordionDataSyncSubtitle || 'Cloud backup, offline database, and storage'}</span>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </button>
-        </div>
-      )}
     </div>
   );
 };
