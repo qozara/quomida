@@ -3,10 +3,11 @@ import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext.js';
 import {
   type FoodItem,
+  type MealType,
   validateMacroAlignment
 } from '@quomida/domain-core';
 import { dictionaries } from '@quomida/i18n-locales';
-import { ArrowLeft, Sparkles, AlertCircle, PlusCircle, X } from 'lucide-react';
+import { ArrowLeft, Sparkles, AlertCircle, PlusCircle, X, Check, Coffee, Utensils, Moon, Apple } from 'lucide-react';
 
 export interface IngredientBuilderProps {
   initialIngredient?: FoodItem | null;
@@ -23,18 +24,60 @@ export interface IngredientBuilderProps {
       fats_100g: number;
     },
     portions?: { name: string; equivalent_weight_g: number }[]
+  ) => Promise<void | string>;
+  mode?: 'catalog' | 'diary';
+  targetMealType?: MealType;
+  onSaveAndLog?: (
+    ingredient: {
+      id?: string;
+      name: string;
+      lang?: 'en' | 'es';
+      calories_100g: number;
+      protein_100g: number;
+      carbs_100g: number;
+      fats_100g: number;
+    },
+    portions: { name: string; equivalent_weight_g: number }[] | undefined,
+    mealType: MealType
   ) => Promise<void>;
 }
+
+const mealOptions: Array<{
+  id: MealType;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'meal_breakfast', icon: Coffee },
+  { id: 'meal_lunch', icon: Utensils },
+  { id: 'meal_dinner', icon: Moon },
+  { id: 'meal_snack', icon: Apple }
+];
+
+const getMealTitle = (meal: MealType, dict: any) => {
+  switch (meal) {
+    case 'meal_breakfast':
+      return dict?.dashboard?.meals?.breakfast || 'Breakfast';
+    case 'meal_lunch':
+      return dict?.dashboard?.meals?.lunch || 'Lunch';
+    case 'meal_dinner':
+      return dict?.dashboard?.meals?.dinner || 'Dinner';
+    case 'meal_snack':
+      return dict?.dashboard?.meals?.snack || 'Snack';
+  }
+};
 
 export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
   initialIngredient,
   onClose,
   onBack,
-  onSave
+  onSave,
+  mode = 'catalog',
+  targetMealType,
+  onSaveAndLog
 }) => {
   const { t } = useApp();
   const dict = t || dictionaries.en;
 
+  const [selectedMeal, setSelectedMeal] = useState<MealType>(() => targetMealType || 'meal_lunch');
   const [name, setName] = useState(() => initialIngredient?.name || '');
   const [calories, setCalories] = useState(() =>
     initialIngredient?.calories_100g !== undefined ? String(initialIngredient.calories_100g) : ''
@@ -60,6 +103,12 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
   const [portionWeight, setPortionWeight] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (targetMealType) {
+      setSelectedMeal(targetMealType);
+    }
+  }, [targetMealType]);
 
   useEffect(() => {
     if (initialIngredient) {
@@ -90,8 +139,8 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
     setPortions(portions.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePerformSave = async (e?: React.FormEvent, andLog = false) => {
+    if (e) e.preventDefault();
     setErrorMsg(null);
     if (!name.trim() || !calories.trim()) return;
 
@@ -114,20 +163,23 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
       });
     }
 
+    const ingredientData = {
+      id: initialIngredient?.id || undefined,
+      name: name.trim(),
+      lang: 'es' as const,
+      calories_100g: calNum,
+      protein_100g: pNum,
+      carbs_100g: cNum,
+      fats_100g: fNum
+    };
+
     setIsSaving(true);
     try {
-      await onSave(
-        {
-          id: initialIngredient?.id || undefined,
-          name: name.trim(),
-          lang: 'es',
-          calories_100g: calNum,
-          protein_100g: pNum,
-          carbs_100g: cNum,
-          fats_100g: fNum
-        },
-        finalPortions
-      );
+      if (andLog && onSaveAndLog) {
+        await onSaveAndLog(ingredientData, finalPortions, selectedMeal);
+      } else {
+        await onSave(ingredientData, finalPortions);
+      }
       onClose();
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to save food');
@@ -140,7 +192,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="ingredient-builder-title"
+      aria-label={name || (initialIngredient ? (dict.catalog?.editCustomIngredient || 'Edit Single Food') : (dict.catalog?.newCustomIngredient || 'New Single Food'))}
       className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right slide-in-from-right overflow-y-auto"
     >
       {/* Top Sticky Navigation Bar with Back Button */}
@@ -162,9 +214,9 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
             </span>
           </div>
           <h2 id="ingredient-builder-title" className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs mx-auto">
-            {initialIngredient
+            {name || (initialIngredient
               ? dict.catalog?.editCustomIngredient || 'Edit Single Food (100g base)'
-              : dict.catalog?.newCustomIngredient || 'New Single Food (100g base)'}
+              : dict.catalog?.newCustomIngredient || 'New Single Food (100g base)')}
           </h2>
         </div>
         <div className="w-[44px]" aria-hidden="true" />
@@ -172,6 +224,39 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
 
       {/* Main Content Form Container */}
       <div className="max-w-lg mx-auto w-full p-4 sm:p-6 space-y-5 flex-1">
+        {/* In Diary Mode: Meal Type Quick Switcher Bar */}
+        {mode === 'diary' && (
+          <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
+            <span className="text-xs font-semibold text-slate-400">
+              {dict.ai?.selectMeal || 'Meal Time'}
+            </span>
+            <div className="grid grid-cols-4 gap-2">
+              {mealOptions.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = selectedMeal === opt.id;
+                const title = getMealTitle(opt.id, dict);
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedMeal(opt.id)}
+                    aria-pressed={isSelected}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
+                      isSelected
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md'
+                        : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-700/80'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isSelected ? 'text-slate-950' : 'text-slate-400'}`} />
+                    <span className="truncate max-w-[70px] text-[11px]">{title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {errorMsg && (
           <div className="p-3 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -179,7 +264,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => handlePerformSave(e, false)} className="space-y-4">
           {/* Food Name */}
           <div>
             <label className="text-xs font-semibold text-slate-400 block mb-1">
@@ -307,24 +392,64 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-3">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-md min-h-[44px] transition-colors"
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              type="button"
-              onClick={onBack || onClose}
-              disabled={isSaving}
-              className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-semibold text-sm rounded-xl transition-colors min-h-[44px]"
-            >
-              {dict.recipes?.cancel || 'Cancel'}
-            </button>
-          </div>
+          {/* Action Buttons */}
+          {mode === 'diary' ? (
+            <div className="flex flex-col sm:flex-row gap-2 pt-3">
+              <button
+                type="button"
+                id="btn-save-and-log-ingredient"
+                data-testid="btn-save-and-log-ingredient"
+                disabled={isSaving}
+                onClick={(e) => handlePerformSave(e, true)}
+                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-sm rounded-xl shadow-md min-h-[44px] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>
+                  {isSaving
+                    ? (dict.recipes?.saving || 'Saving...')
+                    : (dict.catalog?.saveAndLog || 'Save & Log to {{meal}}').replace('{{meal}}', getMealTitle(selectedMeal, dict))}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="btn-save-catalog-ingredient"
+                data-testid="btn-save-catalog-ingredient"
+                disabled={isSaving}
+                onClick={(e) => handlePerformSave(e, false)}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 hover:text-emerald-300 font-semibold text-xs rounded-xl transition-colors min-h-[44px] border border-slate-700"
+              >
+                {dict.catalog?.saveCatalogOnly || 'Save to Catalog only'}
+              </button>
+              <button
+                type="button"
+                onClick={onBack || onClose}
+                disabled={isSaving}
+                className="py-3 px-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs rounded-xl transition-colors min-h-[44px]"
+              >
+                {dict.recipes?.cancel || 'Cancel'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-3">
+              <button
+                type="submit"
+                id="btn-save-ingredient"
+                data-testid="btn-save-ingredient"
+                disabled={isSaving}
+                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-md min-h-[44px] transition-colors"
+              >
+                {isSaving ? (dict.recipes?.saving || 'Saving...') : ((dict.recipes as any)?.save || dict.recipes?.saveRecipe || 'Save')}
+              </button>
+              <button
+                type="button"
+                onClick={onBack || onClose}
+                disabled={isSaving}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-semibold text-sm rounded-xl transition-colors min-h-[44px]"
+              >
+                {dict.recipes?.cancel || 'Cancel'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

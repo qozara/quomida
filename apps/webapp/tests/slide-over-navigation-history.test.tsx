@@ -440,23 +440,23 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     // 4. Click Find More to trigger AI review
     fireEvent.click(findMoreBtn);
 
-    // 5. Verify BatchAiMealReviewModal is open as a top-level slide-over on top of AddFoodModal
-    const aiReviewDialog = await screen.findByRole('dialog', { name: 'Apple pie with ice cream' });
+    // 5. Verify IngredientBuilder is open as a top-level slide-over on top of AddFoodModal
+    const aiReviewDialog = await screen.findByRole('dialog', { name: /apple pie/i });
     expect(aiReviewDialog).toBeDefined();
     expect(aiReviewDialog.className).toContain('z-[60]');
     expect(aiReviewDialog.parentElement).toBe(document.body);
 
     // Both slide-overs are simultaneously open in the DOM
     expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
-    expect(screen.getByRole('dialog', { name: 'Apple pie with ice cream' })).toBeDefined();
+    expect(screen.getByRole('dialog', { name: /apple pie/i })).toBeDefined();
 
-    // 6. Click Back in BatchAiMealReviewModal
-    const aiBackBtn = screen.getByTestId('btn-back-batch-review');
+    // 6. Click Back in IngredientBuilder
+    const aiBackBtn = screen.getByTestId('btn-back-ingredient-builder');
     fireEvent.click(aiBackBtn);
 
-    // AI Review dialog unmounts, while AddFoodModal is still open!
+    // IngredientBuilder dialog unmounts, while AddFoodModal is still open!
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Apple pie with ice cream' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: /apple pie/i })).toBeNull();
     });
     expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
 

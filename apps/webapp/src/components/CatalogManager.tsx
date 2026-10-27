@@ -8,6 +8,7 @@ import {
   type FoodItem,
   type RecipeFoodItem,
   type Recipe,
+  type RecipeComponent,
   type Portion,
   type ResolvedBatchMeal
 } from '@quomida/domain-core';
@@ -26,7 +27,6 @@ import { dictionaries } from '@quomida/i18n-locales';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
-import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 import { LlmRecipeDecomposer } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
@@ -57,7 +57,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
 
   const [isBuildingIngredient, setIsBuildingIngredient] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<FoodItem | null>(null);
-  const [editingRecipe, setEditingRecipe] = useState<RecipeFoodItem | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'ingredients' | 'recipes'>('all');
@@ -71,10 +71,6 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // Batch AI Composition State
-  const [batchMeal, setBatchMeal] = useState<ResolvedBatchMeal | null>(null);
-  const [isBatchReviewOpen, setIsBatchReviewOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
 
   const toggleRecipeExpand = (id: string) => {
@@ -247,8 +243,62 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
       });
 
       setIsParsing(false);
-      setBatchMeal(resolved);
-      setIsBatchReviewOpen(true);
+
+      const isRecipe = Boolean(
+        resolved.synthesizedRecipe ||
+        resolved.compositeDishName ||
+        resolved.items.length > 1 ||
+        (resolved.items.length === 1 && resolved.items[0].food?.kind === 'recipe')
+      );
+
+      if (isRecipe) {
+        let recipeName = resolved.compositeDishName || resolved.synthesizedRecipe?.recipe?.name || resolved.rawInput;
+        let components: RecipeComponent[] = [];
+        let portions = (resolved.synthesizedRecipe?.foodItem as any)?.portions || [];
+
+        if (resolved.synthesizedRecipe) {
+          recipeName = resolved.compositeDishName || resolved.synthesizedRecipe.recipe.name;
+          components = resolved.synthesizedRecipe.recipe.ingredients || [];
+        } else {
+          components = resolved.items.filter(it => it.food).map(it => ({
+            food_id: it.food!.id,
+            name: it.food!.name,
+            weight_g: it.calculatedWeightGrams,
+            calories_100g: it.food!.calories_100g,
+            protein_100g: it.food!.protein_100g,
+            carbs_100g: it.food!.carbs_100g,
+            fats_100g: it.food!.fats_100g,
+            portion_name: it.selectedPortionName,
+            portion_quantity: it.quantity
+          }));
+        }
+
+        const rawWeight = components.reduce((sum, c) => sum + (c.weight_g || 0), 0);
+        const initialRecipeData = {
+          name: recipeName,
+          ingredients: components,
+          raw_weight_g: rawWeight,
+          cooked_weight_g: rawWeight,
+          portions
+        };
+
+        setEditingRecipe(initialRecipeData);
+        setIsBuildingRecipe(true);
+      } else {
+        const singleItem = resolved.items[0];
+        const initialFood: any = singleItem?.food ? { ...singleItem.food } : {
+          id: `custom_${Date.now()}`,
+          name: singleItem?.rawQuery || query,
+          calories_100g: 0,
+          protein_100g: 0,
+          carbs_100g: 0,
+          fats_100g: 0,
+          portions: []
+        };
+
+        setEditingIngredient(initialFood);
+        setIsBuildingIngredient(true);
+      }
     } catch (err) {
       console.error('[CatalogManager] AI Parse error:', err);
       setIsParsing(false);
@@ -547,6 +597,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
       {isBuildingRecipe && (
         <RecipeBuilder
           initialRecipe={editingRecipe}
+          mode="catalog"
           onBack={() => {
             setIsBuildingRecipe(false);
             setEditingRecipe(null);
@@ -563,6 +614,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
       {isBuildingIngredient && (
         <IngredientBuilder
           initialIngredient={editingIngredient}
+          mode="catalog"
           onBack={() => {
             setIsBuildingIngredient(false);
             setEditingIngredient(null);
@@ -572,28 +624,6 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
             setEditingIngredient(null);
           }}
           onSave={handleSaveIngredient}
-        />
-      )}
-
-      {/* Batch AI Composition Modal for Catalog */}
-      {isBatchReviewOpen && batchMeal && (
-        <BatchAiMealReviewModal
-          isOpen={isBatchReviewOpen}
-          batchMeal={batchMeal}
-          mode="catalog"
-          onBack={() => {
-            setIsBatchReviewOpen(false);
-            setBatchMeal(null);
-          }}
-          onClose={() => {
-            setIsBatchReviewOpen(false);
-            setBatchMeal(null);
-          }}
-          onSavedToCatalog={() => {
-            setIsBatchReviewOpen(false);
-            setBatchMeal(null);
-            setSearchQuery('');
-          }}
         />
       )}
     </section>

@@ -117,7 +117,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
 
         {/* Embedded Food Logger / Search Bar & AI Natural Parser */}
         <div className="pt-2">
-          <FoodLogger onSelectIngredient={handleSelect} onClose={onClose} />
+          <FoodLogger onSelectIngredient={handleSelect} onClose={onClose} targetMealType={currentMeal} />
         </div>
       </div>
     </div>

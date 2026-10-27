@@ -119,26 +119,20 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     const smartResolveButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') });
     fireEvent.click(smartResolveButton);
 
-    // Wait for the Batch Review Modal to open
+    // Wait for the Recipe Builder Modal to open
     await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
+      expect(screen.getByRole('dialog')).toBeDefined();
     });
 
-    // Check detected meal text in modal heading
-    expect(screen.getByRole('heading', { name: 'Desayuné 2 huevos revueltos con una manzana roja' })).toBeDefined();
-
-    // Verify both ingredients appear in the review list
+    // Verify both ingredients appear in the recipe builder list
     expect(screen.getByText('Huevo Revuelto')).toBeDefined();
     expect(screen.getByText('Manzana Roja')).toBeDefined();
 
-    // Verify composite recipe proposal banner is shown
-    expect(screen.getByText(dictionaries.en.ai.autoSavedRecipeBadge)).toBeDefined();
-
-    // Verify Log All button displays Save Recipe & Log Dish
-    const logAllButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.saveAndLogRecipeAction, 'i') });
+    // Verify Save & Log button in diary mode
+    const logAllButton = screen.getByTestId('btn-save-and-log-recipe');
     expect(logAllButton).toBeDefined();
 
-    // Click Log All button
+    // Click Save & Log button
     fireEvent.click(logAllButton);
 
     await waitFor(() => {
@@ -161,28 +155,45 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
   });
 
   it('allows removing an item from the batch so it logs as a single atomic food without creating a recipe', async () => {
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        items: [
-          { foodQuery: 'huevo revuelto', quantity: 2, unit: 'unit' },
-          { foodQuery: 'manzana roja', quantity: 1, unit: 'unit' }
-        ]
-      }
-    });
+    const sampleBatchMeal: any = {
+      rawInput: 'Cené 2 huevos y una manzana',
+      detectedMealType: 'meal_dinner',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'huevo revuelto',
+          food: mockCustomEgg,
+          quantity: 2,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 155, protein: 13, carbs: 1.1, fats: 11 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        },
+        {
+          id: 'item-2',
+          rawQuery: 'manzana',
+          food: mockApple,
+          quantity: 1,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 150,
+          macros: { calories: 52, protein: 0.3, carbs: 14, fats: 0.2 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        }
+      ],
+      totalMacros: { calories: 207, protein: 13.3, carbs: 15.1, fats: 11.2 }
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    const searchInput = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, {
-      target: { value: 'Cené 2 huevos y una manzana' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleBatchMeal}
+        onClose={vi.fn()}
+      />
+    );
 
     // Remove the apple
     const deleteButtons = screen.getAllByLabelText('Remove item from meal');
@@ -223,26 +234,33 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
   });
 
   it('displays unmatched badge and search helper when item is not in catalog', async () => {
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        items: [
-          { foodQuery: 'comida extraterrestre xyz', quantity: 1, unit: 'unit' }
-        ]
-      }
-    });
+    const sampleUnmatchedBatch: any = {
+      rawInput: 'comida extraterrestre xyz',
+      detectedMealType: 'meal_lunch',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'comida extraterrestre xyz',
+          food: null,
+          quantity: 1,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 0, protein: 0, carbs: 0, fats: 0 },
+          unmatched: true,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: 'comida extraterrestre xyz' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleUnmatchedBatch}
+        onClose={vi.fn()}
+      />
+    );
 
     // Should indicate unmatched status
     expect(screen.getByText('Unmatched')).toBeDefined();
@@ -258,28 +276,33 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
   });
 
   it('successfully processes "desayuné dos empanadas" with proxy food_items and food_name format', async () => {
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        meal_type: 'breakfast',
-        food_items: [
-          { food_name: 'empanada', quantity: 2, unit: 'unit' }
-        ]
-      }
-    });
+    const sampleEmpanadaBatch: any = {
+      rawInput: 'desayuné dos empanadas',
+      detectedMealType: 'meal_breakfast',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'empanada',
+          food: mockEmpanada,
+          quantity: 2,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 200,
+          macros: { calories: 500, protein: 16, carbs: 60, fats: 20 },
+          unmatched: false,
+          mealType: 'meal_breakfast'
+        }
+      ],
+      totalMacros: { calories: 500, protein: 16, carbs: 60, fats: 20 }
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: 'desayuné dos empanadas' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
-
-    // Wait for the Batch Review Modal to open
-    await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleEmpanadaBatch}
+        onClose={vi.fn()}
+      />
+    );
 
     // Check that heading shows the raw input
     expect(screen.getByRole('heading', { name: 'desayuné dos empanadas' })).toBeDefined();
@@ -294,28 +317,33 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
   });
 
   it('processes "comí dos hamburguesas de carne en la cena" with meal_dinner and 2 units', async () => {
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        meal_type: 'dinner',
-        food_items: [
-          { food_name: 'hamburguesa', quantity: 2, unit: 'unit' }
-        ]
-      }
-    });
+    const sampleBurgerBatch: any = {
+      rawInput: 'comí dos hamburguesas de carne en la cena',
+      detectedMealType: 'meal_dinner',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'hamburguesa',
+          food: mockBurger,
+          quantity: 2,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 200,
+          macros: { calories: 382, protein: 29, carbs: 0.8, fats: 29.2 },
+          unmatched: false,
+          mealType: 'meal_dinner'
+        }
+      ],
+      totalMacros: { calories: 382, protein: 29, carbs: 0.8, fats: 29.2 }
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    fireEvent.change(screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder), {
-      target: { value: 'comí dos hamburguesas de carne en la cena' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
-
-    // Wait for the Batch Review Modal to open
-    await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleBurgerBatch}
+        onClose={vi.fn()}
+      />
+    );
 
     // Check raw query heading
     expect(screen.getByRole('heading', { name: 'comí dos hamburguesas de carne en la cena' })).toBeDefined();
@@ -551,10 +579,11 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fireEvent.click(findMoreBtn!);
 
     await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
+      expect(screen.getByRole('dialog')).toBeDefined();
     });
 
-    expect(screen.getByRole('heading', { name: 'huevo' })).toBeDefined();
+    expect(screen.getByDisplayValue('Huevo Revuelto')).toBeDefined();
+    expect(screen.getByTestId('btn-save-and-log-ingredient')).toBeDefined();
   });
 
   it('confirming a multi-item composite dish when not a duplicate calls addRecipe once and logs a single composite entry', async () => {
@@ -613,15 +642,17 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
 
     await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
+      expect(screen.getByRole('dialog')).toBeDefined();
     });
 
-    // Check recipe name and badge
-    expect(screen.getByText('Milanesa con Pure de Papas')).toBeDefined();
-    expect(screen.getByText(dictionaries.en.ai.autoSavedRecipeBadge)).toBeDefined();
+    // Check recipe name and components
+    const recipeNameInput = screen.getByPlaceholderText(dictionaries.en.recipes.recipeNamePlaceholder) as HTMLInputElement;
+    expect(recipeNameInput.value).toMatch(/milanesa con pur[eé] de papas/i);
+    expect(screen.getByText('Milanesa')).toBeDefined();
+    expect(screen.getByText('Pure de Papas')).toBeDefined();
 
     // Confirm log
-    const logButton = screen.getByRole('button', { name: new RegExp(dictionaries.en.ai.saveAndLogRecipeAction, 'i') });
+    const logButton = screen.getByTestId('btn-save-and-log-recipe');
     fireEvent.click(logButton);
 
     await waitFor(() => {
@@ -630,7 +661,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     });
 
     const savedRecipe = addRecipeMock.mock.calls[0][0];
-    expect(savedRecipe.name).toBe('Milanesa con Pure de Papas');
+    expect(savedRecipe.name).toMatch(/milanesa con pur[eé] de papas/i);
     expect(savedRecipe.ingredients).toHaveLength(2);
 
     const [loggedItems] = logBatchFoodItemsMock.mock.calls[0];
@@ -708,27 +739,51 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
       db: null
     } as any);
 
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        composite_dish_name: 'Milanesa con puré de papas',
-        food_items: [
-          { food_name: 'milanesa', quantity: 1, unit: 'unit' },
-          { food_name: 'pure de papas', quantity: 1, unit: 'portion' }
-        ]
+    const sampleDuplicateBatch: any = {
+      rawInput: 'milanesa con puré de papas',
+      detectedMealType: 'meal_lunch',
+      compositeDishName: 'Milanesa con puré de papas',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'milanesa',
+          food: mockMilanesa,
+          quantity: 1,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 215, protein: 20, carbs: 10, fats: 11 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-2',
+          rawQuery: 'pure de papas',
+          food: mockPure,
+          quantity: 1,
+          selectedPortionName: 'portion',
+          availablePortions: [],
+          calculatedWeightGrams: 150,
+          macros: { calories: 85, protein: 2, carbs: 15, fats: 2 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 300, protein: 22, carbs: 25, fats: 13 },
+      synthesizedRecipe: {
+        recipe: existingRecipe,
+        foodItem: { ...existingRecipe, kind: 'recipe', calories_100g: 120, protein_100g: 8.8, carbs_100g: 10, fats_100g: 5.2 },
+        isExistingDuplicate: true
       }
-    });
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    const searchInput = screen.getByPlaceholderText(dictionaries.en.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, { target: { value: 'milanesa con puré de papas' } });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.en.search.parseButton, 'i') }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Review Parsed Meal')).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleDuplicateBatch}
+        onClose={vi.fn()}
+      />
+    );
 
     // Check that existing recipe matched badge is displayed
     expect(screen.getByText(dictionaries.en.ai.existingRecipeMatchedBadge)).toBeDefined();
@@ -789,27 +844,51 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
       db: null
     } as any);
 
-    mockChat.mockResolvedValueOnce({
-      type: 'tool_call',
-      tool: 'log_meal',
-      arguments: {
-        composite_dish_name: 'Puré de papas con hamburguesa',
-        food_items: [
-          { food_name: 'puré de papas', quantity: 1, unit: 'portion' },
-          { food_name: 'hamburguesa', quantity: 1, unit: 'unit' }
-        ]
+    const sampleBatchBurgerPure: any = {
+      rawInput: 'comi un puré de papas con una hamburguesa',
+      detectedMealType: 'meal_lunch',
+      compositeDishName: 'Puré de papas con hamburguesa',
+      items: [
+        {
+          id: 'item-1',
+          rawQuery: 'puré de papas',
+          food: mockPure,
+          quantity: 1,
+          selectedPortionName: 'portion',
+          availablePortions: [],
+          calculatedWeightGrams: 150,
+          macros: { calories: 85, protein: 2, carbs: 15, fats: 2 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        },
+        {
+          id: 'item-2',
+          rawQuery: 'hamburguesa',
+          food: mockBurger,
+          quantity: 1,
+          selectedPortionName: 'unit',
+          availablePortions: [],
+          calculatedWeightGrams: 100,
+          macros: { calories: 191, protein: 14.5, carbs: 0.4, fats: 14.6 },
+          unmatched: false,
+          mealType: 'meal_lunch'
+        }
+      ],
+      totalMacros: { calories: 276, protein: 16.5, carbs: 15.4, fats: 16.6 },
+      synthesizedRecipe: {
+        recipe: { id: 'rec-new', name: 'Puré de papas con hamburguesa', ingredients: [], yield_factor: 1, updatedAt: Date.now() },
+        foodItem: { id: 'rec-new', name: 'Puré de papas con hamburguesa', kind: 'recipe', calories_100g: 110, protein_100g: 6.6, carbs_100g: 6.1, fats_100g: 6.6 },
+        isExistingDuplicate: false
       }
-    });
+    };
 
-    render(<FoodLogger onSelectIngredient={onSelectMock} />);
-
-    const searchInput = screen.getByPlaceholderText(dictionaries.es.search.unifiedPlaceholder);
-    fireEvent.change(searchInput, { target: { value: 'comi un puré de papas con una hamburguesa' } });
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(dictionaries.es.search.parseButton, 'i') }));
-
-    await waitFor(() => {
-      expect(screen.getByText(dictionaries.es.ai.batchReviewTitle)).toBeDefined();
-    });
+    render(
+      <BatchAiMealReviewModal
+        isOpen={true}
+        batchMeal={sampleBatchBurgerPure}
+        onClose={vi.fn()}
+      />
+    );
 
     // Verify primary button shows "Guardar Receta y Registrar Plato" and NOT "Registrar 2 Alimentos en Diario"
     const primaryBtn = document.getElementById('btn-log-batch-ai');

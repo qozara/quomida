@@ -290,6 +290,7 @@
     "nutritionPer100g": "Densidad Nutricional (por 100g cocido)",
     "totalNutrition": "Nutrición Total de la Receta",
     "saveRecipe": "Guardar Receta",
+    "saving": "Guardando...",
     "cancel": "Cancelar",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noComponents": "Aún no se agregaron alimentos. Busca y agrega componentes arriba.",
@@ -319,6 +320,8 @@
     "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
     "composeDishAi": "✨ Componer plato o estimar con IA para \"{query}\"",
     "composeDishAiSubtitle": "Descomponer en ingredientes y guardar como nueva receta en tu catálogo",
+    "saveAndLog": "Guardar y Registrar en {{meal}}",
+    "saveCatalogOnly": "Solo Guardar en Catálogo",
     "addToLog": "Añadir al diario",
     "edit": "Editar",
     "delete": "Eliminar"
