@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { calculateBaselineSeed } from '@quomida/domain-core';
-import { Target, Activity, Flame, Pencil, User, Scale, Ruler, Sparkles, CheckCircle2 } from 'lucide-react';
-import { GoalsEditModal } from './GoalsEditModal.js';
+import { Target, Activity, Flame, Pencil, User, Scale, Ruler } from 'lucide-react';
+import { ManualGoalsEditModal } from './ManualGoalsEditModal.js';
+import { AdaptiveGoalsEditModal } from './AdaptiveGoalsEditModal.js';
+import { BiometricsEditModal } from './BiometricsEditModal.js';
 
 interface UserProfileGoalsScreenProps {
   onOpenSettings?: () => void;
@@ -17,7 +19,10 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
     selectedDate
   } = useApp();
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isAdaptiveModalOpen, setIsAdaptiveModalOpen] = useState(false);
+  const [isBiometricsModalOpen, setIsBiometricsModalOpen] = useState(false);
+
   const [pendingModeSwitch, setPendingModeSwitch] = useState<'manual' | 'smart' | null>(null);
   const [optimisticMode, setOptimisticMode] = useState<'manual' | 'smart' | null>(null);
 
@@ -125,15 +130,26 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
         custom_macros: seed.custom_macros
       });
     }
+  };
 
-    setPendingModeSwitch(null);
+  const isAnyModalOpen = isManualModalOpen || isAdaptiveModalOpen || isBiometricsModalOpen;
+
+  const handleEditGoalsClick = () => {
+    if (activeMode === 'manual') {
+      setIsManualModalOpen(true);
+    } else {
+      setIsAdaptiveModalOpen(true);
+    }
+  };
+
+  const handleEditBiometricsClick = () => {
+    setIsBiometricsModalOpen(true);
   };
 
   return (
     <div data-testid="user-profile-goals-screen" className="space-y-4 pb-4">
-      {/* Segmented Mode Switcher */}
-      {/* Segmented Control on Main Screen */}
-      {!isEditModalOpen && (
+      {/* 1. Mode Switcher Segmented Control */}
+      {!isAnyModalOpen && (
         <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-sm">
           <button
             type="button"
@@ -166,7 +182,68 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
         </div>
       )}
 
-      {/* Target Overview Card */}
+      {/* 2. Goal Strategy Card (Placed directly below mode switcher with unified Target icon & title) */}
+      <div
+        data-testid="strategy-summary-card"
+        className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            <Target className="w-4 h-4 text-emerald-400" />
+            <span>{t.goals?.strategySummary || 'Goal Strategy'}</span>
+          </div>
+
+          {activeMode === 'smart' ? (
+            <span
+              data-testid="adaptive-status-badge"
+              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                isAdaptive
+                  ? 'bg-emerald-950 text-emerald-400 border-emerald-800/50'
+                  : 'bg-slate-800 text-slate-300 border-slate-700'
+              }`}
+            >
+              {isAdaptive
+                ? (t.goals?.adaptiveActive || 'Adaptive Active')
+                : (t.goals?.adaptiveDeterministic || 'Deterministic')}
+            </span>
+          ) : (
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-slate-800 text-slate-300 border-slate-700">
+              {t.settings.targetModeManual}
+            </span>
+          )}
+        </div>
+
+        {activeMode === 'smart' ? (
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs">
+            <div>
+              <span className="font-bold text-white block text-sm">{goalTypeLabel}</span>
+              <span className="text-slate-400 text-[11px]">
+                {goalConfig?.goal_type === 'lose' && goalConfig.weekly_rate_pct !== undefined
+                  ? `${goalConfig.weekly_rate_pct}% / week`
+                  : goalConfig?.goal_type === 'gain' && goalConfig.weekly_rate_pct !== undefined
+                  ? `+${goalConfig.weekly_rate_pct}% / week`
+                  : 'Target weight balance'}
+              </span>
+            </div>
+
+            <div className="text-right font-mono">
+              <span className="text-[11px] text-slate-400 block">Baseline TDEE</span>
+              <span className="font-bold text-emerald-300">
+                {userSettings?.adaptive_state?.estimated_tdee || userSettings?.adaptive_state?.prior_tdee || calories} kcal
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div
+            data-testid="manual-mode-summary-card"
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300 leading-relaxed"
+          >
+            {t.goals?.manualModeDescription || 'You have full manual control over calorie and macronutrient targets.'}
+          </div>
+        )}
+      </div>
+
+      {/* 3. Daily Target Card (Contains Calorie target, macro breakdown, and Activity config badge) */}
       <div
         data-testid="goals-summary-card"
         className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-4"
@@ -188,7 +265,7 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
             type="button"
             id="btn-edit-goals"
             data-testid="btn-edit-goals"
-            onClick={() => setIsEditModalOpen(true)}
+            onClick={handleEditGoalsClick}
             aria-label={t.goals?.editGoals || 'Edit Goals'}
             className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 text-emerald-400 hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
@@ -196,6 +273,18 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
             <span>{t.goals?.editGoals || 'Edit Goals'}</span>
           </button>
         </div>
+
+        {/* Activity Level Badge inside Daily Target card (for Smart mode) */}
+        {activeMode === 'smart' && (
+          <div
+            data-testid="target-activity-badge"
+            className="flex items-center gap-2 p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs"
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="text-slate-400 text-[11px]">{t.settings.activityLevelLabel}:</span>
+            <span className="font-semibold text-white truncate">{activityLevelLabel}</span>
+          </div>
+        )}
 
         {/* Macro Distribution Bars & Pills */}
         <div className="space-y-2 pt-2 border-t border-slate-800/80">
@@ -251,108 +340,72 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
         </div>
       </div>
 
-      {/* Mode Details Summary Card */}
-      {activeMode === 'manual' ? (
-        <div data-testid="manual-mode-summary-card" className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-5 space-y-3">
+      {/* 4. Biometrics Card (Dedicated Physical Profile with its own Edit button) */}
+      <div
+        data-testid="biometrics-summary-card"
+        className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3.5"
+      >
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-            <Target className="w-4 h-4 text-emerald-400" />
-            <span>{t.goals?.activeMode || 'Active Mode'}: {t.settings.targetModeManual}</span>
+            <User className="w-4 h-4 text-emerald-400" />
+            <span>{t.goals?.biometricsTitle || t.settings.biometricsTitle || 'Biometrics'}</span>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            {t.goals?.manualModeDescription || 'You have full manual control over calorie and macronutrient targets.'}
-          </p>
+
+          <button
+            type="button"
+            id="btn-edit-biometrics"
+            data-testid="btn-edit-biometrics"
+            onClick={handleEditBiometricsClick}
+            aria-label={t.goals?.editBiometrics || 'Edit Biometrics'}
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 text-emerald-400 hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            <span>{t.goals?.editBiometrics || 'Edit'}</span>
+          </button>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {/* Biometrics Summary */}
-          <div data-testid="biometrics-summary-card" className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-5 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-                <Activity className="w-4 h-4 text-emerald-400" />
-                <span>{t.goals?.biometricsSummary || 'Biometrics & Activity'}</span>
-              </div>
-              <span data-testid="adaptive-status-badge" className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                isAdaptive
-                  ? 'bg-emerald-950 text-emerald-400 border-emerald-800/50'
-                  : 'bg-slate-800 text-slate-300 border-slate-700'
-              }`}>
-                {isAdaptive ? (t.goals?.adaptiveActive || 'Adaptive Active') : (t.goals?.adaptiveDeterministic || 'Deterministic')}
-              </span>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-              <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
-                  <User className="w-3 h-3 text-slate-400" />
-                  {t.settings.sexLabel}
-                </span>
-                <span className="font-semibold text-white capitalize">
-                  {biometrics?.sex === 'female' ? t.settings.sexFemale : t.settings.sexMale}
-                  {userAge ? ` • ${userAge}y` : ''}
-                </span>
-              </div>
-
-              <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
-                  <Ruler className="w-3 h-3 text-slate-400" />
-                  {t.settings.heightCmLabel}
-                </span>
-                <span className="font-semibold text-white font-mono">
-                  {biometrics?.height_cm || 170} cm
-                </span>
-              </div>
-
-              <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
-                  <Scale className="w-3 h-3 text-slate-400" />
-                  {t.settings.currentWeightKgLabel}
-                </span>
-                <span className="font-semibold text-white font-mono">
-                  {latestWeight.toFixed(1)} kg
-                </span>
-              </div>
-
-              <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
-                  <Activity className="w-3 h-3 text-slate-400" />
-                  {t.settings.activityLevelLabel}
-                </span>
-                <span className="font-semibold text-white truncate block">
-                  {activityLevelLabel}
-                </span>
-              </div>
-            </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
+            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+              <User className="w-3 h-3 text-slate-400" />
+              {t.settings.sexLabel}
+            </span>
+            <span className="font-semibold text-white capitalize">
+              {biometrics?.sex === 'female' ? t.settings.sexFemale : t.settings.sexMale}
+            </span>
           </div>
 
-          {/* Strategy Summary */}
-          <div data-testid="strategy-summary-card" className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-5 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              <span>{t.goals?.strategySummary || 'Goal Strategy'}</span>
-            </div>
+          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
+            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+              <User className="w-3 h-3 text-slate-400" />
+              {t.goals?.age?.replace('{{age}}', '') || 'Age'}
+            </span>
+            <span className="font-semibold text-white font-mono">
+              {userAge ? `${userAge}y` : '—'}
+            </span>
+          </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs">
-              <div>
-                <span className="font-bold text-white block text-sm">{goalTypeLabel}</span>
-                <span className="text-slate-400 text-[11px]">
-                  {goalConfig?.goal_type === 'lose' && goalConfig.weekly_rate_pct !== undefined
-                    ? `${goalConfig.weekly_rate_pct}% / week`
-                    : goalConfig?.goal_type === 'gain' && goalConfig.weekly_rate_pct !== undefined
-                    ? `+${goalConfig.weekly_rate_pct}% / week`
-                    : 'Target weight balance'}
-                </span>
-              </div>
+          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
+            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+              <Ruler className="w-3 h-3 text-slate-400" />
+              {t.settings.heightCmLabel}
+            </span>
+            <span className="font-semibold text-white font-mono">
+              {biometrics?.height_cm || 170} cm
+            </span>
+          </div>
 
-              <div className="text-right font-mono">
-                <span className="text-[11px] text-slate-400 block">Baseline TDEE</span>
-                <span className="font-bold text-emerald-300">
-                  {userSettings?.adaptive_state?.estimated_tdee || userSettings?.adaptive_state?.prior_tdee || calories} kcal
-                </span>
-              </div>
-            </div>
+          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
+            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+              <Scale className="w-3 h-3 text-slate-400" />
+              {t.settings.currentWeightKgLabel}
+            </span>
+            <span className="font-semibold text-white font-mono">
+              {latestWeight.toFixed(1)} kg
+            </span>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Mode Switch Confirmation Dialog */}
       {pendingModeSwitch !== null && (
@@ -401,11 +454,20 @@ export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () 
         </div>
       )}
 
-      {/* Full Edit Goals Slide-Over Modal */}
-      <GoalsEditModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        initialMode={activeMode}
+      {/* Focused Modals */}
+      <ManualGoalsEditModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+      />
+
+      <AdaptiveGoalsEditModal
+        isOpen={isAdaptiveModalOpen}
+        onClose={() => setIsAdaptiveModalOpen(false)}
+      />
+
+      <BiometricsEditModal
+        isOpen={isBiometricsModalOpen}
+        onClose={() => setIsBiometricsModalOpen(false)}
       />
     </div>
   );

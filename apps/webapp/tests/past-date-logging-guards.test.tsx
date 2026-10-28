@@ -195,13 +195,13 @@ describe('Past Date Logging Guards & Today Pill UX', () => {
 
       render(<UserProfileGoalsScreen />);
 
-      // Open Edit Modal
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
       fireEvent.change(weightInput, { target: { value: '78.5' } });
 
-      const saveBtn = screen.getByTestId('btn-save-nutritional-targets');
+      const saveBtn = screen.getByTestId('btn-save-biometrics');
       fireEvent.click(saveBtn);
 
       await waitFor(() => {

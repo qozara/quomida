@@ -7,7 +7,7 @@ import * as AppContextModule from '../src/context/AppContext.js';
 import en from '../../../packages/i18n-locales/locales/en.json';
 import type { UserSettings } from '@quomida/domain-core';
 
-describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
+describe('UserProfileGoalsScreen & Focused Modals Component Suite', () => {
   const mockUpdateUserSettings = vi.fn().mockResolvedValue(undefined);
   const mockLogWeight = vi.fn().mockResolvedValue(undefined);
 
@@ -90,26 +90,29 @@ describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
     cleanup();
   });
 
-  it('renders read-only pan cards with current calorie and macro targets in manual mode', () => {
+  it('1. renders Goal Strategy card below mode switcher with unified Target icon & title', () => {
     setupMockContext();
-    render(<UserProfileGoalsScreen />);
+    const { container } = render(<UserProfileGoalsScreen />);
 
     // Screen container
     expect(screen.getByTestId('user-profile-goals-screen')).toBeDefined();
 
-    // Summary Card
-    expect(screen.getByTestId('goals-summary-card')).toBeDefined();
-    expect(screen.getByTestId('summary-calories-value').textContent).toContain('2,000');
+    // Goal Strategy card exists
+    const strategyCard = screen.getByTestId('strategy-summary-card');
+    expect(strategyCard).toBeDefined();
+    expect(strategyCard.textContent).toContain('Goal Strategy');
+    expect(strategyCard.textContent).toContain('Manual Targets');
 
-    // Edit button exists
-    expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
+    // Daily Target card exists below it
+    const targetCard = screen.getByTestId('goals-summary-card');
+    expect(targetCard).toBeDefined();
 
-    // Edit inputs are not visible initially (since modal is closed)
-    expect(screen.queryByTestId('btn-back-goals-editor')).toBeNull();
-    expect(screen.queryByTestId('select-biometrics-sex')).toBeNull();
+    // Verify ordering in DOM: strategyCard comes before targetCard
+    const positionCompare = strategyCard.compareDocumentPosition(targetCard);
+    expect(positionCompare & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('triggers confirmation dialog when user clicks Smart / Adaptive switch from manual mode', () => {
+  it('2. triggers confirmation dialog when user clicks Smart / Adaptive switch from manual mode', () => {
     setupMockContext();
     render(<UserProfileGoalsScreen />);
 
@@ -127,7 +130,7 @@ describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
     expect(mockUpdateUserSettings).not.toHaveBeenCalled();
   });
 
-  it('switches to Smart / Adaptive mode upon confirmation in confirm dialog', async () => {
+  it('3. switches to Smart / Adaptive mode upon confirmation in confirm dialog', async () => {
     setupMockContext();
     render(<UserProfileGoalsScreen />);
 
@@ -145,33 +148,38 @@ describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
     expect(screen.queryByTestId('confirm-mode-switch-modal')).toBeNull();
   });
 
-  it('opens GoalsEditModal on Edit Goals button click and closes on back arrow', () => {
+  it('4. opens ManualGoalsEditModal when Edit Goals is clicked in manual mode', () => {
     setupMockContext();
     render(<UserProfileGoalsScreen />);
 
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByTestId('manual-goals-edit-modal')).toBeNull();
 
     // Click edit goals
     fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
-    // Modal dialog is open
-    expect(screen.getByRole('dialog')).toBeDefined();
-    expect(screen.getByTestId('btn-back-goals-editor')).toBeDefined();
+    // Manual editor is open
+    expect(screen.getByTestId('manual-goals-edit-modal')).toBeDefined();
+    expect(screen.getByTestId('btn-back-manual-goals')).toBeDefined();
+    expect(screen.getByTestId('input-calorie-target')).toBeDefined();
+    expect(screen.getByTestId('input-protein-target')).toBeDefined();
     expect(screen.getByTestId('btn-save-nutritional-targets')).toBeDefined();
 
+    // Biometrics inputs must NOT be inside this modal
+    expect(screen.queryByTestId('select-biometrics-sex')).toBeNull();
+    expect(screen.queryByTestId('btn-goal-lose')).toBeNull();
+
     // Click back button closes modal
-    fireEvent.click(screen.getByTestId('btn-back-goals-editor'));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByTestId('btn-back-manual-goals'));
+    expect(screen.queryByTestId('manual-goals-edit-modal')).toBeNull();
   });
 
-  it('edits manual targets inside GoalsEditModal and submits successfully', async () => {
+  it('5. edits manual targets inside ManualGoalsEditModal and submits successfully', async () => {
     setupMockContext();
     render(<UserProfileGoalsScreen />);
 
     fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
-    // Calorie input inside modal
-    const calInput = screen.getByDisplayValue('2000');
+    const calInput = screen.getByTestId('input-calorie-target') as HTMLInputElement;
     fireEvent.change(calInput, { target: { value: '2350' } });
 
     // Save
@@ -187,7 +195,7 @@ describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
     });
   });
 
-  it('renders biometrics and strategy summary cards when in smart/adaptive mode', () => {
+  it('6. opens AdaptiveGoalsEditModal when Edit Goals is clicked in smart mode and shows Activity level in Daily Target card', () => {
     setupMockContext({
       userSettings: {
         ...baseUserSettings,
@@ -196,8 +204,60 @@ describe('UserProfileGoalsScreen & GoalsEditModal Component Suite', () => {
     });
     render(<UserProfileGoalsScreen />);
 
+    // Activity level badge is rendered within the Daily Target card in smart mode
+    expect(screen.getByTestId('target-activity-badge')).toBeDefined();
+    expect(screen.getByTestId('target-activity-badge').textContent).toContain('Moderately Active');
+
+    // Click edit goals opens AdaptiveGoalsEditModal
+    fireEvent.click(screen.getByTestId('btn-edit-goals'));
+    expect(screen.getByTestId('adaptive-goals-edit-modal')).toBeDefined();
+    expect(screen.getByTestId('btn-back-adaptive-goals')).toBeDefined();
+    expect(screen.getByTestId('select-biometrics-activity')).toBeDefined();
+    expect(screen.getByTestId('btn-goal-lose')).toBeDefined();
+    expect(screen.getByTestId('slider-weekly-rate')).toBeDefined();
+    expect(screen.getByTestId('checkbox-adaptive-toggle')).toBeDefined();
+    expect(screen.getByTestId('preview-seed-tdee')).toBeDefined();
+
+    // Biometrics physical inputs must NOT be inside this modal
+    expect(screen.queryByTestId('select-biometrics-sex')).toBeNull();
+    expect(screen.queryByTestId('input-biometrics-height')).toBeNull();
+  });
+
+  it('7. opens BiometricsEditModal from Biometrics card and saves updated measurements', async () => {
+    setupMockContext();
+    render(<UserProfileGoalsScreen />);
+
+    // Biometrics card exists and has its own edit button
     expect(screen.getByTestId('biometrics-summary-card')).toBeDefined();
-    expect(screen.getByTestId('strategy-summary-card')).toBeDefined();
-    expect(screen.getByTestId('adaptive-status-badge')).toBeDefined();
+    const editBioBtn = screen.getByTestId('btn-edit-biometrics');
+    expect(editBioBtn).toBeDefined();
+
+    // Click Edit Biometrics
+    fireEvent.click(editBioBtn);
+
+    expect(screen.getByTestId('biometrics-edit-modal')).toBeDefined();
+    expect(screen.getByTestId('btn-back-biometrics')).toBeDefined();
+    expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
+    expect(screen.getByTestId('input-biometrics-birthdate')).toBeDefined();
+    expect(screen.getByTestId('input-biometrics-height')).toBeDefined();
+    expect(screen.getByTestId('input-biometrics-weight')).toBeDefined();
+
+    // Change height and weight
+    fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '185' } });
+    fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '84.0' } });
+
+    // Save Biometrics
+    fireEvent.click(screen.getByTestId('btn-save-biometrics'));
+
+    await waitFor(() => {
+      expect(mockLogWeight).toHaveBeenCalledWith(expect.any(String), 84.0);
+      expect(mockUpdateUserSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          biometrics: expect.objectContaining({
+            height_cm: 185
+          })
+        })
+      );
+    });
   });
 });

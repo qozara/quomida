@@ -140,20 +140,24 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
       fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
 
-      // Open Edit Modal to view and edit inputs
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
-
+      // Open Biometrics Edit Modal to view physical inputs
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
       expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-birthdate')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-height')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-weight')).toBeDefined();
+      expect(screen.getByTestId('preview-seed-tdee')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-back-biometrics'));
+
+      // Open Goals Edit Modal to view activity and strategy inputs
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
       expect(screen.getByTestId('select-biometrics-activity')).toBeDefined();
       expect(screen.getByTestId('btn-goal-lose')).toBeDefined();
       expect(screen.getByTestId('checkbox-adaptive-toggle')).toBeDefined();
       expect(screen.getByTestId('preview-seed-tdee')).toBeDefined();
 
       // Close modal
-      fireEvent.click(screen.getByTestId('btn-back-goals-editor'));
+      fireEvent.click(screen.getByTestId('btn-back-adaptive-goals'));
 
       // Switch back to Manual via Confirmation Dialog
       fireEvent.click(screen.getByTestId('btn-target-mode-manual'));
@@ -168,8 +172,8 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       });
       render(<UserProfileGoalsScreen />);
 
-      // Open Edit Modal
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Starts in Smart mode
       const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -207,13 +211,12 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       });
       render(<UserProfileGoalsScreen />);
 
-      // Open Edit Modal
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       const birthInput = screen.getByTestId('input-biometrics-birthdate') as HTMLInputElement;
       const heightInput = screen.getByTestId('input-biometrics-height') as HTMLInputElement;
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
-      const palSelect = screen.getByTestId('select-biometrics-activity') as HTMLSelectElement;
 
       // Initial state
       const initialBmr = parseInt(screen.getByTestId('preview-bmr-value').textContent || '0');
@@ -237,13 +240,20 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       const proteinGrams = parseInt(screen.getByTestId('preview-protein-value').textContent || '0');
       expect(proteinGrams).toBe(187);
 
+      // Close Biometrics modal
+      fireEvent.click(screen.getByTestId('btn-back-biometrics'));
+
+      // Open Goals Edit Modal to test Activity Level PAL options
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      const palSelect = screen.getByTestId('select-biometrics-activity') as HTMLSelectElement;
+
       // 4. Test all 5 Activity Level PAL options
       const pals = [
-        { val: '1.2', expectedTdee: Math.round(heavyBmr * 1.2) },
-        { val: '1.375', expectedTdee: Math.round(heavyBmr * 1.375) },
-        { val: '1.55', expectedTdee: Math.round(heavyBmr * 1.55) },
-        { val: '1.725', expectedTdee: Math.round(heavyBmr * 1.725) },
-        { val: '1.9', expectedTdee: Math.round(heavyBmr * 1.9) }
+        { val: '1.2', expectedTdee: Math.round(initialBmr * 1.2) },
+        { val: '1.375', expectedTdee: Math.round(initialBmr * 1.375) },
+        { val: '1.55', expectedTdee: Math.round(initialBmr * 1.55) },
+        { val: '1.725', expectedTdee: Math.round(initialBmr * 1.725) },
+        { val: '1.9', expectedTdee: Math.round(initialBmr * 1.9) }
       ];
 
       for (const pal of pals) {
@@ -326,15 +336,12 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
 
     it('1.5 verifies Adaptive Toggle checkbox saves deterministic_seed when unchecked and adaptive when checked', async () => {
       setupSettingsContext({
-        userSettings: { ...baseUserSettings, target_mode: 'smart' }
+        userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
       render(<UserProfileGoalsScreen />);
 
       // Open Edit Modal
       fireEvent.click(screen.getByTestId('btn-edit-goals'));
-
-      // Switch to smart
-      fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
 
       const checkbox = screen.getByTestId('checkbox-adaptive-toggle') as HTMLInputElement;
       const saveBtn = screen.getByTestId('btn-save-nutritional-targets');
@@ -371,12 +378,12 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
     });
 
     it('1.6 saving creates initial weight log for selectedDate and immediately updates Dashboard MacroRings', async () => {
-      let currentSettings = { ...baseUserSettings, daily_calorie_target: 2000 };
+      let currentSettings: UserSettings = { ...baseUserSettings, target_mode: 'adaptive', daily_calorie_target: 2000 };
       const listeners: Array<() => void> = [];
 
       // Test harness combining SettingsModal and MacroRings sharing live state
       const DualComponentHarness = () => {
-        const [settings, setSettings] = React.useState(currentSettings);
+        const [settings, setSettings] = React.useState<UserSettings>(currentSettings);
         const [logs, setLogs] = React.useState<WeightLog[]>([]);
 
         const updateSettings = async (updates: Partial<UserSettings>) => {
@@ -443,17 +450,14 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       // Initial MacroRings shows 2000 kcal target
       expect(screen.getByText(/\/ 2000 kcal/i)).toBeDefined();
 
-      // Open Edit Modal
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
-
-      // Open Smart targets in SettingsModal
-      fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Change weight to 80 kg
       fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '80' } });
 
       // Save
-      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
       // Verify MacroRings immediately updates to the new calculated calorie target!
       await waitFor(() => {
@@ -595,29 +599,26 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         expect(pillLogBtn).toBeDefined();
       });
 
-      // Open Goals screen editor
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
-      });
-
+      // Switch to smart mode on the main goals screen
       const smartTab = screen.getByTestId('btn-target-mode-smart');
       fireEvent.click(smartTab);
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
 
-      // Set biometrics: Male, 1990-01-01, 180cm, 80kg, PAL 1.55, Goal: Lose -0.5%/wk
+      // 1. Configure Biometrics: Male, 1990-01-01, 180cm, 80kg
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
       fireEvent.change(screen.getByTestId('select-biometrics-sex'), { target: { value: 'male' } });
       fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '180' } });
       fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '80' } });
-      fireEvent.change(screen.getByTestId('select-biometrics-activity'), { target: { value: '1.55' } });
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
-      // Check adaptive toggle
+      // 2. Configure Goals: PAL 1.55, Goal: Lose -0.5%/wk, Adaptive checked
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      fireEvent.change(screen.getByTestId('select-biometrics-activity'), { target: { value: '1.55' } });
       const adaptiveCheckbox = screen.getByTestId('checkbox-adaptive-toggle') as HTMLInputElement;
       if (!adaptiveCheckbox.checked) {
         fireEvent.click(adaptiveCheckbox);
       }
-
-      // Save goals
       fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
 
       // Verify Day 1 initial weight log and initial targets

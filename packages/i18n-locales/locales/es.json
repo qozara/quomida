@@ -448,7 +448,16 @@
     "currentStats": "Estadísticas Actuales",
     "age": "{{age}} años",
     "targetKcal": "Objetivo Diario",
-    "ratePerWeek": "{{rate}}% / semana"
+    "ratePerWeek": "{{rate}}% / semana",
+    "editBiometrics": "Editar Biometría",
+    "editManualTitle": "Editar Objetivos Manuales",
+    "editAdaptiveTitle": "Editar Estrategia de Objetivos",
+    "biometricsTitle": "Biometría",
+    "saveBiometrics": "Guardar Biometría",
+    "saveGoals": "Guardar Objetivos",
+    "saveTargets": "Guardar Objetivos",
+    "macroDistribution": "Distribución de Macros",
+    "weightNotice": "Actualizar tu peso aquí registra un nuevo pesaje para hoy."
   },
   "analytics": {
     "title": "Progreso",

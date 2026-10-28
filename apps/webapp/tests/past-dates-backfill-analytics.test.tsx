@@ -162,14 +162,21 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     await waitFor(() => {
       expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
     });
-    fireEvent.click(screen.getByTestId('btn-edit-goals'));
-    await waitFor(() => {
-      expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+
+    const smartTab = screen.getByTestId('btn-target-mode-smart');
+    fireEvent.click(smartTab);
+    expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+    // Configure biometrics
+    fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
     fireEvent.change(screen.getByTestId('select-biometrics-sex'), { target: { value: 'male' } });
     fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '180' } });
     fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '80' } });
+    fireEvent.click(screen.getByTestId('btn-save-biometrics'));
+
+    // Configure goals
+    fireEvent.click(screen.getByTestId('btn-edit-goals'));
     fireEvent.change(screen.getByTestId('select-biometrics-activity'), { target: { value: '1.55' } });
     const adaptiveCheckbox = screen.getByTestId('checkbox-adaptive-toggle') as HTMLInputElement;
     if (!adaptiveCheckbox.checked) {
@@ -300,15 +307,18 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     await waitFor(() => {
       expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
     });
-    fireEvent.click(screen.getByTestId('btn-edit-goals'));
-    await waitFor(() => {
-      expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+
+    const smartTab = screen.getByTestId('btn-target-mode-smart');
+    fireEvent.click(smartTab);
+    expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+    // Configure biometrics
+    fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
     fireEvent.change(screen.getByTestId('select-biometrics-sex'), { target: { value: 'female' } });
     fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '165' } });
     fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '65' } });
-    fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+    fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
     const closeSettingsBtn = screen.getByTestId('btn-close-settings');
     if (closeSettingsBtn) {

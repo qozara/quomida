@@ -471,13 +471,17 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
       fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
 
-      // Open Edit Modal to view and edit inputs
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Verify biometrics inputs appear
       expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-height')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-weight')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-back-biometrics'));
+
+      // Open Goals Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Verify goal buttons appear
       expect(screen.getByTestId('btn-goal-lose')).toBeDefined();
@@ -501,11 +505,11 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
       fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
 
-      // Open editor
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open biometrics editor
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Click save
-      const saveBtn = screen.getByTestId('btn-save-nutritional-targets');
+      const saveBtn = screen.getByTestId('btn-save-biometrics');
       fireEvent.click(saveBtn);
 
       await waitFor(() => {
@@ -516,7 +520,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
           expect.objectContaining({
             target_mode: expect.stringMatching(/adaptive|deterministic_seed/),
             biometrics: expect.any(Object),
-            goal_config: expect.any(Object),
             daily_calorie_target: expect.any(Number)
           })
         );
@@ -577,8 +580,8 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       rerender(<UserProfileGoalsScreen />);
 
-      // Open Edit Modal to view reactive form fields
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open Biometrics Edit Modal to view reactive form fields
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       await waitFor(() => {
         const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -616,12 +619,12 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       const { unmount } = render(<UserProfileGoalsScreen />);
 
-      // Open editor
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+      // Open biometrics editor
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
       fireEvent.change(weightInput, { target: { value: '78.5' } });
-      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
       await waitFor(() => {
         expect(mockLogWeight).toHaveBeenCalledWith(todayStr, 78.5);
@@ -653,8 +656,8 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       });
 
       render(<UserProfileGoalsScreen />);
-      fireEvent.click(screen.getByTestId('btn-edit-goals'));
-      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
       await waitFor(() => {
         expect(mockUpdateUserSettings).toHaveBeenCalled();

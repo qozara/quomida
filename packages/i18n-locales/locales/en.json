@@ -448,7 +448,16 @@
     "currentStats": "Current Stats",
     "age": "{{age}} years old",
     "targetKcal": "Daily Target",
-    "ratePerWeek": "{{rate}}% / week"
+    "ratePerWeek": "{{rate}}% / week",
+    "editBiometrics": "Edit Biometrics",
+    "editManualTitle": "Edit Manual Targets",
+    "editAdaptiveTitle": "Edit Goal Strategy",
+    "biometricsTitle": "Biometrics",
+    "saveBiometrics": "Save Biometrics",
+    "saveGoals": "Save Goals",
+    "saveTargets": "Save Targets",
+    "macroDistribution": "Macro Distribution",
+    "weightNotice": "Updating your weight here records a new weigh-in for today."
   },
   "analytics": {
     "title": "Progress",
