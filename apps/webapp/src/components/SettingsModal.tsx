@@ -51,6 +51,7 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose }) => {
   const {
     locale,
+    languagePreference,
     setLocale,
     theme,
     setTheme,
@@ -466,14 +467,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               {/* Language & Theme Controls */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1.5 font-medium">{t.settings.language}</label>
+                  <label htmlFor="select-language" className="text-xs text-slate-400 block mb-1.5 font-medium">{t.settings.language}</label>
                   <select
-                    value={locale}
+                    id="select-language"
+                    data-testid="select-language"
+                    value={languagePreference || locale || 'system'}
                     onChange={(e) => setLocale(e.target.value as any)}
                     className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                   >
-                    <option value="es">Español (LatAm)</option>
-                    <option value="en">English (US)</option>
+                    <option value="system">{t.settings.languageSystem || 'System default'}</option>
+                    <option value="es">{t.settings.languageEs || 'Spanish'}</option>
+                    <option value="en">{t.settings.languageEn || 'English'}</option>
                   </select>
                 </div>
 

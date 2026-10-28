@@ -30,13 +30,58 @@ import {
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
 import { useCloudProviderRegistry } from '../cloud-providers/index.js';
 
+export type LanguagePreference = 'system' | 'es' | 'en';
+
+export function isSpanishLocale(lang?: string | null): boolean {
+  if (!lang) return false;
+  const normalized = lang.trim().toLowerCase();
+  return normalized === 'es' || normalized.startsWith('es-') || normalized.startsWith('es_');
+}
+
+export function resolveSystemLocale(): LocaleKey {
+  if (typeof navigator !== 'undefined') {
+    if (Array.isArray(navigator.languages)) {
+      for (const lang of navigator.languages) {
+        if (isSpanishLocale(lang)) {
+          return 'es';
+        }
+      }
+    }
+    if (isSpanishLocale(navigator.language)) {
+      return 'es';
+    }
+  }
+  return 'en';
+}
+
+export function parseLanguagePreference(storedLocale?: string | null): LanguagePreference {
+  if (!storedLocale || storedLocale === 'system') {
+    return 'system';
+  }
+  if (isSpanishLocale(storedLocale)) {
+    return 'es';
+  }
+  if (storedLocale.toLowerCase().startsWith('en')) {
+    return 'en';
+  }
+  return 'system';
+}
+
+export function resolveEffectiveLocale(preference: LanguagePreference): LocaleKey {
+  if (preference === 'system') {
+    return resolveSystemLocale();
+  }
+  return preference;
+}
+
 interface AppContextType {
   db: QuomidaDatabase | null;
   dbService: LocalDBService;
   selectedDate: string; // YYYY-MM-DD
   setSelectedDate: (date: string) => void;
   locale: LocaleKey;
-  setLocale: (lang: LocaleKey) => void;
+  languagePreference: LanguagePreference;
+  setLocale: (lang: LanguagePreference) => void;
   theme: 'dark' | 'light' | 'system';
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   t: typeof dictionaries['es'];
@@ -109,7 +154,7 @@ interface AppContextType {
 
 const defaultSettings: UserSettings = {
   id: 'global_settings',
-  locale: 'es-AR',
+  locale: 'system',
   theme: 'dark',
   daily_calorie_target: 2000,
   custom_macros: { protein: 150, carbs: 200, fats: 65 },
@@ -181,7 +226,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [locale, setLocaleState] = useState<LocaleKey>('es');
+  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
+  const [locale, setLocaleState] = useState<LocaleKey>(() => resolveSystemLocale());
   const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('dark');
   const [userSettings, setUserSettings] = useState<UserSettings>(defaultSettings);
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
@@ -393,8 +439,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Load settings from repository
       const settings = await dbService.getSettings();
       setUserSettings(settings);
-      if (settings.locale?.startsWith('en')) setLocaleState('en');
-      else if (settings.locale?.startsWith('es')) setLocaleState('es');
+      const initialPref = parseLanguagePreference(settings?.locale);
+      setLanguagePreference(initialPref);
+      setLocaleState(resolveEffectiveLocale(initialPref));
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Check if we need to auto-connect before running boot adaptive calibration
@@ -417,8 +464,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
                   const updated = await dbService.getSettings();
                   setUserSettings(updated);
-                  if (updated.locale?.startsWith('en')) setLocaleState('en');
-                  else if (updated.locale?.startsWith('es')) setLocaleState('es');
+                  const updatedPref = parseLanguagePreference(updated?.locale);
+                  setLanguagePreference(updatedPref);
+                  setLocaleState(resolveEffectiveLocale(updatedPref));
                   if (updated.theme) setThemeState(updated.theme as any);
                 } finally {
                   setSyncStatus(newAdapter.getStatus());
@@ -480,11 +528,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
                 return json;
               });
-              if (json.locale?.startsWith('en')) {
-                setLocaleState((prev) => (prev !== 'en' ? 'en' : prev));
-              } else if (json.locale?.startsWith('es')) {
-                setLocaleState((prev) => (prev !== 'es' ? 'es' : prev));
-              }
+              const streamPref = parseLanguagePreference(json?.locale);
+              setLanguagePreference(streamPref);
+              setLocaleState(resolveEffectiveLocale(streamPref));
               if (json.theme) {
                 setThemeState((prev) => (prev !== json.theme ? json.theme as any : prev));
               }
@@ -628,12 +674,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [locale, theme]);
 
-  const setLocale = useCallback((lang: LocaleKey) => {
-    setLocaleState((prev) => (prev !== lang ? lang : prev));
+  // Listen for browser language changes when system default is selected
+  useEffect(() => {
+    if (languagePreference !== 'system') return;
+    const handleLanguageChange = () => {
+      setLocaleState(resolveSystemLocale());
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('languagechange', handleLanguageChange);
+      return () => {
+        window.removeEventListener('languagechange', handleLanguageChange);
+      };
+    }
+  }, [languagePreference]);
+
+  const setLocale = useCallback((targetPref: LanguagePreference) => {
+    setLanguagePreference(targetPref);
+    setLocaleState(resolveEffectiveLocale(targetPref));
     dbService.getSettings().then(async (current) => {
-      const targetLocale = lang === 'es' ? 'es-AR' : 'en-US';
-      if (current.locale !== targetLocale) {
-        await dbService.saveSettings({ locale: targetLocale });
+      if (current.locale !== targetPref) {
+        await dbService.saveSettings({ locale: targetPref });
         const updated = await dbService.getSettings();
         setUserSettings(updated);
         forceSync().catch(console.error);
@@ -768,8 +828,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
           const updated = await dbService.getSettings();
           setUserSettings(updated);
-          if (updated.locale?.startsWith('en')) setLocaleState('en');
-          else if (updated.locale?.startsWith('es')) setLocaleState('es');
+          const syncPref = parseLanguagePreference(updated?.locale);
+          setLanguagePreference(syncPref);
+          setLocaleState(resolveEffectiveLocale(syncPref));
           if (updated.theme) setThemeState(updated.theme as any);
         } finally {
           setSyncStatus(adapter.getStatus());
@@ -991,6 +1052,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedDate,
         setSelectedDate,
         locale,
+        languagePreference,
         setLocale,
         theme,
         setTheme,
