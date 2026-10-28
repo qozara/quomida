@@ -132,11 +132,16 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       const btnSmart = screen.getByTestId('btn-target-mode-smart');
 
       // Starts in manual (from baseUserSettings.target_mode)
-      expect(screen.getByText(en.settings.dailyTarget)).toBeDefined();
+      expect(screen.getByTestId('goals-summary-card')).toBeDefined();
       expect(screen.queryByTestId('select-biometrics-sex')).toBeNull();
 
-      // Switch to Smart
+      // Switch to Smart via Confirmation Dialog
       fireEvent.click(btnSmart);
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+      // Open Edit Modal to view and edit inputs
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-birthdate')).toBeDefined();
@@ -147,9 +152,13 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       expect(screen.getByTestId('checkbox-adaptive-toggle')).toBeDefined();
       expect(screen.getByTestId('preview-seed-tdee')).toBeDefined();
 
-      // Switch back to Manual
-      fireEvent.click(btnManual);
-      expect(screen.getByText(en.settings.dailyTarget)).toBeDefined();
+      // Close modal
+      fireEvent.click(screen.getByTestId('btn-back-goals-editor'));
+
+      // Switch back to Manual via Confirmation Dialog
+      fireEvent.click(screen.getByTestId('btn-target-mode-manual'));
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
       expect(screen.queryByTestId('select-biometrics-sex')).toBeNull();
     });
 
@@ -158,6 +167,9 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
       render(<UserProfileGoalsScreen />);
+
+      // Open Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Starts in Smart mode
       const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -194,6 +206,9 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
       render(<UserProfileGoalsScreen />);
+
+      // Open Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       const birthInput = screen.getByTestId('input-biometrics-birthdate') as HTMLInputElement;
       const heightInput = screen.getByTestId('input-biometrics-height') as HTMLInputElement;
@@ -243,6 +258,9 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         userSettings: { ...baseUserSettings, target_mode: 'adaptive' }
       });
       render(<UserProfileGoalsScreen />);
+
+      // Open Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       const btnLose = screen.getByTestId('btn-goal-lose');
       const btnMaintain = screen.getByTestId('btn-goal-maintain');
@@ -311,6 +329,9 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         userSettings: { ...baseUserSettings, target_mode: 'smart' }
       });
       render(<UserProfileGoalsScreen />);
+
+      // Open Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Switch to smart
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
@@ -421,6 +442,9 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
 
       // Initial MacroRings shows 2000 kcal target
       expect(screen.getByText(/\/ 2000 kcal/i)).toBeDefined();
+
+      // Open Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Open Smart targets in SettingsModal
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
@@ -571,8 +595,8 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
         expect(pillLogBtn).toBeDefined();
       });
 
-      // Open SettingsModal
-      fireEvent.click(screen.getByTestId('btn-test-open-settings'));
+      // Open Goals screen editor
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       await waitFor(() => {
         expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();

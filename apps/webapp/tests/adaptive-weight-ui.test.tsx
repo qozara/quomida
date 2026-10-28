@@ -466,8 +466,13 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(manualTab).toBeDefined();
       expect(smartTab).toBeDefined();
 
-      // Switch to Smart / Adaptive
+      // Switch to Smart / Adaptive via confirm dialog
       fireEvent.click(smartTab);
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+      // Open Edit Modal to view and edit inputs
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Verify biometrics inputs appear
       expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
@@ -491,8 +496,13 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       render(<UserProfileGoalsScreen />);
 
-      // Switch to smart
+      // Switch to smart via confirm dialog
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+      // Open editor
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Click save
       const saveBtn = screen.getByTestId('btn-save-nutritional-targets');
@@ -567,6 +577,9 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       rerender(<UserProfileGoalsScreen />);
 
+      // Open Edit Modal to view reactive form fields
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+
       await waitFor(() => {
         const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
         const heightInput = screen.getByTestId('input-biometrics-height') as HTMLInputElement;
@@ -603,6 +616,9 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       const { unmount } = render(<UserProfileGoalsScreen />);
 
+      // Open editor
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
+
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
       fireEvent.change(weightInput, { target: { value: '78.5' } });
       fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
@@ -637,6 +653,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       });
 
       render(<UserProfileGoalsScreen />);
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
       fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
 
       await waitFor(() => {

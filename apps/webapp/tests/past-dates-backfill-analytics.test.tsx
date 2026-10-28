@@ -160,6 +160,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Step 2: User sets up Smart/Adaptive targets today
     fireEvent.click(screen.getByTestId('btn-open-settings'));
     await waitFor(() => {
+      expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
+    });
+    fireEvent.click(screen.getByTestId('btn-edit-goals'));
+    await waitFor(() => {
       expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
     });
     fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
@@ -293,6 +297,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
     // Configure Smart targets
     fireEvent.click(screen.getByTestId('btn-open-settings'));
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
+    });
+    fireEvent.click(screen.getByTestId('btn-edit-goals'));
     await waitFor(() => {
       expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
     });

@@ -430,7 +430,23 @@
   },
   "goals": {
     "title": "Metas",
-    "subtitle": "Objetivos de calorías y macronutrientes"
+    "subtitle": "Objetivos de calorías y macronutrientes",
+    "editGoals": "Editar Metas",
+    "switchModeConfirmTitle": "¿Cambiar Modo de Objetivos?",
+    "switchToSmartMessage": "Cambiar a Inteligente / Adaptativo calculará tus calorías y macros automáticamente según tus datos biométricos y objetivo de peso. ¿Deseas continuar?",
+    "switchToManualMessage": "Cambiar a Manual te permite definir objetivos fijos de calorías y macronutrientes. Los ajustes adaptativos se pausarán. ¿Deseas continuar?",
+    "confirmSwitch": "Confirmar y Cambiar",
+    "cancel": "Cancelar",
+    "biometricsSummary": "Biometría y Actividad",
+    "strategySummary": "Estrategia de Objetivo",
+    "activeMode": "Modo Activo",
+    "manualModeDescription": "Tienes control manual total sobre los objetivos de calorías y macronutrientes.",
+    "adaptiveActive": "Algoritmo adaptativo activo (se ajusta semanalmente)",
+    "adaptiveDeterministic": "Base determinista (cálculo fijo)",
+    "currentStats": "Estadísticas Actuales",
+    "age": "{{age}} años",
+    "targetKcal": "Objetivo Diario",
+    "ratePerWeek": "{{rate}}% / semana"
   },
   "analytics": {
     "title": "Progreso",

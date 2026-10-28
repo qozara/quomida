@@ -430,7 +430,23 @@
   },
   "goals": {
     "title": "Goals",
-    "subtitle": "Calorie and macronutrient targets"
+    "subtitle": "Calorie and macronutrient targets",
+    "editGoals": "Edit Goals",
+    "switchModeConfirmTitle": "Switch Target Mode?",
+    "switchToSmartMessage": "Switching to Smart / Adaptive will calculate your daily calories and macros automatically based on your biometrics and weight goal. Would you like to proceed?",
+    "switchToManualMessage": "Switching to Manual allows you to set custom fixed calorie and macronutrient targets. Adaptive adjustments will be paused. Would you like to proceed?",
+    "confirmSwitch": "Confirm & Switch",
+    "cancel": "Cancel",
+    "biometricsSummary": "Biometrics & Activity",
+    "strategySummary": "Goal Strategy",
+    "activeMode": "Active Mode",
+    "manualModeDescription": "You have full manual control over calorie and macronutrient targets.",
+    "adaptiveActive": "Adaptive algorithm active (adjusts weekly)",
+    "adaptiveDeterministic": "Deterministic baseline (fixed calculation)",
+    "currentStats": "Current Stats",
+    "age": "{{age}} years old",
+    "targetKcal": "Daily Target",
+    "ratePerWeek": "{{rate}}% / week"
   },
   "analytics": {
     "title": "Progress",
