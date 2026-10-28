@@ -290,6 +290,20 @@ describe('Expanded Theme Options (System Default, Light, Dark)', () => {
       expect(cssContent).toContain('.text-amber-300');
       expect(cssContent).toContain('.text-cyan-300');
       expect(cssContent).toContain('.text-emerald-300');
+
+      // Verify universal white font conversion to dark slate in light mode
+      expect(cssContent).toContain('html:not(.dark) .text-white');
+      expect(cssContent).toContain('color: #0f172a !important;');
+
+      // Verify CTA buttons retain white text
+      expect(cssContent).toContain('html:not(.dark) button.bg-emerald-500');
+      expect(cssContent).toContain('html:not(.dark) button.bg-rose-500');
+
+      // Verify mobile hover states do not turn white
+      expect(cssContent).toContain('html:not(.dark) .hover\\:text-white:hover');
+
+      // Verify gradient containers disable background linear gradients in light mode
+      expect(cssContent).toContain('background-image: none !important;');
     });
   });
 });

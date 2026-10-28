@@ -114,6 +114,7 @@ html:not(.dark) [class^="bg-slate-950/"],
 html:not(.dark) [class*="from-slate-950"],
 html:not(.dark) [class*="to-slate-950"] {
   background-color: #f8fafc !important;
+  background-image: none !important;
 }
 
 /* Main card containers, modals, slide-overs, headers, and sheets (slate-900) -> Solid crisp white */
@@ -127,6 +128,7 @@ html:not(.dark) [class*="from-slate-900"],
 html:not(.dark) [class*="via-slate-900"],
 html:not(.dark) [class*="to-slate-900"] {
   background-color: #ffffff !important;
+  background-image: none !important;
 }
 
 /* Sub-containers, insets, inner cards, inactive pills, and table wrappers (slate-800) -> Clean light slate */
@@ -258,48 +260,63 @@ html:not(.dark) .text-purple-400 {
 }
 
 /* Headings & Labels styled with text-white should turn dark slate when on white cards */
-html:not(.dark) :is(h1, h2, h3, h4, h5, h6, label).text-white {
-  color: #0f172a !important;
-}
-html:not(.dark) span.text-white:not([class*="bg-emerald-500"] *):not([class*="bg-rose-500"] *):not([class*="bg-purple-600"] *):not([class*="bg-gradient"] *),
-html:not(.dark) div.text-white:not([class*="bg-emerald-500"] *):not([class*="bg-rose-500"] *):not([class*="bg-purple-600"] *):not([class*="bg-gradient"] *),
-html:not(.dark) p.text-white:not([class*="bg-emerald-500"] *):not([class*="bg-rose-500"] *):not([class*="bg-purple-600"] *):not([class*="bg-gradient"] *) {
+html:not(.dark) .text-white {
   color: #0f172a !important;
 }
 
-/* Keep white text on solid brand action buttons and badges */
-html:not(.dark) :is(
-  .bg-emerald-500,
-  .bg-emerald-600,
-  .bg-emerald-700,
-  .bg-rose-500,
-  .bg-rose-600,
-  .bg-purple-500,
-  .bg-purple-600,
-  .bg-blue-600,
-  .bg-teal-600,
-  [class*="bg-gradient-to"]
-) {
-  color: #ffffff !important;
-}
-html:not(.dark) :is(
-  .bg-emerald-500,
-  .bg-emerald-600,
-  .bg-emerald-700,
-  .bg-rose-500,
-  .bg-rose-600,
-  .bg-purple-500,
-  .bg-purple-600,
-  .bg-blue-600,
-  .bg-teal-600,
-  [class*="bg-gradient-to"]
-) :is(span, p, div, svg, strong) {
+/* Explicit exceptions: ONLY solid colored CTA buttons and solid badges retain crisp white text */
+html:not(.dark) button.bg-emerald-500,
+html:not(.dark) button.bg-emerald-600,
+html:not(.dark) button.bg-emerald-700,
+html:not(.dark) button.bg-rose-500,
+html:not(.dark) button.bg-rose-600,
+html:not(.dark) button.bg-purple-500,
+html:not(.dark) button.bg-purple-600,
+html:not(.dark) button.bg-blue-600,
+html:not(.dark) a.bg-emerald-500,
+html:not(.dark) a.bg-emerald-600,
+html:not(.dark) a.bg-rose-500,
+html:not(.dark) a.bg-purple-600,
+html:not(.dark) a.bg-blue-600,
+html:not(.dark) button.bg-emerald-500 *,
+html:not(.dark) button.bg-emerald-600 *,
+html:not(.dark) button.bg-emerald-700 *,
+html:not(.dark) button.bg-rose-500 *,
+html:not(.dark) button.bg-rose-600 *,
+html:not(.dark) button.bg-purple-500 *,
+html:not(.dark) button.bg-purple-600 *,
+html:not(.dark) button.bg-blue-600 *,
+html:not(.dark) a.bg-emerald-500 *,
+html:not(.dark) a.bg-emerald-600 *,
+html:not(.dark) a.bg-rose-500 *,
+html:not(.dark) a.bg-purple-600 *,
+html:not(.dark) a.bg-blue-600 * {
   color: #ffffff !important;
 }
 
 /* Ensure text-slate-950 on bright buttons (emerald/amber) stays dark */
 html:not(.dark) .text-slate-950 {
   color: #020617 !important;
+}
+
+/* Mobile & Desktop Hover Fixes: prevent hover states from inverting text into unreadable light shades */
+html:not(.dark) .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html:not(.dark) [class*="group-hover:text-emerald-300"]:hover,
+html:not(.dark) .group:hover [class*="group-hover:text-emerald-300"],
+html:not(.dark) [class*="hover:text-emerald-300"]:hover {
+  color: #059669 !important;
+}
+html:not(.dark) [class*="hover:bg-slate-900"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800\/40"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800\/50"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800"]:hover {
+  background-color: #f1f5f9 !important;
+}
+html:not(.dark) [class*="group-hover:bg-emerald-950"]:hover,
+html:not(.dark) .group:hover [class*="group-hover:bg-emerald-950"] {
+  background-color: #ecfdf5 !important;
 }
 
 /* 5. Colored Badges & Highlights */
@@ -334,6 +351,7 @@ html:not(.dark) [class*="border-purple-800"] {
 /* 6. Charts & SVG Visualizations */
 html:not(.dark) .glass-card {
   background: rgba(255, 255, 255, 0.95) !important;
+  background-image: none !important;
   border: 1px solid rgba(226, 232, 240, 0.9) !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03) !important;
 }

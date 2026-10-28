@@ -394,13 +394,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
             )}
 
             <div className="min-w-0 flex-1 space-y-1">
-              <h2 className="text-lg font-bold text-white truncate">{displayUserName}</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{displayUserName}</h2>
               <p className="text-xs text-slate-400 truncate">{displayUserEmail}</p>
 
               {/* Cloud Sync Status Pill */}
               <div className="pt-1 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                   {activeProvider?.name || 'Cloud'} • {t.sync?.header?.[uxSyncState] || t.sync?.header?.synced || 'Synced'}
                 </span>
               </div>
@@ -413,8 +413,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
             </div>
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white tracking-tight">Quomida</h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Quomida</h2>
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-400">
                   Local-first
                 </span>
               </div>
@@ -825,7 +825,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-white">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
                       {t.settings.catalogTitle || 'Food Catalog & Ingredients'}
                     </span>
                   </div>
@@ -1016,7 +1016,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       <LifeBuoy className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                      <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">
                         {(t.settings as any).supportHelp || 'Get Help & Support'}
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono">
@@ -1024,7 +1024,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       </div>
                     </div>
                   </div>
-                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                 </a>
 
                 <a
@@ -1038,7 +1038,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       <Shield className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                      <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">
                         {(t.settings as any).supportLegal || 'Legal & Privacy Inquiries'}
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono">
@@ -1046,7 +1046,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       </div>
                     </div>
                   </div>
-                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                 </a>
               </div>
 
@@ -1057,13 +1057,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   target="_blank"
                   rel="noopener noreferrer"
                   id="link-tos"
-                  className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+                  className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-white group transition-colors py-1 min-h-[44px]"
                 >
                   <span className="flex items-center gap-2 font-medium">
-                    <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                    <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     {(t.settings as any).termsOfService || 'Terms of Service'}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
                 </a>
 
                 <div className="border-t border-slate-900" />
@@ -1073,16 +1073,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   target="_blank"
                   rel="noopener noreferrer"
                   id="link-privacy"
-                  className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+                  className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-white group transition-colors py-1 min-h-[44px]"
                 >
                   <div className="flex items-center gap-2 font-medium">
-                    <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                    <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     <span>{(t.settings as any).privacyPolicy || 'Privacy Policy'}</span>
                     <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono">
                       {(t.settings as any).googleComplianceBadge || 'Google Limited Use Compliant'}
                     </span>
                   </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
                 </a>
 
                 <div className="border-t border-slate-900" />
@@ -1092,13 +1092,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   target="_blank"
                   rel="noopener noreferrer"
                   id="link-license"
-                  className="flex items-center justify-between text-xs text-slate-300 hover:text-white group transition-colors py-1 min-h-[44px]"
+                  className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-white group transition-colors py-1 min-h-[44px]"
                 >
                   <span className="flex items-center gap-2 font-medium">
-                    <Scale className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400" />
+                    <Scale className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     {(t.settings as any).license || 'Open Source License (Apache 2.0)'}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
                 </a>
               </div>
 

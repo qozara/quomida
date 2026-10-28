@@ -251,7 +251,7 @@ const AnalyticsScreenContent: React.FC = () => {
             <span>{t.analytics.estimatedTdee}</span>
           </div>
           <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white font-mono">
+            <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
               {displayedTdee !== null ? displayedTdee : '--'}
             </span>
             <span className="text-xs text-slate-400">{t.analytics.kcalPerDay}</span>
@@ -265,7 +265,7 @@ const AnalyticsScreenContent: React.FC = () => {
             <span>{t.analytics.sevenDayDelta}</span>
           </div>
           <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white font-mono">
+            <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
               {analytics.weekly_trend_rate_kg > 0 ? '+' : ''}
               {analytics.weekly_trend_rate_kg}
             </span>
@@ -374,8 +374,8 @@ const AnalyticsScreenContent: React.FC = () => {
                 >
                   <div className="flex flex-col min-w-0 pr-2">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-mono font-semibold text-slate-100">{entry.date}</span>
-                      <span className="font-bold text-white font-mono">
+                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-100">{entry.date}</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono">
                         {entry.weight_kg} {t.weight.unitKg}
                       </span>
                       <span className="text-[11px] text-emerald-400 font-mono">
@@ -420,8 +420,8 @@ const AnalyticsScreenContent: React.FC = () => {
                 >
                   <div className="flex flex-col min-w-0 pr-2">
                     <div className="flex items-baseline flex-wrap gap-2">
-                      <span className="font-mono font-semibold text-slate-100">{day.date}</span>
-                      <span className="font-bold text-white font-mono">
+                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-100">{day.date}</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono">
                         {day.intakeKcal} {t.analytics.unitKcal}
                       </span>
                       <span className="text-[11px] text-amber-400 font-mono">

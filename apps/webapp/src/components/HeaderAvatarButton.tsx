@@ -27,7 +27,7 @@ export const HeaderAvatarButton: React.FC = () => {
       data-testid="btn-open-settings-avatar"
       onClick={() => setIsSettingsOpen(true)}
       aria-label={t.settings.title}
-      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-300 hover:text-white transition-all active:scale-95 group focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all active:scale-95 group focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
     >
       {isCloudConnected && userPicture ? (
         <img

@@ -173,12 +173,12 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
           type="button"
           onClick={onClose}
           aria-label="Back"
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="text-center flex-1 mx-2 min-w-0">
-          <h2 className="text-sm font-bold text-white truncate">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">
             {t.goals?.editAdaptiveTitle || 'Edit Goal Strategy'}
           </h2>
         </div>

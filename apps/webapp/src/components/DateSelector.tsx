@@ -101,12 +101,12 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           data-testid="btn-date-prev"
           onClick={handlePrevDay}
           aria-label={t.date?.previousDay || 'Previous day'}
-          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-white transition-colors active:scale-95 shrink-0"
+          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95 shrink-0"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
 
-        <span className="text-xs sm:text-xs font-semibold text-slate-100 capitalize w-[84px] sm:w-[90px] text-center select-none truncate shrink-0">
+        <span className="text-xs sm:text-xs font-semibold text-slate-800 dark:text-slate-100 capitalize w-[84px] sm:w-[90px] text-center select-none truncate shrink-0">
           {displayDateText}
         </span>
 
@@ -116,7 +116,7 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           data-testid="btn-date-next"
           onClick={handleNextDay}
           aria-label={t.date?.nextDay || 'Next day'}
-          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-white transition-colors active:scale-95 shrink-0"
+          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95 shrink-0"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
