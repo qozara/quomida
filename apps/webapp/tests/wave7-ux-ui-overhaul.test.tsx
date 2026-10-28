@@ -104,6 +104,24 @@ describe('Wave 7 UI/UX Overhaul Specifications', () => {
       expect(screen.getByTestId('btn-open-settings')).toBeDefined();
     });
 
+    it('renders with modern floating pill layout, rounded corners, and frosted glass transparency', () => {
+      const onSelectTab = vi.fn();
+      render(<BottomNav activeTab="diary" onSelectTab={onSelectTab} />);
+
+      const navElement = screen.getByRole('tablist');
+      expect(navElement).toBeDefined();
+
+      // Verify floating pill styling and rounded corners
+      expect(navElement.className).toMatch(/floating-bottom-nav/);
+      expect(navElement.className).toMatch(/rounded-\[28px\]|rounded-full/);
+      expect(navElement.className).toMatch(/max-w-md/);
+
+      // Verify outer wrapper provides floating fixed positioning
+      const wrapper = navElement.parentElement;
+      expect(wrapper?.className).toMatch(/fixed bottom-/);
+      expect(wrapper?.className).toMatch(/z-30/);
+    });
+
     it('switches tabs on click', () => {
       const onSelectTab = vi.fn();
       render(<BottomNav activeTab="diary" onSelectTab={onSelectTab} />);

@@ -390,3 +390,30 @@ html:not(.dark) .shadow-xl {
 html:not(.dark) .shadow-2xl {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1) !important;
 }
+
+/* 7. Floating Bottom Navigation Bar (iOS / Android Modern UI) */
+.floating-bottom-nav {
+  background-color: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}
+
+html:not(.dark) .floating-bottom-nav {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(226, 232, 240, 0.85) !important;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06) !important;
+}
+
+html:not(.dark) .floating-bottom-nav .active-nav-pill {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html:not(.dark) .floating-bottom-nav .active-nav-label {
+  color: #047857 !important;
+}
