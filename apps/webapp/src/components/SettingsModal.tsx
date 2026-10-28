@@ -193,8 +193,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
   }
 
   const isCloudConnected = Boolean(
-    (activeProvider && activeProvider.getStatus() !== 'disconnected' && activeProvider.name !== 'Mock Storage') ||
-    (userSettings?.active_cloud_provider?.id && userSettings.active_cloud_provider.id !== 'mock')
+    (activeProvider && activeProvider.getStatus() !== 'disconnected') ||
+    userSettings?.active_cloud_provider?.id
   );
 
   const displayUserName = userName || t.settings?.accountLocalUser || 'Local Profile';

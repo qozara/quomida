@@ -28,10 +28,10 @@ import {
   weightLogsSchema
 } from '@quomida/domain-core';
 import {
-  MockCloudSyncProvider,
   GoogleDriveSheetsCloudSyncProvider,
   type GoogleHttpClient
 } from '@quomida/cloud-providers';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers/testing';
 import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
@@ -311,7 +311,7 @@ describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Sui
         id: 'mock-sync-adapter',
         name: 'Mock Cloud Connector',
         description: 'Mock',
-        iconType: 'mock',
+        iconType: 'custom',
         connect: async () => ({ adapter: sharedAdapter, credentials: {} }),
         restore: async () => sharedAdapter
       }
@@ -507,7 +507,7 @@ describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Sui
         id: 'mock-sync-adapter',
         name: 'Mock Cloud Connector',
         description: 'Mock',
-        iconType: 'mock',
+        iconType: 'custom',
         connect: async () => ({ adapter: sharedAdapter, credentials: {} }),
         restore: async () => sharedAdapter
       }

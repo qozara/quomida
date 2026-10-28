@@ -37,4 +37,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0030: Multi-Device User Settings Synchronization, Zero-Epoch Seed & Credential Isolation](./0030-multi-device-settings-sync-and-credential-isolation.md)
 * [ADR 0031: Event-Driven PWA Service Worker Update Lifecycle, Prompt Toast & Manual Settings Check](./0031-pwa-service-worker-update-lifecycle-and-prompt-ux.md)
 * [ADR 0032: Dedicated Top-Level Profile & Goals Page and Settings Decoupling](./0032-dedicated-profile-and-goals-page-and-settings-decoupling.md)
+* [ADR 0033: Isolation of Mock Cloud Sync Provider to Test Packages and Removal from Production UI](./0033-quomida-mock-cloud-sync-isolation-to-test-packages.md)
 

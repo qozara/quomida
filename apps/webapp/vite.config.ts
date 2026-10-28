@@ -194,6 +194,7 @@ export default defineConfig(({ mode }) => {
   resolve: {
     alias: {
       '@quomida/domain-core': path.resolve(__dirname, '../../packages/domain-core/src/index.ts'),
+      '@quomida/cloud-providers/testing': path.resolve(__dirname, '../../packages/cloud-providers/src/testing/index.ts'),
       '@quomida/cloud-providers': path.resolve(__dirname, '../../packages/cloud-providers/src/index.ts'),
       '@quomida/ai-services': path.resolve(__dirname, '../../packages/ai-services/src/index.ts'),
       '@quomida/i18n-locales': path.resolve(__dirname, '../../packages/i18n-locales/src/index.ts')

@@ -1,5 +1,5 @@
-import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from './types.js';
-import { shouldAcceptIncomingDoc, sanitizeRemoteDocument } from './strategy/CompositeCloudSyncProvider.js';
+import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from '../types.js';
+import { shouldAcceptIncomingDoc, sanitizeRemoteDocument } from '../strategy/CompositeCloudSyncProvider.js';
 
 export class MockCloudSyncProvider implements CloudSyncProvider {
   id = 'mock-sync-adapter';
@@ -133,4 +133,3 @@ export class MockCloudSyncProvider implements CloudSyncProvider {
     this.setStatus('idle');
   }
 }
-

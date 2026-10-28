@@ -3,9 +3,9 @@ import { formatRelativeTime } from '../src/components/sync/SyncTimestamp.js';
 import {
   resolveUXStatus,
   resolveProviderDiagnostic,
-  MockCloudSyncProvider,
   GoogleDriveSheetsCloudSyncProvider
 } from '@quomida/cloud-providers';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers/testing';
 
 
 describe('Sync Inspector UI Logic & Time Formatter (WCAG 2.2)', () => {

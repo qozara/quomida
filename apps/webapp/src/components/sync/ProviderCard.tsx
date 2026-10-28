@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, HardDrive, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Cloud, AlertTriangle, ExternalLink } from 'lucide-react';
 import { StatusDot } from './StatusDot.js';
 import { useApp } from '../../context/AppContext.js';
 import { resolveProviderDiagnostic, type UXSyncState } from '@quomida/cloud-providers';
@@ -8,7 +8,7 @@ export interface ProviderInfo {
   id: string;
   name: string;
   description: string;
-  iconType: 'mock' | 'gdrive' | 'custom';
+  iconType: 'gdrive' | 'custom';
 }
 
 export interface ProviderCardProps {
@@ -70,9 +70,6 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   const getIcon = () => {
     if (provider.iconType === 'gdrive') {
       return <Cloud className="w-5 h-5 text-emerald-400" />;
-    }
-    if (provider.iconType === 'mock') {
-      return <HardDrive className="w-5 h-5 text-cyan-400" />;
     }
     return <Cloud className="w-5 h-5 text-indigo-400" />;
   };

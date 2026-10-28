@@ -12,8 +12,8 @@ export const HeaderAvatarButton: React.FC = () => {
 
   // Cloud Connection & Profile Picture
   const isCloudConnected = Boolean(
-    (activeProvider && activeProvider.getStatus() !== 'disconnected' && activeProvider.name !== 'Mock Storage') ||
-    (userSettings?.active_cloud_provider?.id && userSettings.active_cloud_provider.id !== 'mock')
+    (activeProvider && activeProvider.getStatus() !== 'disconnected') ||
+    userSettings?.active_cloud_provider?.id
   );
 
   const userPicture =

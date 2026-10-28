@@ -4,7 +4,7 @@ export interface CloudProviderFactory {
   id: string;
   name: string;
   description: string;
-  iconType: 'mock' | 'gdrive' | 'custom';
+  iconType: 'gdrive' | 'custom';
   
   /**
    * Connects interactively or fetches new credentials if necessary.
