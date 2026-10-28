@@ -34,7 +34,7 @@ We promote **User Profile & Goals** to a top-level primary page within the main 
 
 4. **Bi-directional Navigation & Context State (`AppContext.tsx`, `App.tsx`)**:
    - `AppContext` provides `isProfileOpen` and `setIsProfileOpen` alongside existing page state flags.
-   - `App.tsx` sticky header dynamically renders the section title and a settings launcher button (`#btn-profile-open-settings`) when on the Profile & Goals screen.
+   - `App.tsx` sticky header dynamically renders the section title and the unified top-left profile/cloud avatar button (`#btn-open-settings-avatar`) across all 4 main screens (Dashboard, Progress, My Foods, and Goals).
    - Slide-over navigation history seamlessly tracks and restores previous views when opening and closing `SettingsModal`.
 
 ## Consequences

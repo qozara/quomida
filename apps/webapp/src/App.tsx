@@ -17,8 +17,9 @@ import { BottomNav, type NavTab } from './components/navigation/BottomNav.js';
 import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import { UserProfileGoalsScreen } from './components/profile/UserProfileGoalsScreen.js';
+import { HeaderAvatarButton } from './components/HeaderAvatarButton.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Cloud, X, Settings, Target, BarChart3, FolderHeart } from 'lucide-react';
+import { Cloud, X, Target, BarChart3, FolderHeart } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -192,18 +193,8 @@ export const DashboardContent: React.FC = () => {
       ) : (
         <div className="sticky top-0 z-30 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/40">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
-            <div className="w-10">
-              {activeTab === 'settings' && (
-                <button
-                  id="btn-profile-open-settings"
-                  data-testid="btn-profile-open-settings"
-                  onClick={() => setIsSettingsOpen(true)}
-                  aria-label={t.settings.title}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-full text-slate-400 hover:text-white transition-all active:scale-95"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-              )}
+            <div className="w-10 flex items-center justify-start shrink-0">
+              <HeaderAvatarButton />
             </div>
             <h1 className="text-sm font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
               {activeTab === 'analytics' ? (
@@ -237,7 +228,7 @@ export const DashboardContent: React.FC = () => {
         ) : activeTab === 'catalog' ? (
           <CatalogManager onSelectFood={(item) => handleOpenPortionModal(item, 'meal_lunch', 'catalog')} />
         ) : activeTab === 'settings' ? (
-          <UserProfileGoalsScreen onOpenSettings={() => setIsSettingsOpen(true)} />
+          <UserProfileGoalsScreen />
         ) : (
           <>
             {/* Onboarding Banner for Fresh Devices */}

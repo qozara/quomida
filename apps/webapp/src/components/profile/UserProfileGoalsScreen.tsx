@@ -6,11 +6,7 @@ import { ManualGoalsEditModal } from './ManualGoalsEditModal.js';
 import { AdaptiveGoalsEditModal } from './AdaptiveGoalsEditModal.js';
 import { BiometricsEditModal } from './BiometricsEditModal.js';
 
-interface UserProfileGoalsScreenProps {
-  onOpenSettings?: () => void;
-}
-
-export const UserProfileGoalsScreen: React.FC<UserProfileGoalsScreenProps> = () => {
+export const UserProfileGoalsScreen: React.FC = () => {
   const {
     t,
     userSettings,

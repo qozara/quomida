@@ -127,6 +127,44 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
       fireEvent.click(avatarBtn);
       expect(mockSetIsSettingsOpen).toHaveBeenCalledWith(true);
     });
+
+    it('renders the same avatar button across all 4 main screens (Diary, Progress, My Foods, Goals) and removes gear icon from Goals', () => {
+      // 1. Diary
+      vi.spyOn(AppContext, 'useApp').mockReturnValue({
+        ...baseContext
+      } as any);
+      const { unmount: unmountDiary } = render(<DashboardContent />);
+      expect(screen.getByTestId('btn-open-settings-avatar')).toBeDefined();
+      unmountDiary();
+
+      // 2. Progress / Analytics
+      vi.spyOn(AppContext, 'useApp').mockReturnValue({
+        ...baseContext,
+        isAnalyticsOpen: true
+      } as any);
+      const { unmount: unmountAnalytics } = render(<DashboardContent />);
+      expect(screen.getByTestId('btn-open-settings-avatar')).toBeDefined();
+      unmountAnalytics();
+
+      // 3. My Foods / Catalog
+      vi.spyOn(AppContext, 'useApp').mockReturnValue({
+        ...baseContext,
+        isCatalogOpen: true
+      } as any);
+      const { unmount: unmountCatalog } = render(<DashboardContent />);
+      expect(screen.getByTestId('btn-open-settings-avatar')).toBeDefined();
+      unmountCatalog();
+
+      // 4. Goals
+      vi.spyOn(AppContext, 'useApp').mockReturnValue({
+        ...baseContext,
+        isProfileOpen: true
+      } as any);
+      const { unmount: unmountGoals } = render(<DashboardContent />);
+      expect(screen.getByTestId('btn-open-settings-avatar')).toBeDefined();
+      expect(screen.queryByTestId('btn-profile-open-settings')).toBeNull();
+      unmountGoals();
+    });
   });
 
   describe('Modern Settings Full-Screen Slide-Over', () => {

@@ -223,8 +223,8 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
       </GoogleOAuthProvider>
     );
 
-    // Profile & Goals main screen is displayed with settings launcher button
-    const openSettingsBtn = screen.getByTestId('btn-profile-open-settings');
+    // Profile & Goals main screen is displayed with unified avatar settings launcher button
+    const openSettingsBtn = screen.getByTestId('btn-open-settings-avatar');
     expect(openSettingsBtn).toBeDefined();
 
     // User clicks Settings launcher
@@ -274,8 +274,8 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
       </GoogleOAuthProvider>
     );
 
-    // Profile & Goals main screen is displayed with settings launcher button
-    const openSettingsBtn = screen.getByTestId('btn-profile-open-settings');
+    // Profile & Goals main screen is displayed with unified avatar settings launcher button
+    const openSettingsBtn = screen.getByTestId('btn-open-settings-avatar');
     expect(openSettingsBtn).toBeDefined();
 
     // User clicks Settings launcher
