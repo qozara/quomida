@@ -11,6 +11,7 @@ import { singularizeWord } from '../recipes/RecipeManager.js';
 export interface ICatalogProvider {
   searchIngredients(query: string, limit?: number): Promise<BaseIngredient[]>;
   getPortionsForIngredient(baseFoodId: string): Promise<Portion[]>;
+  getIngredientsByIds?(ids: string[]): Promise<BaseIngredient[]>;
 }
 
 export interface FoodSearchOptions {

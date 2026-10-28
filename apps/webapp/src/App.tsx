@@ -17,7 +17,7 @@ import { AddFoodModal } from './components/AddFoodModal.js';
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt.js';
 import { UserProfileGoalsScreen } from './components/profile/UserProfileGoalsScreen.js';
 import type { BaseIngredient, FoodItem, MealType } from '@quomida/domain-core';
-import { Cloud, X, Settings, Target, BarChart3 } from 'lucide-react';
+import { Cloud, X, Settings, Target, BarChart3, FolderHeart } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const {
@@ -211,7 +211,10 @@ export const DashboardContent: React.FC = () => {
                   <span>{t.analytics?.title || t.nav?.analytics || 'Progress'}</span>
                 </>
               ) : activeTab === 'catalog' ? (
-                <span>{t.catalog?.title || t.nav?.catalog || 'Catalog'}</span>
+                <>
+                  <FolderHeart className="w-4 h-4 text-emerald-400" />
+                  <span>{t.nav?.catalog || t.catalog?.title || 'My Foods'}</span>
+                </>
               ) : (
                 <>
                   <Target className="w-4 h-4 text-emerald-400" />

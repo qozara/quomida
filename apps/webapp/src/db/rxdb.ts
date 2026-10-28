@@ -533,6 +533,24 @@ export class LocalDBService {
     );
   }
 
+  observeRecentDailyLogs(cutoffDate: string): Observable<DailyLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.daily_logs) {
+      return of([]);
+    }
+    return db.daily_logs.find({
+      selector: {
+        date: {
+          $gte: cutoffDate
+        }
+      }
+    }).$.pipe(
+      map((docs: any[]) =>
+        docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      )
+    );
+  }
+
   observeIngredients(): Observable<BaseIngredient[]> {
     if (!this.db) {
       throw new Error('Database not initialized.');

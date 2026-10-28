@@ -318,12 +318,13 @@
     "editRecipe": "Edit Recipe"
   },
   "catalog": {
-    "title": "Food Catalog Manager",
+    "title": "My Foods",
     "newFood": "New",
     "newCustomIngredient": "New Single Food (100g base)",
     "editCustomIngredient": "Edit Single Food (100g base)",
     "combineFoods": "Combine Foods (Recipe)",
     "searchPlaceholder": "Search catalog...",
+    "filterRecent": "Recently used",
     "filterAll": "All",
     "filterIngredients": "Ingredients",
     "filterRecipes": "Recipes",
@@ -331,6 +332,7 @@
     "deleteRecipeConfirm": "Are you sure you want to delete this recipe?",
     "noFoodsFound": "No foods found",
     "noCustomFoodsYet": "No custom foods or recipes added yet",
+    "noRecentFoods": "No recently used foods or recipes in the last 60 days",
     "composeDishAi": "✨ Compose dish or estimate with AI for \"{query}\"",
     "composeDishAiSubtitle": "Decompose into ingredients and save as a new recipe in your catalog",
     "saveAndLog": "Save & Log to {{meal}}",

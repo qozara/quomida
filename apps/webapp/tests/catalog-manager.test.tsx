@@ -149,7 +149,8 @@ describe('CatalogManager - Custom Portions UI', () => {
       protein_100g: 8.5,
       carbs_100g: 1.5,
       fats_100g: 4.5,
-      portions: [{ name: 'Half block', equivalent_weight_g: 150 }]
+      portions: [{ name: 'Half block', equivalent_weight_g: 150 }],
+      updatedAt: Date.now()
     };
 
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
@@ -204,10 +205,12 @@ describe('CatalogManager - Recipes Integration', () => {
       carbs: 80,
       fats: 10
     },
+    updatedAt: Date.now(),
     recipe: {
       id: 'recipe_lentil_stew',
       name: 'Lentil Stew',
       yield_factor: 1.11,
+      updatedAt: Date.now(),
       ingredients: [
         {
           food_id: 'ing_lentils',
@@ -237,7 +240,7 @@ describe('CatalogManager - Recipes Integration', () => {
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
       isCatalogOpen: true,
       ingredients: [],
-      recipes: [],
+      recipes: [sampleRecipeFood.recipe],
       recipeFoods: [sampleRecipeFood],
       addCustomIngredient: vi.fn(),
       removeCustomIngredient: vi.fn(),
@@ -458,6 +461,93 @@ describe('CatalogManager - Recipes Integration', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /tofu stir fry with veggies/i })).toBeNull();
     });
+  });
+
+  it('renders "My Foods" screen with "Recently used" as default active filter, and supports switching between filters', async () => {
+    const recentRecipeFood: any = {
+      id: 'rec_recent',
+      name: 'Recent Oatmeal',
+      kind: 'recipe',
+      source: 'custom',
+      calories_100g: 150,
+      protein_100g: 5,
+      carbs_100g: 27,
+      fats_100g: 3,
+      raw_weight_g: 100,
+      cooked_weight_g: 250,
+      yield_factor: 2.5,
+      total_macros: { calories: 375, protein: 12.5, carbs: 67.5, fats: 7.5 },
+      updatedAt: Date.now(),
+      recipe: { id: 'rec_recent', name: 'Recent Oatmeal', yield_factor: 2.5, ingredients: [], updatedAt: Date.now() }
+    };
+
+    const oldIngredient: any = {
+      id: 'ing_old',
+      name: 'Old Ancient Grain',
+      kind: 'ingredient',
+      source: 'custom',
+      calories_100g: 300,
+      protein_100g: 10,
+      carbs_100g: 60,
+      fats_100g: 2,
+      // Older than 60 days
+      updatedAt: Date.now() - 90 * 24 * 60 * 60 * 1000
+    };
+
+    const mockSelectFood = vi.fn();
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      isCatalogOpen: true,
+      ingredients: [oldIngredient],
+      recipes: [recentRecipeFood.recipe],
+      recipeFoods: [recentRecipeFood],
+      addCustomIngredient: vi.fn(),
+      removeCustomIngredient: vi.fn(),
+      addRecipe: vi.fn(),
+      removeRecipe: vi.fn(),
+      setIsCatalogOpen: vi.fn(),
+      db: {}
+    } as any);
+
+    render(<CatalogManager onSelectFood={mockSelectFood} />);
+
+    // Screen title / region has accessible name "My Foods"
+    expect(screen.getByRole('region', { name: /my foods/i })).toBeDefined();
+
+    // "Recently used" button is active by default and shows count of 1 (the recent recipe)
+    const recentFilterBtn = screen.getByText(/recently used/i);
+    expect(recentFilterBtn.className).toContain('bg-emerald-600');
+    expect(recentFilterBtn.textContent).toContain('(1)');
+
+    // Recent recipe is displayed, old ingredient is not
+    expect(screen.getByText('Recent Oatmeal')).toBeDefined();
+    expect(screen.queryByText('Old Ancient Grain')).toBeNull();
+
+    // Clicking '+' on the card triggers onSelectFood
+    const plusButtons = screen.getAllByLabelText(/add recipe to log|add food to log/i);
+    expect(plusButtons.length).toBeGreaterThan(0);
+    fireEvent.click(plusButtons[0]);
+    expect(mockSelectFood).toHaveBeenCalledWith(expect.objectContaining({ id: 'rec_recent' }));
+
+    // Switch to "All" filter
+    const allFilterBtn = screen.getByText(/^All/);
+    fireEvent.click(allFilterBtn);
+
+    // Now both the recent recipe and the old ingredient are visible
+    expect(screen.getByText('Recent Oatmeal')).toBeDefined();
+    expect(screen.getByText('Old Ancient Grain')).toBeDefined();
+
+    // Switch to "Ingredients" filter
+    const ingredientsFilterBtn = screen.getByText(/^Ingredients/);
+    fireEvent.click(ingredientsFilterBtn);
+
+    expect(screen.queryByText('Recent Oatmeal')).toBeNull();
+    expect(screen.getByText('Old Ancient Grain')).toBeDefined();
+
+    // Switch back to "Recently used" filter
+    fireEvent.click(screen.getByText(/recently used/i));
+    expect(screen.getByText('Recent Oatmeal')).toBeDefined();
+    expect(screen.queryByText('Old Ancient Grain')).toBeNull();
   });
 });
 

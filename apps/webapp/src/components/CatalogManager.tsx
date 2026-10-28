@@ -4,13 +4,15 @@ import {
   CatalogSearchManager,
   BatchMealResolver,
   MealService,
+  addDaysToDate,
   type BaseIngredient,
   type FoodItem,
   type RecipeFoodItem,
   type Recipe,
   type RecipeComponent,
   type Portion,
-  type ResolvedBatchMeal
+  type ResolvedBatchMeal,
+  type DailyLog
 } from '@quomida/domain-core';
 import {
   Plus,
@@ -60,8 +62,10 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
-  const [filterType, setFilterType] = useState<'all' | 'ingredients' | 'recipes'>('all');
+  const [filterType, setFilterType] = useState<'recent' | 'all' | 'ingredients' | 'recipes'>('recent');
   const [expandedRecipeIds, setExpandedRecipeIds] = useState<Record<string, boolean>>({});
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>([]);
+  const [recentSystemFoods, setRecentSystemFoods] = useState<Record<string, BaseIngredient>>({});
 
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
@@ -80,6 +84,182 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
     }));
   };
 
+  // 60-day cutoff date calculation
+  const cutoffDate = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return addDaysToDate(today, -60);
+  }, []);
+
+  const cutoffTimestamp = useMemo(() => {
+    return Date.now() - 60 * 24 * 60 * 60 * 1000;
+  }, []);
+
+  // Subscribe to daily logs from the last 60 days
+  useEffect(() => {
+    if (!db?.daily_logs?.find) return;
+
+    let sub: any;
+    try {
+      sub = db.daily_logs
+        .find({
+          selector: {
+            date: {
+              $gte: cutoffDate
+            }
+          }
+        })
+        .$.subscribe((docs: any[]) => {
+          const mapped = docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog);
+          setRecentLogs(mapped);
+        });
+    } catch (e) {
+      console.warn('[CatalogManager] Failed to subscribe to recent daily logs:', e);
+    }
+
+    return () => {
+      sub?.unsubscribe?.();
+    };
+  }, [db, cutoffDate]);
+
+  // Batch-resolve system food items used in recent logs that are not in custom ingredients or recipes
+  useEffect(() => {
+    if (!recentLogs || recentLogs.length === 0) return;
+
+    const customIdSet = new Set<string>([
+      ...(ingredients || []).map(i => i.id),
+      ...(recipes || []).map(r => r.id)
+    ]);
+
+    const systemIdsToFetch = Array.from(
+      new Set(
+        recentLogs
+          .map(l => l.food_reference_id)
+          .filter(id => id && !customIdSet.has(id) && !recentSystemFoods[id])
+      )
+    );
+
+    if (systemIdsToFetch.length === 0) return;
+
+    let active = true;
+    remoteService
+      .getIngredientsByIds(systemIdsToFetch)
+      .then(items => {
+        if (!active || items.length === 0) return;
+        setRecentSystemFoods(prev => {
+          const next = { ...prev };
+          for (const item of items) {
+            next[item.id] = item;
+          }
+          return next;
+        });
+      })
+      .catch(err => {
+        console.warn('[CatalogManager] Failed to batch-fetch recent system ingredients:', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [recentLogs, ingredients, recipes, remoteService, recentSystemFoods]);
+
+  // Compute recently used items (foods/recipes created/edited or logged in daily log within the last 60 days)
+  const recentItems: FoodItem[] = useMemo(() => {
+    // Map to keep the most recent interaction timestamp per unique food ID
+    const interactionTimes = new Map<string, number>();
+
+    // 1. Process recent daily logs
+    for (const log of recentLogs) {
+      const foodId = log.food_reference_id;
+      if (!foodId) continue;
+      const logTime = log.updatedAt || (log.timestamp ? new Date(log.timestamp).getTime() : 0);
+      const currentTime = interactionTimes.get(foodId) || 0;
+      if (logTime > currentTime) {
+        interactionTimes.set(foodId, logTime);
+      }
+    }
+
+    // 2. Process custom recipes created/edited in the last 60 days
+    for (const recipe of recipes || []) {
+      const updatedTime = recipe.updatedAt || 0;
+      if (updatedTime >= cutoffTimestamp) {
+        const currentTime = interactionTimes.get(recipe.id) || 0;
+        if (updatedTime > currentTime) {
+          interactionTimes.set(recipe.id, updatedTime);
+        }
+      }
+    }
+
+    // 3. Process custom ingredients created/edited in the last 60 days
+    for (const ing of ingredients || []) {
+      const updatedTime = ing.updatedAt || 0;
+      if (updatedTime >= cutoffTimestamp) {
+        const currentTime = interactionTimes.get(ing.id) || 0;
+        if (updatedTime > currentTime) {
+          interactionTimes.set(ing.id, updatedTime);
+        }
+      }
+    }
+
+    if (interactionTimes.size === 0) return [];
+
+    // Map recipes and custom ingredients for quick lookup
+    const recipeFoodMap = new Map<string, RecipeFoodItem>();
+    for (const rf of recipeFoods || []) {
+      recipeFoodMap.set(rf.id, rf);
+    }
+
+    const ingredientMap = new Map<string, BaseIngredient>();
+    for (const ing of ingredients || []) {
+      ingredientMap.set(ing.id, ing);
+    }
+
+    // Also build fallback from recent daily logs snapshots for any system item not yet loaded in SQLite
+    const logFallbackMap = new Map<string, DailyLog>();
+    for (const log of recentLogs) {
+      if (log.food_reference_id && !logFallbackMap.has(log.food_reference_id)) {
+        logFallbackMap.set(log.food_reference_id, log);
+      }
+    }
+
+    const resolvedItems: { item: FoodItem; timestamp: number }[] = [];
+
+    for (const [id, timestamp] of interactionTimes.entries()) {
+      if (recipeFoodMap.has(id)) {
+        resolvedItems.push({ item: recipeFoodMap.get(id)!, timestamp });
+      } else if (ingredientMap.has(id)) {
+        const ing = ingredientMap.get(id)!;
+        resolvedItems.push({
+          item: { ...ing, kind: 'ingredient' },
+          timestamp
+        });
+      } else if (recentSystemFoods[id]) {
+        resolvedItems.push({
+          item: { ...recentSystemFoods[id], kind: 'ingredient' },
+          timestamp
+        });
+      } else if (logFallbackMap.has(id)) {
+        const log = logFallbackMap.get(id)!;
+        // Build resilient fallback food item from daily log snapshot
+        const fallbackIng: FoodItem = {
+          id,
+          name: log.food_name || id,
+          source: 'system',
+          lang: 'es',
+          kind: 'ingredient',
+          calories_100g: log.macros?.calories ?? 0,
+          protein_100g: log.macros?.protein ?? 0,
+          carbs_100g: log.macros?.carbs ?? 0,
+          fats_100g: log.macros?.fats ?? 0
+        };
+        resolvedItems.push({ item: fallbackIng, timestamp });
+      }
+    }
+
+    // Sort descending by interaction timestamp (most recently used/edited first)
+    resolvedItems.sort((a, b) => b.timestamp - a.timestamp);
+    return resolvedItems.map(r => r.item);
+  }, [recentLogs, recipes, ingredients, recipeFoods, recentSystemFoods, cutoffTimestamp]);
+
   // Build stable items list
   const customItems: FoodItem[] = useMemo(() => [
     ...(recipeFoods || []),
@@ -90,15 +270,28 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   ], [ingredients, recipeFoods]);
 
   const displayedItems = useMemo(() => {
-    let items = searchQuery.trim() ? searchResults : customItems;
+    if (searchQuery.trim()) {
+      let items = searchResults;
+      if (filterType === 'ingredients') {
+        return items.filter(item => item.kind === 'ingredient');
+      }
+      if (filterType === 'recipes') {
+        return items.filter(item => item.kind === 'recipe');
+      }
+      return items;
+    }
+
+    if (filterType === 'recent') {
+      return recentItems;
+    }
     if (filterType === 'ingredients') {
-      return items.filter(item => item.kind === 'ingredient');
+      return customItems.filter(item => item.kind === 'ingredient');
     }
     if (filterType === 'recipes') {
-      return items.filter(item => item.kind === 'recipe');
+      return customItems.filter(item => item.kind === 'recipe');
     }
-    return items;
-  }, [searchQuery, searchResults, customItems, filterType]);
+    return customItems;
+  }, [searchQuery, searchResults, customItems, recentItems, filterType]);
 
   // Search effect: searches custom recipes, custom ingredients AND system catalog items
   useEffect(() => {
@@ -352,11 +545,22 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
         </div>
 
         {/* Filter Pills */}
-        <div className="flex gap-1.5 pt-1">
+        <div className="flex gap-1.5 pt-1 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setFilterType('recent')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
+              filterType === 'recent'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {dict.catalog?.filterRecent || 'Recently used'} ({recentItems.length})
+          </button>
           <button
             type="button"
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
               filterType === 'all'
                 ? 'bg-slate-700 text-white'
                 : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
@@ -367,7 +571,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
           <button
             type="button"
             onClick={() => setFilterType('recipes')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
               filterType === 'recipes'
                 ? 'bg-purple-600 text-white'
                 : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
@@ -378,9 +582,9 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
           <button
             type="button"
             onClick={() => setFilterType('ingredients')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
               filterType === 'ingredients'
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-emerald-700 text-white'
                 : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -407,7 +611,11 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
       <div className="space-y-2">
         {displayedItems.length === 0 && !isSearching && (
           <div className="text-center py-6 text-slate-500 text-sm">
-            {searchQuery ? dict.catalog.noFoodsFound : dict.catalog.noCustomFoodsYet}
+            {searchQuery
+              ? dict.catalog.noFoodsFound
+              : filterType === 'recent'
+              ? (dict.catalog?.noRecentFoods || 'No recently used foods or recipes in the last 60 days')
+              : dict.catalog.noCustomFoodsYet}
           </div>
         )}
         {displayedItems.map((item) => {

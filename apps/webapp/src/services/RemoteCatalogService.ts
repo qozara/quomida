@@ -333,6 +333,56 @@ export class RemoteCatalogService implements ICatalogProvider {
     }
   }
 
+  async getIngredientsByIds(ids: string[]): Promise<BaseIngredient[]> {
+    const cleanIds = ids
+      .map(id => id.replace(/[^a-zA-Z0-9_\-]/g, ''))
+      .filter(Boolean);
+
+    if (cleanIds.length === 0) return [];
+
+    let worker: any;
+    try {
+      worker = await this.getWorker();
+    } catch (e) {
+      console.warn('[RemoteCatalogService] Worker initialization error:', e);
+      return [];
+    }
+
+    const CHUNK_SIZE = 400;
+    const results: BaseIngredient[] = [];
+
+    for (let i = 0; i < cleanIds.length; i += CHUNK_SIZE) {
+      const chunk = cleanIds.slice(i, i + CHUNK_SIZE);
+      const inClause = chunk.map(id => `'${id}'`).join(',');
+      const sql = `
+        SELECT 
+          b.id as id,
+          b.name as name,
+          b.source as source,
+          b.lang as lang,
+          b.calories_100g as calories_100g,
+          b.protein_100g as protein_100g,
+          b.carbs_100g as carbs_100g,
+          b.fats_100g as fats_100g,
+          b.contentHash as contentHash
+        FROM base_ingredients b
+        WHERE b.id IN (${inClause})
+      `;
+
+      try {
+        const res = await worker('exec', { sql, rowMode: 'array' } as any);
+        const rows = res?.result?.resultRows || [];
+        if (rows.length > 0) {
+          results.push(...this.mapRowsToIngredients(rows));
+        }
+      } catch (err) {
+        console.warn('[RemoteCatalogService] Error querying ingredients by IDs:', err);
+      }
+    }
+
+    return results;
+  }
+
   async getPortionsForIngredient(baseFoodId: string): Promise<Portion[]> {
     const safeFoodId = baseFoodId.replace(/[^a-zA-Z0-9_\-]/g, '');
     if (!safeFoodId) return [];

@@ -318,12 +318,13 @@
     "editRecipe": "Editar Receta"
   },
   "catalog": {
-    "title": "Administrador de Catálogo de Alimentos",
+    "title": "Mis Alimentos",
     "newFood": "Nuevo",
     "newCustomIngredient": "Nuevo Alimento Simple (base 100g)",
     "editCustomIngredient": "Editar Alimento Simple (base 100g)",
     "combineFoods": "Combinar Alimentos (Receta)",
     "searchPlaceholder": "Buscar en el catálogo...",
+    "filterRecent": "Usados recientemente",
     "filterAll": "Todos",
     "filterIngredients": "Ingredientes",
     "filterRecipes": "Recetas",
@@ -331,6 +332,7 @@
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
     "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
+    "noRecentFoods": "No hay alimentos o recetas usados en los últimos 60 días",
     "composeDishAi": "✨ Componer plato o estimar con IA para \"{query}\"",
     "composeDishAiSubtitle": "Descomponer en ingredientes y guardar como nueva receta en tu catálogo",
     "saveAndLog": "Guardar y Registrar en {{meal}}",

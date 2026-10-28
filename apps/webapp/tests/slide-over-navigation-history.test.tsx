@@ -42,7 +42,8 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
           calories_100g: 52,
           protein_100g: 0.3,
           carbs_100g: 14,
-          fats_100g: 0.2
+          fats_100g: 0.2,
+          updatedAt: Date.now()
         }
       ],
       recipes: [],
