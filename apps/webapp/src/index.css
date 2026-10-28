@@ -199,6 +199,23 @@ html:not(.dark) [class*="divide-slate-700"] > * + * {
 }
 
 /* 4. High-Contrast Typography in Light Mode */
+html:not(.dark) .text-slate-950,
+html:not(.dark) .text-slate-900,
+html:not(.dark) [class*="text-slate-900"],
+html:not(.dark) .text-slate-850 {
+  color: #0f172a !important;
+}
+html:not(.dark) .text-slate-800,
+html:not(.dark) [class*="text-slate-800"],
+html:not(.dark) .text-slate-750,
+html:not(.dark) .text-slate-700,
+html:not(.dark) [class*="text-slate-700"] {
+  color: #1e293b !important;
+}
+html:not(.dark) .text-slate-650,
+html:not(.dark) .text-slate-600 {
+  color: #334155 !important;
+}
 html:not(.dark) .text-slate-100,
 html:not(.dark) .text-slate-200 {
   color: #0f172a !important;
@@ -211,6 +228,15 @@ html:not(.dark) .text-slate-400 {
 }
 html:not(.dark) .text-slate-500 {
   color: #64748b !important;
+}
+
+/* Ensure any element styled with dark:text-white or dark:text-slate-* renders high-contrast dark text in light mode */
+html:not(.dark) [class*="dark:text-white"] {
+  color: #0f172a !important;
+}
+html:not(.dark) [class*="dark:text-slate-100"],
+html:not(.dark) [class*="dark:text-slate-200"] {
+  color: #0f172a !important;
 }
 
 /* Fix light/pastel fonts in edit dialogs & stats cards */

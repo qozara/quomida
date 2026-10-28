@@ -291,8 +291,10 @@ describe('Expanded Theme Options (System Default, Light, Dark)', () => {
       expect(cssContent).toContain('.text-cyan-300');
       expect(cssContent).toContain('.text-emerald-300');
 
-      // Verify universal white font conversion to dark slate in light mode
+      // Verify universal white font and dark:text-white conversion to dark slate in light mode
       expect(cssContent).toContain('html:not(.dark) .text-white');
+      expect(cssContent).toContain('html:not(.dark) .text-slate-900');
+      expect(cssContent).toContain('html:not(.dark) [class*="dark:text-white"]');
       expect(cssContent).toContain('color: #0f172a !important;');
 
       // Verify CTA buttons retain white text
