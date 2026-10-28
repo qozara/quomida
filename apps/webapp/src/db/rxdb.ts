@@ -281,7 +281,7 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
     await db.user_settings.insert({
       id: 'global_settings',
       locale: 'system',
-      theme: 'dark',
+      theme: 'system',
       daily_calorie_target: 2000,
       custom_macros: {
         protein: 150,
@@ -359,7 +359,7 @@ export class LocalDBService {
     const fallback: UserSettings = {
       id: 'global_settings',
       locale: 'system',
-      theme: 'dark',
+      theme: 'system',
       daily_calorie_target: 2000,
       custom_macros: { protein: 150, carbs: 200, fats: 65 },
       target_mode: 'manual',

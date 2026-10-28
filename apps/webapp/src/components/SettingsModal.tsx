@@ -4,6 +4,7 @@ import {
   X,
   ArrowLeft,
   Globe,
+  Monitor,
   Moon,
   Sun,
   Cloud,
@@ -483,26 +484,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
                 <div>
                   <label className="text-xs text-slate-400 block mb-1.5 font-medium">{t.settings.theme}</label>
-                  <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 min-h-[44px] items-center">
+                  <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 min-h-[44px] items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setTheme('dark')}
-                      className={`flex-1 min-h-[36px] flex justify-center items-center rounded-lg transition-all ${
-                        theme === 'dark' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                      id="btn-theme-system"
+                      data-testid="btn-theme-system"
+                      onClick={() => setTheme('system')}
+                      className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        theme === 'system' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
                       }`}
-                      aria-label="Dark theme"
+                      aria-label={t.settings.themeSystem || 'System'}
+                      title={t.settings.themeSystem || 'System'}
                     >
-                      <Moon className="w-4 h-4" />
+                      <Monitor className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline">{t.settings.themeSystem || 'System'}</span>
                     </button>
                     <button
                       type="button"
+                      id="btn-theme-light"
+                      data-testid="btn-theme-light"
                       onClick={() => setTheme('light')}
-                      className={`flex-1 min-h-[36px] flex justify-center items-center rounded-lg transition-all ${
+                      className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
                         theme === 'light' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
                       }`}
-                      aria-label="Light theme"
+                      aria-label={t.settings.themeLight || 'Light'}
+                      title={t.settings.themeLight || 'Light'}
                     >
-                      <Sun className="w-4 h-4" />
+                      <Sun className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline">{t.settings.themeLight || 'Light'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-theme-dark"
+                      data-testid="btn-theme-dark"
+                      onClick={() => setTheme('dark')}
+                      className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        theme === 'dark' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                      }`}
+                      aria-label={t.settings.themeDark || 'Dark'}
+                      title={t.settings.themeDark || 'Dark'}
+                    >
+                      <Moon className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline">{t.settings.themeDark || 'Dark'}</span>
                     </button>
                   </div>
                 </div>

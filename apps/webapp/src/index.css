@@ -73,3 +73,196 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
 }
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Light Theme Overrides (Active when .dark class is NOT present on <html>) */
+html:not(.dark) {
+  color-scheme: light;
+}
+
+html:not(.dark) body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Surfaces & Card Containers */
+html:not(.dark) .bg-slate-950 {
+  background-color: #f8fafc;
+}
+html:not(.dark) .bg-slate-950\/90,
+html:not(.dark) .bg-slate-950\/80 {
+  background-color: rgba(248, 250, 252, 0.92);
+}
+
+html:not(.dark) .bg-slate-900 {
+  background-color: #ffffff;
+}
+html:not(.dark) .bg-slate-900\/90,
+html:not(.dark) .bg-slate-900\/80,
+html:not(.dark) .bg-slate-900\/60,
+html:not(.dark) .bg-slate-900\/50,
+html:not(.dark) .bg-slate-900\/40 {
+  background-color: #ffffff;
+}
+
+html:not(.dark) .bg-slate-850 {
+  background-color: #f8fafc;
+}
+
+html:not(.dark) .bg-slate-800 {
+  background-color: #f1f5f9;
+}
+html:not(.dark) .bg-slate-800\/80,
+html:not(.dark) .bg-slate-800\/60,
+html:not(.dark) .bg-slate-800\/50,
+html:not(.dark) .bg-slate-800\/40 {
+  background-color: #f1f5f9;
+}
+
+html:not(.dark) .bg-slate-750,
+html:not(.dark) .bg-slate-700 {
+  background-color: #e2e8f0;
+}
+
+html:not(.dark) .hover\:bg-slate-800:hover,
+html:not(.dark) .hover\:bg-slate-800\/80:hover {
+  background-color: #e2e8f0;
+}
+html:not(.dark) .hover\:bg-slate-750:hover,
+html:not(.dark) .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1;
+}
+
+/* Borders */
+html:not(.dark) .border-slate-800,
+html:not(.dark) .border-slate-700,
+html:not(.dark) [class*="border-slate-800/"],
+html:not(.dark) [class*="border-slate-700/"] {
+  border-color: #e2e8f0;
+}
+html:not(.dark) .hover\:border-slate-700:hover {
+  border-color: #cbd5e1;
+}
+
+/* Typography & Contrast */
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200 {
+  color: #0f172a;
+}
+html:not(.dark) .text-slate-300 {
+  color: #334155;
+}
+html:not(.dark) .text-slate-400 {
+  color: #64748b;
+}
+html:not(.dark) .text-slate-500 {
+  color: #64748b;
+}
+html:not(.dark) .placeholder-slate-500::placeholder {
+  color: #94a3b8;
+}
+
+/* Invert standalone text-white, but preserve on solid colored buttons & badges */
+html:not(.dark) :is(h1, h2, h3, h4, h5, h6, p, span, div, label, input, select, textarea).text-white:not(
+  [class*="bg-emerald"] *,
+  [class*="bg-rose"] *,
+  [class*="bg-purple"] *,
+  [class*="bg-teal"] *,
+  [class*="bg-blue"] *,
+  [class*="bg-indigo"] *,
+  [class*="bg-amber"] *,
+  [class*="bg-red"] *,
+  [class*="bg-gradient-to"] *,
+  [class*="from-emerald"] *,
+  [class*="from-teal"] *,
+  [class*="from-purple"] *,
+  .bg-emerald-500,
+  .bg-emerald-600,
+  .bg-emerald-700,
+  .bg-rose-500,
+  .bg-rose-600,
+  .bg-purple-500,
+  .bg-purple-600
+) {
+  color: #0f172a;
+}
+
+html:not(.dark) .hover\:text-white:hover:not(
+  [class*="bg-emerald"] *,
+  [class*="bg-rose"] *,
+  [class*="bg-purple"] *,
+  [class*="bg-teal"] *,
+  [class*="bg-blue"] *,
+  [class*="bg-gradient-to"] *
+) {
+  color: #0f172a;
+}
+
+/* Ensure text-slate-950 on bright buttons (emerald/amber) stays dark */
+html:not(.dark) .text-slate-950 {
+  color: #020617;
+}
+
+/* Accessible Colored Badges & Highlights */
+html:not(.dark) [class*="bg-emerald-950"] {
+  background-color: #ecfdf5;
+}
+html:not(.dark) [class*="border-emerald-800"] {
+  border-color: #a7f3d0;
+}
+html:not(.dark) .text-emerald-400 {
+  color: #059669;
+}
+
+html:not(.dark) [class*="bg-rose-950"] {
+  background-color: #fff1f2;
+}
+html:not(.dark) [class*="border-rose-800"] {
+  border-color: #fecdd3;
+}
+html:not(.dark) .text-rose-400 {
+  color: #e11d48;
+}
+
+html:not(.dark) [class*="bg-amber-950"] {
+  background-color: #fffbeb;
+}
+html:not(.dark) [class*="border-amber-800"] {
+  border-color: #fde68a;
+}
+html:not(.dark) .text-amber-400:not([class*="bg-amber-400"] *) {
+  color: #d97706;
+}
+
+html:not(.dark) [class*="bg-purple-950"] {
+  background-color: #faf5ff;
+}
+html:not(.dark) [class*="border-purple-800"] {
+  border-color: #e9d5ff;
+}
+html:not(.dark) .text-purple-400 {
+  color: #7c3aed;
+}
+
+/* Glass cards and shadows in light mode */
+html:not(.dark) .glass-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+}
+
+html:not(.dark) .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+html:not(.dark) .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
+html:not(.dark) .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+html:not(.dark) .shadow-2xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.09), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}

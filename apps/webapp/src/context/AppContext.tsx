@@ -74,6 +74,17 @@ export function resolveEffectiveLocale(preference: LanguagePreference): LocaleKe
   return preference;
 }
 
+export function resolveSystemTheme(): 'dark' | 'light' {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'dark';
+}
+
+export function resolveEffectiveTheme(themePref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  return themePref === 'system' ? resolveSystemTheme() : themePref;
+}
+
 interface AppContextType {
   db: QuomidaDatabase | null;
   dbService: LocalDBService;
@@ -155,7 +166,7 @@ interface AppContextType {
 const defaultSettings: UserSettings = {
   id: 'global_settings',
   locale: 'system',
-  theme: 'dark',
+  theme: 'system',
   daily_calorie_target: 2000,
   custom_macros: { protein: 150, carbs: 200, fats: 65 },
   target_mode: 'manual',
@@ -228,7 +239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [locale, setLocaleState] = useState<LocaleKey>(() => resolveSystemLocale());
-  const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('dark');
+  const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('system');
   const [userSettings, setUserSettings] = useState<UserSettings>(defaultSettings);
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -664,15 +675,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [db, dailyLogs.length, ingredients.length, recipes.length, updateItemCounts]);
 
-  // Update HTML tag lang & dark mode
+  // Update HTML tag lang
   useEffect(() => {
     document.documentElement.lang = locale;
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  }, [locale]);
+
+  // Update HTML tag dark mode & listen to system scheme changes
+  useEffect(() => {
+    const applyTheme = () => {
+      const effective = resolveEffectiveTheme(theme);
+      if (effective === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    if (theme === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+      } else if ((mediaQuery as any).addListener) {
+        (mediaQuery as any).addListener(handleChange);
+        return () => (mediaQuery as any).removeListener(handleChange);
+      }
     }
-  }, [locale, theme]);
+  }, [theme]);
 
   // Listen for browser language changes when system default is selected
   useEffect(() => {
