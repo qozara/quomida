@@ -260,4 +260,36 @@ describe('Expanded Theme Options (System Default, Light, Dark)', () => {
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
   });
+
+  describe('4. Light Mode CSS & Contrast Rules Verification', () => {
+    it('defines comprehensive light theme overrides in index.css without unstyled grey opacities', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const cssPath = path.resolve(__dirname, '../src/index.css');
+      const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+      // Check for light theme root block
+      expect(cssContent).toContain('html:not(.dark)');
+
+      // Verify slate variable definitions for light mode
+      expect(cssContent).toContain('--color-slate-950: #f8fafc;');
+      expect(cssContent).toContain('--color-slate-900: #ffffff;');
+      expect(cssContent).toContain('--color-slate-800: #f1f5f9;');
+
+      // Verify card containers and modals are solid crisp white
+      expect(cssContent).toContain('[class~="bg-slate-900"]');
+      expect(cssContent).toContain('background-color: #ffffff !important;');
+
+      // Verify inputs and selects have crisp white background and dark text
+      expect(cssContent).toContain('html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="range"])');
+      expect(cssContent).toContain('color: #0f172a !important;');
+      expect(cssContent).toContain('html:not(.dark) select option');
+
+      // Verify high-contrast text overrides for light/pastel fonts in edit dialogs
+      expect(cssContent).toContain('.text-rose-300');
+      expect(cssContent).toContain('.text-amber-300');
+      expect(cssContent).toContain('.text-cyan-300');
+      expect(cssContent).toContain('.text-emerald-300');
+    });
+  });
 });
