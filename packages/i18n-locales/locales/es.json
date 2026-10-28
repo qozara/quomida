@@ -306,6 +306,7 @@
     "saving": "Guardando...",
     "cancel": "Cancelar",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
+    "deleteConfirmTitle": "¿Eliminar receta?",
     "noComponents": "Aún no se agregaron alimentos. Busca y agrega componentes arriba.",
     "recipeBadge": "Receta",
     "customBadge": "Personalizado",
@@ -329,6 +330,7 @@
     "filterIngredients": "Ingredientes",
     "filterRecipes": "Recetas",
     "deleteCustomConfirm": "¿Estás seguro de que deseas eliminar este alimento personalizado?",
+    "deleteCustomTitle": "¿Eliminar alimento personalizado?",
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
     "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
@@ -486,5 +488,11 @@
     "recentEnergyEntries": "Registros Energéticos Recientes",
     "qualifyingDayBadge": "Completo",
     "partialDayBadge": "Parcial (<800 kcal)"
+  },
+  "dialog": {
+    "ok": "Aceptar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar"
   }
 }

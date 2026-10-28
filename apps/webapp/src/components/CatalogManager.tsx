@@ -28,6 +28,7 @@ import {
 import { dictionaries } from '@quomida/i18n-locales';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
+import { CustomDialog } from './common/CustomDialog.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 import { LlmRecipeDecomposer } from '@quomida/ai-services';
@@ -76,6 +77,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'ingredient' | 'recipe'; name: string } | null>(null);
 
   const toggleRecipeExpand = (id: string) => {
     setExpandedRecipeIds(prev => ({
@@ -362,16 +364,12 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
     setEditingIngredient(null);
   };
 
-  const handleRemoveIngredient = async (id: string) => {
-    if (confirm(dict.catalog.deleteCustomConfirm)) {
-      await removeCustomIngredient(id);
-    }
+  const handleRemoveIngredient = (id: string, name = '') => {
+    setDeleteTarget({ id, type: 'ingredient', name });
   };
 
-  const handleRemoveRecipe = async (id: string) => {
-    if (confirm(dict.recipes.deleteConfirm)) {
-      await removeRecipe(id);
-    }
+  const handleRemoveRecipe = (id: string, name = '') => {
+    setDeleteTarget({ id, type: 'recipe', name });
   };
 
   const handleSaveRecipe = async (recipe: Recipe, recipePortions?: { name: string; equivalent_weight_g: number }[]) => {
@@ -834,6 +832,38 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
           onSave={handleSaveIngredient}
         />
       )}
+
+      {/* Mobile-Friendly Delete Confirmation Dialog */}
+      <CustomDialog
+        isOpen={deleteTarget !== null}
+        variant="danger"
+        title={
+          deleteTarget?.type === 'recipe'
+            ? ((dict.recipes as any).deleteConfirmTitle || dict.catalog?.delete || 'Delete Recipe?')
+            : ((dict.catalog as any).deleteCustomTitle || dict.catalog?.delete || 'Delete Custom Food?')
+        }
+        message={
+          deleteTarget?.type === 'recipe'
+            ? dict.recipes.deleteConfirm
+            : dict.catalog.deleteCustomConfirm
+        }
+        confirmText={dict.catalog?.delete || 'Delete'}
+        cancelText={dict.recipes?.cancel || 'Cancel'}
+        confirmTestId="btn-confirm-delete"
+        cancelTestId="btn-cancel-delete"
+        dialogTestId="confirm-delete-dialog"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          const { id, type } = deleteTarget;
+          setDeleteTarget(null);
+          if (type === 'recipe') {
+            await removeRecipe(id);
+          } else {
+            await removeCustomIngredient(id);
+          }
+        }}
+      />
     </section>
   );
 };

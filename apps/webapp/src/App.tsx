@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProvider, useApp } from './context/AppContext.js';
+import { DialogProvider } from './context/DialogContext.js';
 import { DashboardDateBar } from './components/DashboardDateBar.js';
 import { MacroRings } from './components/MacroRings.js';
 import { MealSection } from './components/MealSection.js';
@@ -342,7 +343,9 @@ export const App: React.FC = () => {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <AppProvider>
-        <DashboardContent />
+        <DialogProvider>
+          <DashboardContent />
+        </DialogProvider>
       </AppProvider>
     </GoogleOAuthProvider>
   );

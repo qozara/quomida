@@ -278,7 +278,6 @@ describe('CatalogManager - Recipes Integration', () => {
   });
 
   it('calls removeRecipe when delete option in context menu is clicked and confirmed', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<CatalogManager />);
 
     // Open context menu
@@ -288,8 +287,30 @@ describe('CatalogManager - Recipes Integration', () => {
     const deleteBtn = screen.getByLabelText('Delete recipe');
     fireEvent.click(deleteBtn);
 
-    expect(window.confirm).toHaveBeenCalled();
+    // Verify custom mobile-friendly dialog appears
+    expect(screen.getByTestId('confirm-delete-dialog')).toBeDefined();
+    const confirmDeleteBtn = screen.getByTestId('btn-confirm-delete');
+    fireEvent.click(confirmDeleteBtn);
+
     expect(removeRecipeMock).toHaveBeenCalledWith('recipe_lentil_stew');
+    expect(screen.queryByTestId('confirm-delete-dialog')).toBeNull();
+  });
+
+  it('does not remove recipe when delete is cancelled in custom dialog', () => {
+    render(<CatalogManager />);
+
+    const optionsBtn = screen.getByLabelText('Item options');
+    fireEvent.click(optionsBtn);
+
+    const deleteBtn = screen.getByLabelText('Delete recipe');
+    fireEvent.click(deleteBtn);
+
+    expect(screen.getByTestId('confirm-delete-dialog')).toBeDefined();
+    const cancelBtn = screen.getByTestId('btn-cancel-delete');
+    fireEvent.click(cancelBtn);
+
+    expect(screen.queryByTestId('confirm-delete-dialog')).toBeNull();
+    expect(removeRecipeMock).not.toHaveBeenCalled();
   });
 
   it('triggers onSelectFood when plus button is clicked on an item card', () => {
