@@ -147,4 +147,75 @@ describe('Analytics Main Screen UI/UX Specification', () => {
     expect(screen.getByText(en.dashboard.meals.breakfast)).toBeDefined();
     expect(screen.getByText(en.dashboard.meals.lunch)).toBeDefined();
   });
+
+  describe('Adaptive Calibration Card Visibility & Collapsible Behavior', () => {
+    it('completely hides calibration card and toggle button when target_mode is manual', () => {
+      vi.spyOn(AppContextModule, 'useApp').mockReturnValue({
+        ...baseMockContext,
+        userSettings: {
+          ...baseMockContext.userSettings,
+          target_mode: 'manual'
+        }
+      });
+
+      render(<AnalyticsScreen />);
+
+      expect(screen.queryByTestId('btn-toggle-calibration-details')).toBeNull();
+      expect(screen.queryByTestId('calibration-details-card')).toBeNull();
+      expect(screen.queryByText(en.analytics.complianceTitle)).toBeNull();
+    });
+
+    it('renders collapsed calibration label button at bottom when target_mode is adaptive', () => {
+      vi.spyOn(AppContextModule, 'useApp').mockReturnValue({
+        ...baseMockContext,
+        userSettings: {
+          ...baseMockContext.userSettings,
+          target_mode: 'adaptive'
+        }
+      });
+
+      render(<AnalyticsScreen />);
+
+      const toggleBtn = screen.getByTestId('btn-toggle-calibration-details');
+      expect(toggleBtn).toBeDefined();
+      expect(toggleBtn.textContent).toContain(en.analytics.statusCollecting);
+      expect(screen.queryByTestId('calibration-details-card')).toBeNull();
+      expect(screen.queryByText(en.analytics.complianceTitle)).toBeNull();
+    });
+
+    it('expands detailed card when label is clicked, collapses on second click, and collapses on tab change', () => {
+      vi.spyOn(AppContextModule, 'useApp').mockReturnValue({
+        ...baseMockContext,
+        userSettings: {
+          ...baseMockContext.userSettings,
+          target_mode: 'adaptive'
+        }
+      });
+
+      render(<AnalyticsScreen />);
+
+      // 1. Initially collapsed
+      const toggleBtn = screen.getByTestId('btn-toggle-calibration-details');
+      expect(screen.queryByTestId('calibration-details-card')).toBeNull();
+
+      // 2. Click to expand
+      fireEvent.click(toggleBtn);
+      expect(screen.getByTestId('calibration-details-card')).toBeDefined();
+      expect(screen.getByText(en.analytics.complianceTitle)).toBeDefined();
+
+      // 3. Click again to collapse
+      const cardHeader = screen.getByTestId('calibration-details-card').firstChild as HTMLElement;
+      fireEvent.click(cardHeader);
+      expect(screen.queryByTestId('calibration-details-card')).toBeNull();
+      expect(screen.getByTestId('btn-toggle-calibration-details')).toBeDefined();
+
+      // 4. Expand again, then switch chart tabs -> should automatically collapse
+      fireEvent.click(screen.getByTestId('btn-toggle-calibration-details'));
+      expect(screen.getByTestId('calibration-details-card')).toBeDefined();
+
+      fireEvent.click(screen.getByTestId('tab-analytics-energy'));
+      expect(screen.queryByTestId('calibration-details-card')).toBeNull();
+      expect(screen.getByTestId('btn-toggle-calibration-details')).toBeDefined();
+    });
+  });
 });

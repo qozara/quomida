@@ -8,7 +8,8 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  Clock
+  Clock,
+  ChevronDown
 } from 'lucide-react';
 import {
   computeWeightTrendAnalytics,
@@ -226,6 +227,14 @@ const AnalyticsScreenContent: React.FC = () => {
 
   const StatusIcon = statusConfig.icon;
 
+  const isAdaptive = userSettings?.target_mode === 'adaptive';
+  const [isCalibrationDetailsOpen, setIsCalibrationDetailsOpen] = useState(false);
+
+  // Collapse detailed card if user moves/switches tabs, date, or chart range
+  useEffect(() => {
+    setIsCalibrationDetailsOpen(false);
+  }, [activeChartTab, rangeDays, selectedDate]);
+
   return (
     <section
       role="region"
@@ -261,50 +270,6 @@ const AnalyticsScreenContent: React.FC = () => {
               {analytics.weekly_trend_rate_kg}
             </span>
             <span className="text-xs text-slate-400">{t.analytics.kgPerWeek}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Calibration & Next Check-In Status Card */}
-      <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className={`px-2.5 py-1 rounded-full border text-xs font-semibold flex items-center gap-1.5 ${statusConfig.className}`}>
-            <StatusIcon className="w-3.5 h-3.5" />
-            <span>{statusConfig.label}</span>
-          </div>
-
-          <div className="text-xs text-slate-400 font-medium flex items-center gap-1">
-            <span>{t.analytics.nextCheckIn}:</span>
-            <span className="text-slate-200 font-bold">
-              {analytics.calibration_status === 'ready'
-                ? t.analytics.readyNow
-                : t.analytics.daysRemaining.replace('{{days}}', String(analytics.days_until_next_calibration))}
-            </span>
-          </div>
-        </div>
-
-        {/* Compliance Requirements */}
-        <div className="pt-2 border-t border-slate-800 text-xs space-y-1.5 text-slate-400">
-          <div className="font-semibold text-slate-300 mb-1">
-            {t.analytics.complianceTitle}
-          </div>
-          <div className="flex items-center justify-between">
-            <span>{t.analytics.complianceRecentWeight.replace('{{count}}', String(analytics.recent_weight_count_7d))}</span>
-            <span className={analytics.recent_weight_count_7d >= 4 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-              {analytics.recent_weight_count_7d >= 4 ? '✓' : '...'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>{t.analytics.compliancePriorWeight.replace('{{count}}', String(analytics.prior_weight_count_7d))}</span>
-            <span className={analytics.prior_weight_count_7d >= 1 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-              {analytics.prior_weight_count_7d >= 1 ? '✓' : '...'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>{t.analytics.complianceFoodDays.replace('{{count}}', String(analytics.qualifying_intake_days_14d))}</span>
-            <span className={analytics.qualifying_intake_days_14d >= 10 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-              {analytics.qualifying_intake_days_14d >= 10 ? '✓' : '...'}
-            </span>
           </div>
         </div>
       </div>
@@ -483,6 +448,86 @@ const AnalyticsScreenContent: React.FC = () => {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Calibration & Baseline Data Section (Adaptive mode only, collapsed by default at bottom) */}
+      {isAdaptive && (
+        <div className="pt-1 pb-4">
+          {!isCalibrationDetailsOpen ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                id="btn-toggle-calibration-details"
+                data-testid="btn-toggle-calibration-details"
+                onClick={() => setIsCalibrationDetailsOpen(true)}
+                className={`px-3 py-1.5 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-90 active:scale-95 ${statusConfig.className}`}
+                aria-expanded={false}
+              >
+                <StatusIcon className="w-3.5 h-3.5" />
+                <span>{statusConfig.label}</span>
+                <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+              </button>
+            </div>
+          ) : (
+            <div
+              data-testid="calibration-details-card"
+              className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg space-y-3 animate-in fade-in duration-150"
+            >
+              <div
+                onClick={() => setIsCalibrationDetailsOpen(false)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setIsCalibrationDetailsOpen(false);
+                  }
+                }}
+                className="flex items-center justify-between flex-wrap gap-2 cursor-pointer select-none group"
+                aria-expanded={true}
+              >
+                <div className={`px-2.5 py-1 rounded-full border text-xs font-semibold flex items-center gap-1.5 ${statusConfig.className}`}>
+                  <StatusIcon className="w-3.5 h-3.5" />
+                  <span>{statusConfig.label}</span>
+                </div>
+
+                <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <span>{t.analytics.nextCheckIn}:</span>
+                  <span className="text-slate-200 font-bold">
+                    {analytics.calibration_status === 'ready'
+                      ? t.analytics.readyNow
+                      : t.analytics.daysRemaining.replace('{{days}}', String(analytics.days_until_next_calibration))}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 rotate-180 transition-transform" />
+                </div>
+              </div>
+
+              {/* Compliance Requirements */}
+              <div className="pt-2 border-t border-slate-800 text-xs space-y-1.5 text-slate-400">
+                <div className="font-semibold text-slate-300 mb-1">
+                  {t.analytics.complianceTitle}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>{t.analytics.complianceRecentWeight.replace('{{count}}', String(analytics.recent_weight_count_7d))}</span>
+                  <span className={analytics.recent_weight_count_7d >= 4 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                    {analytics.recent_weight_count_7d >= 4 ? '✓' : '...'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>{t.analytics.compliancePriorWeight.replace('{{count}}', String(analytics.prior_weight_count_7d))}</span>
+                  <span className={analytics.prior_weight_count_7d >= 1 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                    {analytics.prior_weight_count_7d >= 1 ? '✓' : '...'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>{t.analytics.complianceFoodDays.replace('{{count}}', String(analytics.qualifying_intake_days_14d))}</span>
+                  <span className={analytics.qualifying_intake_days_14d >= 10 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                    {analytics.qualifying_intake_days_14d >= 10 ? '✓' : '...'}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>

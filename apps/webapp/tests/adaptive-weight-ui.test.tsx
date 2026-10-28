@@ -336,7 +336,9 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       // Check estimated TDEE display
       expect(screen.getByText('2450')).toBeDefined();
 
-      // Check compliance indicators exist
+      // Check compliance indicators exist (expand collapsed calibration details card first)
+      const toggleBtn = screen.getByTestId('btn-toggle-calibration-details');
+      fireEvent.click(toggleBtn);
       expect(screen.getByText(/Weigh-ins \(last 7d\)/i)).toBeDefined();
 
       // Check recent logs are listed

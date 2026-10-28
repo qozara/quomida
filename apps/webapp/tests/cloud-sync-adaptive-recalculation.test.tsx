@@ -488,6 +488,9 @@ describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Sui
     });
 
     // 4. Verify AnalyticsModal displays compliance 14/10 and updated TDEE
+    const toggleBtn1 = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleBtn1);
+
     await waitFor(() => {
       expect(screen.getByText(/14\/10/i)).toBeDefined();
       expect(screen.getAllByText(new RegExp(`${Math.round(expectedEWMA[13].trend_weight_kg)}`, 'i')).length).toBeGreaterThan(0);
@@ -665,6 +668,9 @@ describe('Cloud Sync Multi-Device Adaptive Recalculation & EWMA Healing Test Sui
     });
 
     // Verify AnalyticsModal reflects the dropped count (8/10)
+    const toggleBtn2 = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleBtn2);
+
     await waitFor(() => {
       expect(screen.getByText(/8\/10/i)).toBeDefined();
     });

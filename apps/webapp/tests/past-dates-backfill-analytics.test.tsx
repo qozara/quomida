@@ -55,6 +55,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
       selectedDate,
       setSelectedDate,
       userSettings,
+      updateUserSettings,
       weightLogs,
       logFoodItem,
       logWeight,
@@ -91,6 +92,12 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
         </button>
         <button data-testid="btn-close-analytics" onClick={() => setIsAnalyticsOpen(false)}>
           Close Analytics
+        </button>
+        <button
+          data-testid="btn-enable-adaptive"
+          onClick={() => updateUserSettings({ target_mode: 'adaptive' })}
+        >
+          Enable Adaptive
         </button>
         <button
           data-testid="btn-set-date"
@@ -252,6 +259,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
       expect(screen.getByRole('region', { name: new RegExp(en.analytics.title, 'i') })).toBeDefined();
     });
 
+    // Expand collapsed calibration details at bottom of Analytics
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
+
     // Check what the compliance pane shows:
     // If the bug exists:
     // It only sees 2026-10-07 (window ending on 2026-10-07).
@@ -273,6 +284,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     await waitFor(() => {
       expect(screen.getByTestId('selected-date-val').textContent).toBe('2026-10-20');
     });
+
+    // Re-expand collapsed card after moving/date navigation
+    const toggleDetailsBtnToday = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtnToday);
 
     const complianceWhenOnToday = screen.getByText(en.analytics.complianceTitle).parentElement;
     console.log('COMPLIANCE WHEN ON TODAY:', complianceWhenOnToday?.textContent);
@@ -347,6 +362,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Open AnalyticsModal while on past date 2026-10-12
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
 
+    // Expand collapsed calibration details
+    const toggleDetailsBtn1 = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn1);
+
     // Should show 9/10 food days (not 1/10!)
     await waitFor(() => {
       expect(screen.getByText(/9\/10/i)).toBeDefined();
@@ -372,6 +391,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Re-open AnalyticsModal while on 2026-10-11
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
 
+    // Expand collapsed calibration details at bottom
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
+
     // Now food days should update to 10/10 and status should become ready!
     await waitFor(() => {
       expect(screen.getByText(/10\/10/i)).toBeDefined();
@@ -392,6 +415,9 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
     const setDateBtn = screen.getByTestId('btn-set-date');
     const logWeightBtn = screen.getByTestId('btn-log-weight-entry');
+
+    // Switch to adaptive mode so calibration status is tracked and displayed
+    fireEvent.click(screen.getByTestId('btn-enable-adaptive'));
 
     // User sets up initial weight on 2026-10-20
     act(() => {
@@ -424,6 +450,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
     // Open AnalyticsModal while on past date 2026-10-10
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
+
+    // Expand collapsed calibration details at bottom
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
 
     // Verify recent weigh-ins count is 5/4 and prior is 1/1
     await waitFor(() => {

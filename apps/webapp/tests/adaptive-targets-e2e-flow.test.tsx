@@ -744,6 +744,10 @@ describe('Wave 6 SDET Suite: Quomida Adaptive Expenditure & Weight Tracking Engi
       expect(screen.getByText(en.analytics.statusReady)).toBeDefined();
       expect(screen.getAllByText(new RegExp(calibratedTdee!, 'i')).length).toBeGreaterThanOrEqual(1);
 
+      // Expand collapsed calibration details at bottom
+      const toggleBtn = await screen.findByTestId('btn-toggle-calibration-details');
+      fireEvent.click(toggleBtn);
+
       // Compliance checkmarks: 7/4, 7/1, 14/10
       expect(screen.getByText(/7\/4/i)).toBeDefined();
       expect(screen.getByText(/7\/1/i)).toBeDefined();
