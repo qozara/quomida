@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext.js';
-import { ArrowLeft, Target, Save, Check } from 'lucide-react';
+import { Target, Save, Check } from 'lucide-react';
+import { BottomSheet } from '../common/BottomSheet.js';
 
 interface ManualGoalsEditModalProps {
   isOpen: boolean;
@@ -53,39 +54,23 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.goals?.editManualTitle || 'Edit Manual Targets'}
-      data-testid="manual-goals-edit-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right overflow-y-auto"
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      onBack={onClose}
+      backTestId="btn-back-manual-goals"
+      backId="btn-back-manual-goals"
+      title={t.goals?.editManualTitle || 'Edit Manual Targets'}
+      titleId="manual-goals-modal-title"
+      testId="manual-goals-edit-modal"
+      maxHeight="max-h-[90dvh]"
     >
-      {/* Top Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
-        <button
-          id="btn-back-manual-goals"
-          data-testid="btn-back-manual-goals"
-          type="button"
-          onClick={onClose}
-          aria-label="Back"
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="text-center flex-1 mx-2 min-w-0">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-            {t.goals?.editManualTitle || 'Edit Manual Targets'}
-          </h2>
-        </div>
-        <div className="w-[44px]" aria-hidden="true" />
-      </header>
-
       {/* Main Form */}
-      <div className="max-w-md mx-auto w-full p-4 space-y-4 flex-1">
+      <div className="max-w-md mx-auto w-full space-y-4">
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="space-y-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-sm">
+          <div className="space-y-3 bg-slate-100 dark:bg-slate-900/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <div>
-              <label className="text-xs text-slate-400 block mb-1 font-medium">
+              <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1 font-medium">
                 {t.settings.dailyTarget}
               </label>
               <input
@@ -96,13 +81,13 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
                 max="10000"
                 value={calorieTarget}
                 onChange={(e) => setCalorieTarget(Number(e.target.value))}
-                className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
+                className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-bold"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">
+                <label className="text-[11px] text-slate-600 dark:text-slate-400 block mb-1">
                   {t.dashboard.protein} (g)
                 </label>
                 <input
@@ -113,12 +98,12 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
                   max="500"
                   value={proteinTarget}
                   onChange={(e) => setProteinTarget(Number(e.target.value))}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs text-slate-900 dark:text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">
+                <label className="text-[11px] text-slate-600 dark:text-slate-400 block mb-1">
                   {t.dashboard.carbs} (g)
                 </label>
                 <input
@@ -129,12 +114,12 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
                   max="1000"
                   value={carbsTarget}
                   onChange={(e) => setCarbsTarget(Number(e.target.value))}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs text-slate-900 dark:text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">
+                <label className="text-[11px] text-slate-600 dark:text-slate-400 block mb-1">
                   {t.dashboard.fats} (g)
                 </label>
                 <input
@@ -145,20 +130,20 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
                   max="500"
                   value={fatsTarget}
                   onChange={(e) => setFatsTarget(Number(e.target.value))}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs text-slate-900 dark:text-white text-center focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
             </div>
 
             {/* Macro Distribution Bar & Summary */}
-            <div className="pt-2 border-t border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                 <span>{t.goals?.macroDistribution || 'Macro Distribution'}</span>
-                <span className="font-mono text-[11px]">
+                <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
                   {totalMacroCalories} / {calorieTarget} kcal
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden flex gap-0.5">
+              <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex gap-0.5">
                 <div
                   className="bg-rose-500 transition-all duration-300"
                   style={{ width: `${proteinPct}%` }}
@@ -175,10 +160,10 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
                   title={`Fats: ${fatsPct}%`}
                 />
               </div>
-              <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                <span className="text-rose-400">{proteinPct}% {t.dashboard.protein}</span>
-                <span className="text-amber-400">{carbsPct}% {t.dashboard.carbs}</span>
-                <span className="text-cyan-400">{fatsPct}% {t.dashboard.fats}</span>
+              <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-mono">
+                <span className="text-rose-600 dark:text-rose-400">{proteinPct}% {t.dashboard.protein}</span>
+                <span className="text-amber-600 dark:text-amber-400">{carbsPct}% {t.dashboard.carbs}</span>
+                <span className="text-cyan-600 dark:text-cyan-400">{fatsPct}% {t.dashboard.fats}</span>
               </div>
             </div>
           </div>
@@ -203,6 +188,6 @@ export const ManualGoalsEditModal: React.FC<ManualGoalsEditModalProps> = ({
           </button>
         </form>
       </div>
-    </div>
+    </BottomSheet>
   );
 };

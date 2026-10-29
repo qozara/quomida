@@ -280,10 +280,10 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       setupMockContext({ isWeightModalOpen: true });
       render(<WeightQuickLogModal />);
 
-      // Verify slide-over modal styling and accessible back arrow
+      // Verify bottom sheet modal styling and accessible back arrow
       const dialog = screen.getByRole('dialog');
-      expect(dialog.className).toContain('fixed inset-0');
-      expect(dialog.className).toContain('animate-slide-in-right');
+      expect(dialog.className).toContain('rounded-t-3xl');
+      expect(dialog.className).toContain('animate-slide-in-up');
 
       const backBtn = screen.getByTestId('btn-close-weight-modal');
       expect(backBtn).toBeDefined();

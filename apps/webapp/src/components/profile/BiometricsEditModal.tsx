@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { calculateBaselineSeed, type UserSex } from '@quomida/domain-core';
-import { ArrowLeft, User, Scale, Ruler, Calendar, Save, Check, Info, Flame } from 'lucide-react';
+import { User, Scale, Ruler, Calendar, Save, Check, Info, Flame } from 'lucide-react';
+import { BottomSheet } from '../common/BottomSheet.js';
 
 interface BiometricsEditModalProps {
   isOpen: boolean;
@@ -146,41 +147,25 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.goals?.editBiometrics || 'Edit Biometrics'}
-      data-testid="biometrics-edit-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right overflow-y-auto"
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      onBack={onClose}
+      backTestId="btn-back-biometrics"
+      backId="btn-back-biometrics"
+      title={t.goals?.editBiometrics || 'Edit Biometrics'}
+      titleId="biometrics-modal-title"
+      testId="biometrics-edit-modal"
+      maxHeight="max-h-[92dvh]"
     >
-      {/* Top Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
-        <button
-          id="btn-back-biometrics"
-          data-testid="btn-back-biometrics"
-          type="button"
-          onClick={onClose}
-          aria-label="Back"
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="text-center flex-1 mx-2 min-w-0">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-            {t.goals?.editBiometrics || 'Edit Biometrics'}
-          </h2>
-        </div>
-        <div className="w-[44px]" aria-hidden="true" />
-      </header>
-
       {/* Main Form */}
-      <div className="max-w-md mx-auto w-full p-4 space-y-4 flex-1">
+      <div className="max-w-md mx-auto w-full space-y-4">
         <form onSubmit={handleSaveBiometrics} className="space-y-4">
-          <div className="space-y-4 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-sm">
+          <div className="space-y-4 bg-slate-100 dark:bg-slate-900/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1 font-medium flex items-center gap-1">
-                  <User className="w-3.5 h-3.5 text-emerald-400" />
+                <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1 font-medium flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   {t.settings.sexLabel}
                 </label>
                 <select
@@ -188,7 +173,7 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
                   data-testid="select-biometrics-sex"
                   value={sex}
                   onChange={(e) => setSex(e.target.value as UserSex)}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 >
                   <option value="male">{t.settings.sexMale}</option>
                   <option value="female">{t.settings.sexFemale}</option>
@@ -196,8 +181,8 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1 font-medium flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1 font-medium flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   {t.settings.birthDateLabel}
                 </label>
                 <input
@@ -206,15 +191,15 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
                   data-testid="input-biometrics-birthdate"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1 font-medium flex items-center gap-1">
-                  <Ruler className="w-3.5 h-3.5 text-emerald-400" />
+                <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1 font-medium flex items-center gap-1">
+                  <Ruler className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   {t.settings.heightCmLabel}
                 </label>
                 <input
@@ -225,13 +210,13 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
                   max="250"
                   value={heightCm}
                   onChange={(e) => setHeightCm(Number(e.target.value))}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1 font-medium flex items-center gap-1">
-                  <Scale className="w-3.5 h-3.5 text-emerald-400" />
+                <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1 font-medium flex items-center gap-1">
+                  <Scale className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   {t.settings.currentWeightKgLabel}
                 </label>
                 <input
@@ -243,13 +228,13 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
                   max="300"
                   value={currentWeightKg}
                   onChange={(e) => setCurrentWeightKg(Number(e.target.value))}
-                  className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
-              <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-white/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2">
+              <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <span>{t.goals?.weightNotice || 'Updating your weight here records a new weigh-in for today.'}</span>
             </div>
           </div>
@@ -258,48 +243,48 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
           <div
             id="preview-seed-tdee"
             data-testid="preview-seed-tdee"
-            className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 space-y-3"
+            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/90 p-4 space-y-3"
           >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <Flame className="w-3.5 h-3.5" />
               <span>{t.settings.previewTitle}</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">{t.settings.previewBmr}</span>
-                <span data-testid="preview-bmr-value" className="text-xs font-bold text-white font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t.settings.previewBmr}</span>
+                <span data-testid="preview-bmr-value" className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                   {baselinePreview.bmr} kcal
                 </span>
               </div>
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">{t.settings.previewTdee}</span>
-                <span data-testid="preview-tdee-value" className="text-xs font-bold text-white font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t.settings.previewTdee}</span>
+                <span data-testid="preview-tdee-value" className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                   {baselinePreview.seed_tdee} kcal
                 </span>
               </div>
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-emerald-500/30">
-                <span className="text-[10px] text-emerald-400 font-semibold block">{t.settings.previewTargetKcal}</span>
-                <span data-testid="preview-target-kcal-value" className="text-xs font-extrabold text-emerald-400 font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-emerald-500/30 shadow-xs">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block">{t.settings.previewTargetKcal}</span>
+                <span data-testid="preview-target-kcal-value" className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                   {baselinePreview.daily_calorie_target} kcal
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1 border-t border-slate-800/80 font-mono">
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1 border-t border-slate-200 dark:border-slate-800/80 font-mono">
               <div>
-                <span className="text-slate-400 block text-[10px]">Protein</span>
-                <span data-testid="preview-protein-value" className="font-bold text-rose-300">
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Protein</span>
+                <span data-testid="preview-protein-value" className="font-bold text-rose-600 dark:text-rose-300">
                   {baselinePreview.custom_macros.protein}g
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Carbs</span>
-                <span className="font-bold text-amber-300">{baselinePreview.custom_macros.carbs}g</span>
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Carbs</span>
+                <span className="font-bold text-amber-600 dark:text-amber-300">{baselinePreview.custom_macros.carbs}g</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Fats</span>
-                <span className="font-bold text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Fats</span>
+                <span className="font-bold text-cyan-600 dark:text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
               </div>
             </div>
           </div>
@@ -324,6 +309,6 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
           </button>
         </form>
       </div>
-    </div>
+    </BottomSheet>
   );
 };

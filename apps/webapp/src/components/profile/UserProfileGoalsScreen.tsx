@@ -410,9 +410,13 @@ export const UserProfileGoalsScreen: React.FC = () => {
           aria-modal="true"
           data-testid="confirm-mode-switch-modal"
           aria-labelledby="confirm-switch-mode-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain"
+          onClick={() => setPendingModeSwitch(null)}
         >
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4"
+          >
             <div className="flex items-center gap-2 text-emerald-500 font-bold">
               <Target className="w-5 h-5" />
               <h3 id="confirm-switch-mode-title" className="text-base text-slate-900 dark:text-white font-bold">

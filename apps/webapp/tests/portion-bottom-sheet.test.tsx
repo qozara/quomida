@@ -294,8 +294,8 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     // Dialog container
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeDefined();
-    expect(dialog.className).toContain('fixed inset-0');
-    expect(dialog.className).toContain('animate-slide-in-right');
+    expect(dialog.className).toContain('rounded-t-3xl');
+    expect(dialog.className).toContain('animate-slide-in-up');
 
     // Title
     expect(screen.getByText(dictionaries.es.portionModal.title)).toBeDefined();

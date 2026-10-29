@@ -354,7 +354,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-screen-title"
-      className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
+      className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-y-auto animate-slide-in-left"
     >
       {/* Modern Sticky Navigation Header */}
       <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
@@ -1185,11 +1185,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
       {/* Confirmation Dialog: Download Offline Database */}
       {showConfirmDownload && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain"
+          onClick={() => setShowConfirmDownload(false)}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-download-title"
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
             <div className="p-3 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full mb-3 border border-emerald-300 dark:border-emerald-800/50">
@@ -1230,11 +1234,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
       {/* Confirmation Dialog: Delete Offline Database */}
       {showConfirmDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain"
+          onClick={() => setShowConfirmDelete(false)}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
             <div className="p-3 bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-full mb-3 border border-rose-300 dark:border-rose-800/50">

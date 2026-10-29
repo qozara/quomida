@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { calculateBaselineSeed, type GoalType } from '@quomida/domain-core';
-import { ArrowLeft, Target, Activity, Flame, Save, Check } from 'lucide-react';
+import { Target, Activity, Flame, Save, Check } from 'lucide-react';
+import { BottomSheet } from '../common/BottomSheet.js';
 
 interface AdaptiveGoalsEditModalProps {
   isOpen: boolean;
@@ -158,39 +159,23 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.goals?.editAdaptiveTitle || 'Edit Goal Strategy'}
-      data-testid="adaptive-goals-edit-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right overflow-y-auto"
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      onBack={onClose}
+      backTestId="btn-back-adaptive-goals"
+      backId="btn-back-adaptive-goals"
+      title={t.goals?.editAdaptiveTitle || 'Edit Goal Strategy'}
+      titleId="adaptive-goals-modal-title"
+      testId="adaptive-goals-edit-modal"
+      maxHeight="max-h-[92dvh]"
     >
-      {/* Top Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
-        <button
-          id="btn-back-adaptive-goals"
-          data-testid="btn-back-adaptive-goals"
-          type="button"
-          onClick={onClose}
-          aria-label="Back"
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="text-center flex-1 mx-2 min-w-0">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-            {t.goals?.editAdaptiveTitle || 'Edit Goal Strategy'}
-          </h2>
-        </div>
-        <div className="w-[44px]" aria-hidden="true" />
-      </header>
-
       {/* Main Form */}
-      <div className="max-w-md mx-auto w-full p-4 space-y-4 flex-1">
+      <div className="max-w-md mx-auto w-full space-y-4">
         <form onSubmit={handleSaveGoals} className="space-y-4">
           {/* Activity Level Selection */}
-          <div className="space-y-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-sm">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+          <div className="space-y-3 bg-slate-100 dark:bg-slate-900/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <Activity className="w-3.5 h-3.5" />
               <span>{t.settings.activityLevelLabel}</span>
             </div>
@@ -201,7 +186,7 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                 data-testid="select-biometrics-activity"
                 value={activityMultiplier}
                 onChange={(e) => setActivityMultiplier(Number(e.target.value))}
-                className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
               >
                 <option value={1.2}>{t.settings.activitySedentary}</option>
                 <option value={1.375}>{t.settings.activityLight}</option>
@@ -213,8 +198,8 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
           </div>
 
           {/* Goal Selector & Rhythm */}
-          <div className="space-y-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-sm">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+          <div className="space-y-3 bg-slate-100 dark:bg-slate-900/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <Target className="w-3.5 h-3.5" />
               <span>{t.settings.goalSelectorTitle}</span>
             </div>
@@ -227,8 +212,8 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                 onClick={() => handleGoalTypeChange('lose')}
                 className={`py-2 px-1 text-xs font-medium rounded-xl transition-all min-h-[44px] ${
                   goalType === 'lose'
-                    ? 'bg-rose-500/20 border border-rose-500/50 text-rose-300 font-bold'
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-rose-500/20 border border-rose-500/50 text-rose-700 dark:text-rose-300 font-bold'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {t.settings.goalLose}
@@ -240,8 +225,8 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                 onClick={() => handleGoalTypeChange('maintain')}
                 className={`py-2 px-1 text-xs font-medium rounded-xl transition-all min-h-[44px] ${
                   goalType === 'maintain'
-                    ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 font-bold'
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-700 dark:text-emerald-300 font-bold'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {t.settings.goalMaintain}
@@ -253,8 +238,8 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                 onClick={() => handleGoalTypeChange('gain')}
                 className={`py-2 px-1 text-xs font-medium rounded-xl transition-all min-h-[44px] ${
                   goalType === 'gain'
-                    ? 'bg-sky-500/20 border border-sky-500/50 text-sky-300 font-bold'
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-sky-500/20 border border-sky-500/50 text-sky-700 dark:text-sky-300 font-bold'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {t.settings.goalGain}
@@ -265,10 +250,10 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
             {goalType !== 'maintain' && (
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs text-slate-400 font-medium">
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                     {t.settings.weeklyRateLabel}
                   </label>
-                  <span className="text-xs font-bold text-emerald-400 font-mono">
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                     {weeklyRatePct > 0 ? `+${weeklyRatePct}%` : `${weeklyRatePct}%`}/wk
                   </span>
                 </div>
@@ -281,13 +266,13 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                   step={goalType === 'lose' ? 0.05 : 0.05}
                   value={weeklyRatePct}
                   onChange={(e) => setWeeklyRatePct(Number(e.target.value))}
-                  className="w-full accent-emerald-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  className="w-full accent-emerald-500 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
                 />
               </div>
             )}
 
             {/* Adaptive Toggle */}
-            <div className="pt-3 border-t border-slate-800">
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -295,13 +280,13 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
                   data-testid="checkbox-adaptive-toggle"
                   checked={isAdaptive}
                   onChange={(e) => setIsAdaptive(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                  className="w-4 h-4 mt-0.5 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-emerald-500 focus:ring-emerald-500"
                 />
                 <div className="text-xs">
-                  <span className="font-semibold text-white block">
+                  <span className="font-semibold text-slate-900 dark:text-white block">
                     {t.settings.adaptiveToggleLabel}
                   </span>
-                  <span className="text-slate-400 text-[11px] leading-tight block mt-0.5">
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px] leading-tight block mt-0.5">
                     {t.settings.adaptiveToggleHint}
                   </span>
                 </div>
@@ -313,48 +298,48 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
           <div
             id="preview-seed-tdee"
             data-testid="preview-seed-tdee"
-            className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 space-y-3"
+            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/90 p-4 space-y-3"
           >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <Flame className="w-3.5 h-3.5" />
               <span>{t.settings.previewTitle}</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">{t.settings.previewBmr}</span>
-                <span data-testid="preview-bmr-value" className="text-xs font-bold text-white font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t.settings.previewBmr}</span>
+                <span data-testid="preview-bmr-value" className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                   {baselinePreview.bmr} kcal
                 </span>
               </div>
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">{t.settings.previewTdee}</span>
-                <span data-testid="preview-tdee-value" className="text-xs font-bold text-white font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t.settings.previewTdee}</span>
+                <span data-testid="preview-tdee-value" className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                   {baselinePreview.seed_tdee} kcal
                 </span>
               </div>
-              <div className="bg-slate-950/60 p-2 rounded-xl border border-emerald-500/30">
-                <span className="text-[10px] text-emerald-400 font-semibold block">{t.settings.previewTargetKcal}</span>
-                <span data-testid="preview-target-kcal-value" className="text-xs font-extrabold text-emerald-400 font-mono">
+              <div className="bg-white dark:bg-slate-950/60 p-2 rounded-xl border border-emerald-500/30 shadow-xs">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block">{t.settings.previewTargetKcal}</span>
+                <span data-testid="preview-target-kcal-value" className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                   {baselinePreview.daily_calorie_target} kcal
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1 border-t border-slate-800/80 font-mono">
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1 border-t border-slate-200 dark:border-slate-800/80 font-mono">
               <div>
-                <span className="text-slate-400 block text-[10px]">Protein</span>
-                <span data-testid="preview-protein-value" className="font-bold text-rose-300">
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Protein</span>
+                <span data-testid="preview-protein-value" className="font-bold text-rose-600 dark:text-rose-300">
                   {baselinePreview.custom_macros.protein}g
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Carbs</span>
-                <span className="font-bold text-amber-300">{baselinePreview.custom_macros.carbs}g</span>
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Carbs</span>
+                <span className="font-bold text-amber-600 dark:text-amber-300">{baselinePreview.custom_macros.carbs}g</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Fats</span>
-                <span className="font-bold text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Fats</span>
+                <span className="font-bold text-cyan-600 dark:text-cyan-300">{baselinePreview.custom_macros.fats}g</span>
               </div>
             </div>
           </div>
@@ -379,6 +364,6 @@ export const AdaptiveGoalsEditModal: React.FC<AdaptiveGoalsEditModalProps> = ({
           </button>
         </form>
       </div>
-    </div>
+    </BottomSheet>
   );
 };

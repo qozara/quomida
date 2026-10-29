@@ -176,11 +176,11 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
 
       render(<SettingsModal />);
 
-      // Verify full-screen dialog
+      // Verify full-screen dialog with slide-in-from-left animation
       const dialog = screen.getByRole('dialog');
       expect(dialog).toBeDefined();
       expect(dialog.className).toContain('fixed inset-0 z-50');
-      expect(dialog.className).toContain('animate-slide-in-right');
+      expect(dialog.className).toContain('animate-slide-in-left');
 
       // Verify back button
       const backBtn = screen.getByTestId('btn-back-settings');

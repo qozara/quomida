@@ -141,11 +141,15 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
 
       {/* Disconnect Confirmation Sheet / Dialog */}
       {disconnectTarget && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain"
+          onClick={() => setDisconnectTarget(null)}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-disconnect-title"
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
             <div className="p-3 bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 rounded-full mb-3 border border-rose-300 dark:border-rose-800/50">
@@ -183,11 +187,15 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
 
       {/* Empty Local Database Confirmation Dialog */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain"
+          onClick={() => setShowResetConfirm(false)}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-empty-db-title"
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
             <div className="p-3 bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 rounded-full mb-3 border border-rose-300 dark:border-rose-800/50">
