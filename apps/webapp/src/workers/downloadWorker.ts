@@ -64,10 +64,12 @@ self.onmessage = async (e: MessageEvent) => {
       } else if (typeof (tmpHandle as any).createSyncAccessHandle === 'function') {
         const accessHandle = await (tmpHandle as any).createSyncAccessHandle();
         const reader = decompressedStream.getReader();
+        let writeOffset = 0;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          accessHandle.write(value);
+          const written = accessHandle.write(value, { at: writeOffset });
+          writeOffset += (typeof written === 'number' ? written : value.byteLength);
         }
         accessHandle.flush();
         accessHandle.close();
@@ -87,14 +89,30 @@ self.onmessage = async (e: MessageEvent) => {
       console.log('[downloadWorker] Header verified: SQLite format 3 OK. Performing atomic swap in OPFS to catalog.sqlite...');
 
       // 7. Atomic Swap: move or copy tmp to target
+      let swapSucceeded = false;
       if (typeof (tmpHandle as any).move === 'function') {
         try {
-          await opfsRoot.removeEntry('catalog.sqlite');
-        } catch (err: any) {
-          if (err.name !== 'NotFoundError') throw err;
+          try {
+            await opfsRoot.removeEntry('catalog.sqlite');
+          } catch (err: any) {
+            if (err.name !== 'NotFoundError') throw err;
+          }
+          try {
+            // WebKit/Safari requires destination directory handle as 1st argument: move(directory, newName)
+            await (tmpHandle as any).move(opfsRoot, 'catalog.sqlite');
+            swapSucceeded = true;
+          } catch (firstErr) {
+            console.warn('[downloadWorker] move(opfsRoot, name) failed, attempting move(name):', firstErr);
+            await (tmpHandle as any).move('catalog.sqlite');
+            swapSucceeded = true;
+          }
+        } catch (moveErr) {
+          console.warn('[downloadWorker] tmpHandle.move failed, falling back to copy:', moveErr);
+          swapSucceeded = false;
         }
-        await (tmpHandle as any).move('catalog.sqlite');
-      } else {
+      }
+
+      if (!swapSucceeded) {
         const targetHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
         if (typeof targetHandle.createWritable === 'function') {
           const writable = await targetHandle.createWritable();
@@ -102,10 +120,12 @@ self.onmessage = async (e: MessageEvent) => {
         } else if (typeof (targetHandle as any).createSyncAccessHandle === 'function') {
           const accessHandle = await (targetHandle as any).createSyncAccessHandle();
           const reader = tmpFile.stream().getReader();
+          let writeOffset = 0;
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            accessHandle.write(value);
+            const written = accessHandle.write(value, { at: writeOffset });
+            writeOffset += (typeof written === 'number' ? written : value.byteLength);
           }
           accessHandle.flush();
           accessHandle.close();
