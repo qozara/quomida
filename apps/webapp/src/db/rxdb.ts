@@ -280,8 +280,8 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
   if (!existingSettings) {
     await db.user_settings.insert({
       id: 'global_settings',
-      locale: 'es-AR',
-      theme: 'dark',
+      locale: 'system',
+      theme: 'system',
       daily_calorie_target: 2000,
       custom_macros: {
         protein: 150,
@@ -358,8 +358,8 @@ export class LocalDBService {
     }
     const fallback: UserSettings = {
       id: 'global_settings',
-      locale: 'es-AR',
-      theme: 'dark',
+      locale: 'system',
+      theme: 'system',
       daily_calorie_target: 2000,
       custom_macros: { protein: 150, carbs: 200, fats: 65 },
       target_mode: 'manual',
@@ -527,6 +527,24 @@ export class LocalDBService {
       return of([]);
     }
     return db.daily_logs.find().$.pipe(
+      map((docs: any[]) =>
+        docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
+      )
+    );
+  }
+
+  observeRecentDailyLogs(cutoffDate: string): Observable<DailyLog[]> {
+    const db = this.db || this.getDatabaseInstance();
+    if (!db || !db.daily_logs) {
+      return of([]);
+    }
+    return db.daily_logs.find({
+      selector: {
+        date: {
+          $gte: cutoffDate
+        }
+      }
+    }).$.pipe(
       map((docs: any[]) =>
         docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog)
       )

@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-libra
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppProvider, useApp } from '../src/context/AppContext.js';
 import { SettingsModal } from '../src/components/SettingsModal.js';
+import { UserProfileGoalsScreen } from '../src/components/profile/UserProfileGoalsScreen.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
 import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { destroyDatabase, clearLocalDatabase } from '../src/db/rxdb.js';
@@ -26,6 +27,8 @@ vi.mock('@react-oauth/google', () => ({
 
 describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pane', () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
     vi.clearAllMocks();
     vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
       status: 'idle',
@@ -42,6 +45,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
   afterEach(async () => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await clearLocalDatabase();
   });
@@ -51,6 +55,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
       selectedDate,
       setSelectedDate,
       userSettings,
+      updateUserSettings,
       weightLogs,
       logFoodItem,
       logWeight,
@@ -72,6 +77,7 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
         <span data-testid="weight-logs-count">{weightLogs.length}</span>
         <span data-testid="adaptive-status">{userSettings.adaptive_state?.calibration_status || 'none'}</span>
 
+        <UserProfileGoalsScreen />
         <SettingsModal />
         <AnalyticsModal />
 
@@ -83,6 +89,15 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
         </button>
         <button data-testid="btn-open-analytics" onClick={() => setIsAnalyticsOpen(true)}>
           Open Analytics
+        </button>
+        <button data-testid="btn-close-analytics" onClick={() => setIsAnalyticsOpen(false)}>
+          Close Analytics
+        </button>
+        <button
+          data-testid="btn-enable-adaptive"
+          onClick={() => updateUserSettings({ target_mode: 'adaptive' })}
+        >
+          Enable Adaptive
         </button>
         <button
           data-testid="btn-set-date"
@@ -152,12 +167,23 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Step 2: User sets up Smart/Adaptive targets today
     fireEvent.click(screen.getByTestId('btn-open-settings'));
     await waitFor(() => {
-      expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
+      expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
     });
-    fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+
+    const smartTab = screen.getByTestId('btn-target-mode-smart');
+    fireEvent.click(smartTab);
+    expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+    // Configure biometrics
+    fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
     fireEvent.change(screen.getByTestId('select-biometrics-sex'), { target: { value: 'male' } });
     fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '180' } });
     fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '80' } });
+    fireEvent.click(screen.getByTestId('btn-save-biometrics'));
+
+    // Configure goals
+    fireEvent.click(screen.getByTestId('btn-edit-goals'));
     fireEvent.change(screen.getByTestId('select-biometrics-activity'), { target: { value: '1.55' } });
     const adaptiveCheckbox = screen.getByTestId('checkbox-adaptive-toggle') as HTMLInputElement;
     if (!adaptiveCheckbox.checked) {
@@ -230,8 +256,12 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // recognize calibration is ready (or reflect the user's active baseline),
     // and NOT say 1/4 weigh-ins and 1/10 food days (collecting data)!
     await waitFor(() => {
-      expect(screen.getByText(en.analytics.title)).toBeDefined();
+      expect(screen.getByRole('region', { name: new RegExp(en.analytics.title, 'i') })).toBeDefined();
     });
+
+    // Expand collapsed calibration details at bottom of Analytics
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
 
     // Check what the compliance pane shows:
     // If the bug exists:
@@ -254,6 +284,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     await waitFor(() => {
       expect(screen.getByTestId('selected-date-val').textContent).toBe('2026-10-20');
     });
+
+    // Re-expand collapsed card after moving/date navigation
+    const toggleDetailsBtnToday = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtnToday);
 
     const complianceWhenOnToday = screen.getByText(en.analytics.complianceTitle).parentElement;
     console.log('COMPLIANCE WHEN ON TODAY:', complianceWhenOnToday?.textContent);
@@ -286,13 +320,20 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Configure Smart targets
     fireEvent.click(screen.getByTestId('btn-open-settings'));
     await waitFor(() => {
-      expect(screen.getByTestId('btn-target-mode-smart')).toBeDefined();
+      expect(screen.getByTestId('btn-edit-goals')).toBeDefined();
     });
-    fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+
+    const smartTab = screen.getByTestId('btn-target-mode-smart');
+    fireEvent.click(smartTab);
+    expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+    // Configure biometrics
+    fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
     fireEvent.change(screen.getByTestId('select-biometrics-sex'), { target: { value: 'female' } });
     fireEvent.change(screen.getByTestId('input-biometrics-height'), { target: { value: '165' } });
     fireEvent.change(screen.getByTestId('input-biometrics-weight'), { target: { value: '65' } });
-    fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+    fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
     const closeSettingsBtn = screen.getByTestId('btn-close-settings');
     if (closeSettingsBtn) {
@@ -321,6 +362,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Open AnalyticsModal while on past date 2026-10-12
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
 
+    // Expand collapsed calibration details
+    const toggleDetailsBtn1 = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn1);
+
     // Should show 9/10 food days (not 1/10!)
     await waitFor(() => {
       expect(screen.getByText(/9\/10/i)).toBeDefined();
@@ -346,6 +391,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
     // Re-open AnalyticsModal while on 2026-10-11
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
 
+    // Expand collapsed calibration details at bottom
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
+
     // Now food days should update to 10/10 and status should become ready!
     await waitFor(() => {
       expect(screen.getByText(/10\/10/i)).toBeDefined();
@@ -366,6 +415,9 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
     const setDateBtn = screen.getByTestId('btn-set-date');
     const logWeightBtn = screen.getByTestId('btn-log-weight-entry');
+
+    // Switch to adaptive mode so calibration status is tracked and displayed
+    fireEvent.click(screen.getByTestId('btn-enable-adaptive'));
 
     // User sets up initial weight on 2026-10-20
     act(() => {
@@ -398,6 +450,10 @@ describe('SDET Breaker Test: Past Dates Backfill & Recalibration Requirements Pa
 
     // Open AnalyticsModal while on past date 2026-10-10
     fireEvent.click(screen.getByTestId('btn-open-analytics'));
+
+    // Expand collapsed calibration details at bottom
+    const toggleDetailsBtn = await screen.findByTestId('btn-toggle-calibration-details');
+    fireEvent.click(toggleDetailsBtn);
 
     // Verify recent weigh-ins count is 5/4 and prior is 1/1
     await waitFor(() => {

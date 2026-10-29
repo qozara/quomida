@@ -39,11 +39,11 @@ export const MacroRings: React.FC = () => {
             <Flame className="w-4 h-4 fill-emerald-400/20" />
             <span>{t.dashboard.calories}</span>
           </div>
-          <div className="text-3xl font-extrabold text-white mt-1 tracking-tight">
+          <div className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1 tracking-tight">
             {Math.round(totalConsumed.calories)}
-            <span className="text-base font-normal text-slate-400 ml-1">/ {calTarget} kcal</span>
+            <span className="text-base font-normal text-slate-500 dark:text-slate-400 ml-1">/ {calTarget} kcal</span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {calRemaining > 0
               ? `${Math.round(calRemaining)} kcal ${t.dashboard.remaining}`
               : `${Math.round(totalConsumed.calories - calTarget)} kcal ${t.dashboard.overGoal}`}
@@ -69,7 +69,7 @@ export const MacroRings: React.FC = () => {
               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
             />
           </svg>
-          <span className="absolute text-sm font-bold text-slate-100">
+          <span className="absolute text-sm font-bold text-slate-900 dark:text-slate-100">
             {getPercentage(totalConsumed.calories, calTarget)}%
           </span>
         </div>
@@ -79,13 +79,13 @@ export const MacroRings: React.FC = () => {
       <div className="grid grid-cols-3 gap-3">
         {/* Protein */}
         <div className="bg-slate-900/90 rounded-2xl p-3 border border-slate-800/80 shadow-sm">
-          <div className="flex items-center gap-1 text-rose-400 text-xs font-semibold mb-1">
+          <div className="flex items-center gap-1 text-rose-500 dark:text-rose-400 text-xs font-semibold mb-1">
             <Dumbbell className="w-3.5 h-3.5" />
             <span>{t.dashboard.protein}</span>
           </div>
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-slate-900 dark:text-white">
             {Math.round(totalConsumed.protein)}
-            <span className="text-xs text-slate-400 font-normal">g</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">g</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
             <div
@@ -93,18 +93,18 @@ export const MacroRings: React.FC = () => {
               style={{ width: `${getPercentage(totalConsumed.protein, pTarget)}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 mt-1 text-right">target {pTarget}g</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 text-right">target {pTarget}g</div>
         </div>
 
         {/* Carbs */}
         <div className="bg-slate-900/90 rounded-2xl p-3 border border-slate-800/80 shadow-sm">
-          <div className="flex items-center gap-1 text-amber-400 text-xs font-semibold mb-1">
+          <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400 text-xs font-semibold mb-1">
             <Wheat className="w-3.5 h-3.5" />
             <span>{t.dashboard.carbs}</span>
           </div>
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-slate-900 dark:text-white">
             {Math.round(totalConsumed.carbs)}
-            <span className="text-xs text-slate-400 font-normal">g</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">g</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
             <div
@@ -112,18 +112,18 @@ export const MacroRings: React.FC = () => {
               style={{ width: `${getPercentage(totalConsumed.carbs, cTarget)}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 mt-1 text-right">target {cTarget}g</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 text-right">target {cTarget}g</div>
         </div>
 
         {/* Fats */}
         <div className="bg-slate-900/90 rounded-2xl p-3 border border-slate-800/80 shadow-sm">
-          <div className="flex items-center gap-1 text-cyan-400 text-xs font-semibold mb-1">
+          <div className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400 text-xs font-semibold mb-1">
             <Droplet className="w-3.5 h-3.5" />
             <span>{t.dashboard.fats}</span>
           </div>
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-slate-900 dark:text-white">
             {Math.round(totalConsumed.fats)}
-            <span className="text-xs text-slate-400 font-normal">g</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">g</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
             <div

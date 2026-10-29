@@ -8,8 +8,9 @@ import { WeightTrendChart, type WeightChartDataPoint } from '../src/components/a
 import { DashboardWeightPill } from '../src/components/DashboardWeightPill.js';
 import { WeightQuickLogModal } from '../src/components/WeightQuickLogModal.js';
 import { AnalyticsModal } from '../src/components/analytics/AnalyticsModal.js';
-import { Header } from '../src/components/Header.js';
+import { BottomNav } from '../src/components/navigation/BottomNav.js';
 import { SettingsModal } from '../src/components/SettingsModal.js';
+import { UserProfileGoalsScreen } from '../src/components/profile/UserProfileGoalsScreen.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { en } from '@quomida/i18n-locales';
 import type { WeightLog, UserSettings } from '@quomida/domain-core';
@@ -18,6 +19,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
   const mockLogWeight = vi.fn().mockResolvedValue(undefined);
   const mockDeleteWeightLog = vi.fn().mockResolvedValue(undefined);
   const mockSetIsWeightModalOpen = vi.fn();
+  const mockSetSelectedDate = vi.fn();
   const mockSetIsAnalyticsOpen = vi.fn();
   const mockSetIsSettingsOpen = vi.fn();
   const mockSetIsCatalogOpen = vi.fn();
@@ -64,7 +66,7 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
   const setupMockContext = (overrides: Partial<any> = {}) => {
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
       selectedDate: '2026-10-20',
-      setSelectedDate: vi.fn(),
+      setSelectedDate: mockSetSelectedDate,
       locale: 'en',
       setLocale: vi.fn(),
       theme: 'dark',
@@ -273,6 +275,38 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         expect(mockSetIsWeightModalOpen).toHaveBeenCalledWith(false);
       });
     });
+
+    it('renders as slide-over with back button, and allows changing date via DateSelector to save weight to newly selected date', async () => {
+      setupMockContext({ isWeightModalOpen: true });
+      render(<WeightQuickLogModal />);
+
+      // Verify bottom sheet modal styling and accessible back arrow
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.className).toContain('rounded-t-3xl');
+      expect(dialog.className).toContain('animate-slide-in-up');
+
+      const backBtn = screen.getByTestId('btn-close-weight-modal');
+      expect(backBtn).toBeDefined();
+
+      // Verify date selector is present at top
+      const dateSelector = screen.getByTestId('date-selector');
+      expect(dateSelector).toBeDefined();
+
+      // Click Next Day button (advancing from 2026-10-20 to 2026-10-21)
+      const nextDayBtn = screen.getByTestId('btn-date-next');
+      fireEvent.click(nextDayBtn);
+
+      expect(mockSetSelectedDate).toHaveBeenCalledWith('2026-10-21');
+
+      // Save weight
+      const saveBtn = screen.getByTestId('btn-save-weight');
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(mockLogWeight).toHaveBeenCalledWith('2026-10-21', 80, undefined);
+        expect(mockSetIsWeightModalOpen).toHaveBeenCalledWith(false);
+      });
+    });
   });
 
   describe('4. AnalyticsModal', () => {
@@ -297,24 +331,21 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       render(<AnalyticsModal />);
 
-      expect(screen.getByRole('dialog')).toBeDefined();
-      expect(screen.getByText(en.analytics.title)).toBeDefined();
+      expect(screen.getByRole('region', { name: new RegExp(en.analytics.title, 'i') })).toBeDefined();
 
       // Check estimated TDEE display
       expect(screen.getByText('2450')).toBeDefined();
 
-      // Check compliance indicators exist
+      // Check compliance indicators exist (expand collapsed calibration details card first)
+      const toggleBtn = screen.getByTestId('btn-toggle-calibration-details');
+      fireEvent.click(toggleBtn);
       expect(screen.getByText(/Weigh-ins \(last 7d\)/i)).toBeDefined();
 
       // Check recent logs are listed
       expect(screen.getByText('Morning weigh-in')).toBeDefined();
 
-      // Close button meets touch target
-      const closeBtn = screen.getByTestId('btn-close-analytics');
-      expect(closeBtn.className).toMatch(/min-w-\[44px\]/);
-      expect(closeBtn.className).toMatch(/min-h-\[44px\]/);
-      fireEvent.click(closeBtn);
-      expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(false);
+      // Close button is omitted on main screen as user navigates via bottom bar
+      expect(screen.queryByTestId('btn-close-analytics')).toBeNull();
     });
 
     it('switches between Weight Trend and Energy Trend tabs with contextual chart and bottom list', async () => {
@@ -407,10 +438,11 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     });
   });
 
-  describe('5. Header Analytics Button', () => {
+  describe('5. Bottom Navigation Analytics Button', () => {
     it('renders #btn-open-analytics and meets touch target requirements', () => {
+      const mockOnSelectTab = vi.fn();
       setupMockContext();
-      render(<Header />);
+      render(<BottomNav activeTab="diary" onSelectTab={mockOnSelectTab} />);
 
       const analyticsBtn = screen.getByTestId('btn-open-analytics');
       expect(analyticsBtn).toBeDefined();
@@ -418,18 +450,17 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(analyticsBtn.className).toMatch(/min-h-\[44px\]/);
 
       fireEvent.click(analyticsBtn);
-      expect(mockSetIsAnalyticsOpen).toHaveBeenCalledWith(true);
+      expect(mockOnSelectTab).toHaveBeenCalledWith('analytics');
     });
   });
 
-  describe('6. SettingsModal Target Mode Selector (Manual vs Smart/Adaptive)', () => {
+  describe('6. Target Mode Selector (Manual vs Smart/Adaptive) in User Profile & Goals', () => {
     it('renders mode switcher and switches between manual and smart/adaptive', async () => {
       setupMockContext({
-        isSettingsOpen: true,
         userSettings: defaultMockUserSettings
       });
 
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
       const manualTab = screen.getByTestId('btn-target-mode-manual');
       const smartTab = screen.getByTestId('btn-target-mode-smart');
@@ -437,13 +468,22 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       expect(manualTab).toBeDefined();
       expect(smartTab).toBeDefined();
 
-      // Switch to Smart / Adaptive
+      // Switch to Smart / Adaptive via confirm dialog
       fireEvent.click(smartTab);
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+      // Open Biometrics Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Verify biometrics inputs appear
       expect(screen.getByTestId('select-biometrics-sex')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-height')).toBeDefined();
       expect(screen.getByTestId('input-biometrics-weight')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-back-biometrics'));
+
+      // Open Goals Edit Modal
+      fireEvent.click(screen.getByTestId('btn-edit-goals'));
 
       // Verify goal buttons appear
       expect(screen.getByTestId('btn-goal-lose')).toBeDefined();
@@ -456,18 +496,22 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
     it('saves biometrics, goal config, and logs initial weight when saving smart targets', async () => {
       setupMockContext({
-        isSettingsOpen: true,
         weightLogs: [], // No prior logs
         userSettings: defaultMockUserSettings
       });
 
-      render(<SettingsModal />);
+      render(<UserProfileGoalsScreen />);
 
-      // Switch to smart
+      // Switch to smart via confirm dialog
       fireEvent.click(screen.getByTestId('btn-target-mode-smart'));
+      expect(screen.getByTestId('btn-confirm-mode-switch')).toBeDefined();
+      fireEvent.click(screen.getByTestId('btn-confirm-mode-switch'));
+
+      // Open biometrics editor
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       // Click save
-      const saveBtn = screen.getByTestId('btn-save-nutritional-targets');
+      const saveBtn = screen.getByTestId('btn-save-biometrics');
       fireEvent.click(saveBtn);
 
       await waitFor(() => {
@@ -478,7 +522,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
           expect.objectContaining({
             target_mode: expect.stringMatching(/adaptive|deterministic_seed/),
             biometrics: expect.any(Object),
-            goal_config: expect.any(Object),
             daily_calorie_target: expect.any(Number)
           })
         );
@@ -488,7 +531,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
     it('reactively updates form fields when userSettings and weightLogs update after mount (e.g. after cloud sync)', async () => {
       // 1. Mount with initial factory default settings
       setupMockContext({
-        isSettingsOpen: false,
         weightLogs: [],
         userSettings: {
           id: 'global_settings',
@@ -501,11 +543,10 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      const { rerender } = render(<SettingsModal />);
+      const { rerender } = render(<UserProfileGoalsScreen />);
 
-      // 2. Simulate cloud sync completing and user opening SettingsModal
+      // 2. Simulate cloud sync completing
       setupMockContext({
-        isSettingsOpen: true,
         weightLogs: [
           {
             id: 'weight_2026-10-20',
@@ -539,7 +580,10 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      rerender(<SettingsModal />);
+      rerender(<UserProfileGoalsScreen />);
+
+      // Open Biometrics Edit Modal to view reactive form fields
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       await waitFor(() => {
         const sexSelect = screen.getByTestId('select-biometrics-sex') as HTMLSelectElement;
@@ -551,10 +595,10 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
       });
     });
 
-    it('updates weight log on selectedDate when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
-      // Case A: log already exists on selectedDate (80.0 kg), user edits weight to 78.5 kg in SettingsModal
+    it('updates weight log on today when weight input is modified, and avoids spurious weight log when weight is unchanged', async () => {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      // Case A: log already exists (80.0 kg), user edits weight to 78.5 kg
       setupMockContext({
-        isSettingsOpen: true,
         selectedDate: '2026-10-20',
         weightLogs: sampleWeightLogs, // has 80.0 on 2026-10-20
         userSettings: {
@@ -575,14 +619,17 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      const { unmount } = render(<SettingsModal />);
+      const { unmount } = render(<UserProfileGoalsScreen />);
+
+      // Open biometrics editor
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
 
       const weightInput = screen.getByTestId('input-biometrics-weight') as HTMLInputElement;
       fireEvent.change(weightInput, { target: { value: '78.5' } });
-      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
       await waitFor(() => {
-        expect(mockLogWeight).toHaveBeenCalledWith('2026-10-20', 78.5);
+        expect(mockLogWeight).toHaveBeenCalledWith(todayStr, 78.5);
       });
 
       unmount();
@@ -590,7 +637,6 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
 
       // Case B: log exists on earlier date (2026-10-19, 80.2 kg), no log on selectedDate (2026-10-21), user does NOT change weight
       setupMockContext({
-        isSettingsOpen: true,
         selectedDate: '2026-10-21',
         weightLogs: sampleWeightLogs.slice(0, 2), // latest is 2026-10-19 (80.2 kg)
         userSettings: {
@@ -611,8 +657,9 @@ describe('Wave 5: Adaptive Expenditure & Weight Tracking UI Components', () => {
         }
       });
 
-      render(<SettingsModal />);
-      fireEvent.click(screen.getByTestId('btn-save-nutritional-targets'));
+      render(<UserProfileGoalsScreen />);
+      fireEvent.click(screen.getByTestId('btn-edit-biometrics'));
+      fireEvent.click(screen.getByTestId('btn-save-biometrics'));
 
       await waitFor(() => {
         expect(mockUpdateUserSettings).toHaveBeenCalled();

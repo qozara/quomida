@@ -80,7 +80,7 @@ export const WeightTrendChart: React.FC<WeightTrendChartProps> = ({
               className={`min-w-[44px] min-h-[44px] px-3 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                 rangeDays === r
                   ? activeRangeClass
-                  : 'bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/50'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-700/50'
               }`}
             >
               {r}d
@@ -231,7 +231,7 @@ export const WeightTrendChart: React.FC<WeightTrendChartProps> = ({
               className={`min-w-[44px] min-h-[44px] px-3 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                 rangeDays === r
                   ? activeRangeClass
-                  : 'bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/50'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-700/50'
               }`}
             >
               {r}d

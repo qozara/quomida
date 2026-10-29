@@ -22,11 +22,13 @@ We adopt a **Three-Trigger Event-Driven PWA Update Lifecycle** using `vite-plugi
 2. **Trigger 2 — Non-Disruptive Update Prompt Toast (`PwaUpdatePrompt.tsx`)**:
    - `apps/webapp/vite.config.ts` is configured with `registerType: 'prompt'`.
    - When a new Service Worker finishes downloading and enters the `waiting` state (`onNeedRefresh`), `PwaUpdatePrompt` renders an accessible (`role="status"`, `aria-live="polite"`) non-blocking banner above the bottom navigation bar.
-   - The user can tap **"Update & Reload"** (which sends `SKIP_WAITING` and reloads the page cleanly) or dismiss the toast (**"Later"**) without interrupting in-flight meal logging or sync operations.
+   - The user can tap **"Update & Reload"** (which posts `SKIP_WAITING` to waiting service workers, binds `controllerchange` to reload, and sets a 500ms fallback reload timer) or dismiss the toast (**"Later"**) without interrupting in-flight meal logging or sync operations.
+   - Provides visual tactile feedback with `isUpdating` spinner state and disabled interactions to prevent race conditions during activation.
 
 3. **Trigger 3 — Manual "Check for App Update" Control in Settings (`SettingsModal.tsx`)**:
    - Inside the **About & Legal** section of `SettingsModal.tsx`, directly beneath the `Version <commit-hash>` display, a **"Check for App Update"** button allows users to deterministically query `registration.update()` on demand.
    - If a waiting Service Worker is detected or finishes installing during the check, the button transitions into an **"Update & Reload Now"** action; otherwise, it confirms *"Quomida is up to date"*.
+   - Clicking **"Update & Reload Now"** executes `applyPwaAppUpdate()` with immediate loading feedback and guaranteed reload via `controllerchange` or fallback reload timer.
 
 ## Consequences
 

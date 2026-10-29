@@ -1,5 +1,5 @@
 import { calculateItemMacros } from '@quomida/domain-core';
-import { MockCloudSyncProvider } from '@quomida/cloud-providers';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers/testing';
 
 console.log('====================================================');
 console.log('  🥗 Quomida CLI Admin & Domain Core Test Tool');

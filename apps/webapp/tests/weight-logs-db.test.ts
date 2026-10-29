@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getDatabase, destroyDatabase, LocalDBService } from '../src/db/rxdb.js';
 import { SYNCABLE_COLLECTIONS, syncDatabaseWithRemote } from '../src/db/replication.js';
-import { MockCloudSyncProvider } from '@quomida/cloud-providers';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers/testing';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { firstValueFrom, take } from 'rxjs';
 import {

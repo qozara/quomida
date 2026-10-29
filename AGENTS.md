@@ -21,7 +21,8 @@ This document contains operational guidelines, architectural constraints, and st
 
 4. **BYOS Sync Adapter Isolation**:
    - Presentation logic in `apps/webapp` strictly communicates with the storage layer via the `CloudSyncProvider` interface (`packages/cloud-providers`).
-   - Out-of-the-box local development MUST default to `MockCloudSyncProvider` so `npm run dev` works with zero initial cloud credential configuration.
+   - Out-of-the-box local development operates 100% offline with zero initial cloud credential configuration.
+   - `MockCloudSyncProvider` is isolated to `@quomida/cloud-providers/testing` strictly for test environments and headless simulation; it must never be registered in production UI screens or settings.
 
 5. **Test-Driven Development (TDD)**:
    - NEVER claim a task or bug fix is complete without running `npm run test` or `npx vitest run` to verify green test execution.
@@ -131,7 +132,7 @@ npm run build
 | Serializers & Dynamic Header Mapping | `packages/cloud-providers/src/strategy/serializers.ts` |
 | Composite Sync Adapter Orchestrator | `packages/cloud-providers/src/strategy/CompositeCloudSyncProvider.ts` |
 | Sync Adapter Interface & Types | `packages/cloud-providers/src/types.ts` |
-| Mock Sync Adapter | `packages/cloud-providers/src/mock/MockCloudSyncProvider.ts` |
+| Mock Sync Adapter (Test Utility) | `packages/cloud-providers/src/testing/MockCloudSyncProvider.ts` |
 | Google Drive Sheets Sync Adapter | `packages/cloud-providers/src/google/GoogleDriveSheetsCloudSyncProvider.ts` |
 | Macro Calculations & Formulas | `packages/domain-core/src/calculations/index.ts` |
 

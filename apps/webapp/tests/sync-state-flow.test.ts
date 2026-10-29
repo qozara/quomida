@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MockCloudSyncProvider, resolveUXStatus, resolveProviderDiagnostic, type UXSyncState } from '@quomida/cloud-providers';
+import { resolveUXStatus, resolveProviderDiagnostic, type UXSyncState } from '@quomida/cloud-providers';
+import { MockCloudSyncProvider } from '@quomida/cloud-providers/testing';
 import { LocalDBService, destroyDatabase } from '../src/db/rxdb.js';
 import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 

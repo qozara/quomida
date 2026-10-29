@@ -1,29 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
-import type { BaseIngredient, FoodItem, MealType, Portion, ResolvedBatchMeal } from '@quomida/domain-core';
-import { CatalogSearchManager, BatchMealResolver, MealService } from '@quomida/domain-core';
+import type { BaseIngredient, FoodItem, MealType, Portion, RecipeComponent } from '@quomida/domain-core';
+import { CatalogSearchManager, BatchMealResolver, MealService, RecipeManager, type Recipe } from '@quomida/domain-core';
 import { LlmRecipeDecomposer, AiMealError, classifyAiError } from '@quomida/ai-services';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
 import { AI_CONFIG } from '../config/ai.js';
-import { BatchAiMealReviewModal } from './BatchAiMealReviewModal.js';
+import { RecipeBuilder } from './recipes/RecipeBuilder.js';
+import { IngredientBuilder } from './IngredientBuilder.js';
 
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
 
 interface FoodLoggerProps {
   onSelectIngredient: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
+  onClose?: () => void;
+  targetMealType?: MealType;
 }
 
-export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) => {
-  const { ingredients, recipes = [], recipeFoods = [], t, locale, setIsSettingsOpen, userSettings, db } = useApp();
+export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType }) => {
+  const {
+    ingredients = [],
+    recipes = [],
+    recipeFoods = [],
+    selectedDate,
+    t,
+    locale,
+    setIsSettingsOpen,
+    userSettings,
+    db,
+    addRecipe,
+    addCustomIngredient,
+    logFoodItem,
+    logBatchFoodItems
+  } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
   const [searchManager] = useState(() => new CatalogSearchManager());
+  const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
-  const [batchMeal, setBatchMeal] = useState<ResolvedBatchMeal | null>(null);
-  const [isBatchReviewOpen, setIsBatchReviewOpen] = useState(false);
+
+  const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
+  const [isBuildingIngredient, setIsBuildingIngredient] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<FoodItem | null>(null);
+  const [detectedMealType, setDetectedMealType] = useState<MealType | null>(null);
+
   const [isSearching, setIsSearching] = useState(false);
   const [isFullCatalog, setIsFullCatalog] = useState(() => remoteService.isFullCatalogLoaded);
 
@@ -140,8 +163,63 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
       });
 
       setIsParsing(false);
-      setBatchMeal(resolved);
-      setIsBatchReviewOpen(true);
+      setDetectedMealType(resolved.detectedMealType || null);
+
+      const isRecipe = Boolean(
+        resolved.synthesizedRecipe ||
+        resolved.compositeDishName ||
+        resolved.items.length > 1 ||
+        (resolved.items.length === 1 && resolved.items[0].food?.kind === 'recipe')
+      );
+
+      if (isRecipe) {
+        let recipeName = resolved.compositeDishName || resolved.synthesizedRecipe?.recipe?.name || resolved.rawInput;
+        let components: RecipeComponent[] = [];
+        let portions = (resolved.synthesizedRecipe?.foodItem as any)?.portions || [];
+
+        if (resolved.synthesizedRecipe) {
+          recipeName = resolved.compositeDishName || resolved.synthesizedRecipe.recipe.name;
+          components = resolved.synthesizedRecipe.recipe.ingredients || [];
+        } else {
+          components = resolved.items.filter(it => it.food).map(it => ({
+            food_id: it.food!.id,
+            name: it.food!.name,
+            weight_g: it.calculatedWeightGrams,
+            calories_100g: it.food!.calories_100g,
+            protein_100g: it.food!.protein_100g,
+            carbs_100g: it.food!.carbs_100g,
+            fats_100g: it.food!.fats_100g,
+            portion_name: it.selectedPortionName,
+            portion_quantity: it.quantity
+          }));
+        }
+
+        const rawWeight = components.reduce((sum, c) => sum + (c.weight_g || 0), 0);
+        const initialRecipeData = {
+          name: recipeName,
+          ingredients: components,
+          raw_weight_g: rawWeight,
+          cooked_weight_g: rawWeight,
+          portions
+        };
+
+        setEditingRecipe(initialRecipeData);
+        setIsBuildingRecipe(true);
+      } else {
+        const singleItem = resolved.items[0];
+        const initialFood: any = singleItem?.food ? { ...singleItem.food } : {
+          id: `custom_${Date.now()}`,
+          name: singleItem?.rawQuery || query,
+          calories_100g: 0,
+          protein_100g: 0,
+          carbs_100g: 0,
+          fats_100g: 0,
+          portions: []
+        };
+
+        setEditingIngredient(initialFood);
+        setIsBuildingIngredient(true);
+      }
     } catch (err: unknown) {
       setIsParsing(false);
       const aiError = err instanceof AiMealError ? err : classifyAiError(err);
@@ -256,7 +334,6 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
                 type="button"
                 onClick={() => {
                   onSelectIngredient(ing, 'meal_lunch');
-                  setSearchQuery('');
                 }}
                 className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
               >
@@ -324,16 +401,113 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient }) =>
         )}
       </form>
 
-      {/* Batch AI Multi-Ingredient Review Modal */}
-      {isBatchReviewOpen && batchMeal && (
-        <BatchAiMealReviewModal
-          isOpen={isBatchReviewOpen}
-          batchMeal={batchMeal}
-          onClose={() => setIsBatchReviewOpen(false)}
-          onLoggedSuccess={() => {
+      {/* Inferred Recipe Builder Modal */}
+      {isBuildingRecipe && (
+        <RecipeBuilder
+          initialRecipe={editingRecipe}
+          initialDate={selectedDate}
+          mode="diary"
+          targetMealType={targetMealType || detectedMealType || 'meal_lunch'}
+          onBack={() => {
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+          }}
+          onClose={() => {
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+            onClose?.();
+          }}
+          onSave={async (recipe, portions) => {
+            await addRecipe(recipe, portions);
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
             setSearchQuery('');
-            setIsBatchReviewOpen(false);
-            setBatchMeal(null);
+            onClose?.();
+          }}
+          onSaveAndLog={async (recipe, portions, meal, date) => {
+            const savedRecipeId = await addRecipe(recipe, portions);
+            const recipeWithId = { ...recipe, id: recipe.id || savedRecipeId };
+            const recipeFood = recipeManager.toFoodItem(recipeWithId);
+            const hasServing = portions && portions.length > 0;
+            const portionName = hasServing ? portions[0].name : 'Whole recipe';
+            const quantity = 1;
+            const portionsToUse = portions?.map((p, idx) => ({
+              id: `port-${savedRecipeId}-${idx}`,
+              base_food_id: savedRecipeId,
+              name: p.name,
+              equivalent_weight_g: p.equivalent_weight_g,
+              source: 'custom' as const
+            }));
+            if (logFoodItem) {
+              await logFoodItem(recipeFood, meal, quantity, portionName, portionsToUse, date);
+            } else if (logBatchFoodItems) {
+              await logBatchFoodItems(
+                [{ food: recipeFood, quantity, portionName, availablePortions: portionsToUse, mealType: meal }],
+                meal
+              );
+            }
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+            setSearchQuery('');
+            onClose?.();
+          }}
+        />
+      )}
+
+      {/* Inferred Single Ingredient Builder Modal */}
+      {isBuildingIngredient && (
+        <IngredientBuilder
+          initialIngredient={editingIngredient}
+          initialDate={selectedDate}
+          mode="diary"
+          targetMealType={targetMealType || detectedMealType || 'meal_lunch'}
+          onBack={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+          }}
+          onClose={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+            onClose?.();
+          }}
+          onSave={async (ingredient, portions) => {
+            await addCustomIngredient({ ...ingredient, lang: ingredient.lang || 'es' }, portions);
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+            setSearchQuery('');
+            onClose?.();
+          }}
+          onSaveAndLog={async (ingredient, portions, meal, date) => {
+            const savedId = await addCustomIngredient({ ...ingredient, lang: ingredient.lang || 'es' }, portions);
+            const idToUse = ingredient.id || savedId || `custom_${Date.now()}`;
+            const baseFood: BaseIngredient = {
+              ...ingredient,
+              id: idToUse,
+              lang: ingredient.lang || 'es',
+              source: 'custom'
+            };
+            const hasPortions = portions && portions.length > 0;
+            const portionName = hasPortions ? portions[0].name : 'g';
+            const quantity = hasPortions ? 1 : 100;
+            const portionsToUse = portions?.map((p, idx) => ({
+              id: `port-${idToUse}-${idx}`,
+              base_food_id: idToUse,
+              name: p.name,
+              equivalent_weight_g: p.equivalent_weight_g,
+              source: 'custom' as const
+            }));
+            if (logFoodItem) {
+              await logFoodItem(baseFood, meal, quantity, portionName, portionsToUse, date);
+            } else if (logBatchFoodItems) {
+              await logBatchFoodItems(
+                [{ food: baseFood, quantity, portionName, availablePortions: portionsToUse, mealType: meal }],
+                meal
+              );
+            }
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+            setSearchQuery('');
+            onClose?.();
           }}
         />
       )}

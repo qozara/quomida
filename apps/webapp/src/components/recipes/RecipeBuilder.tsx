@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext.js';
 import {
   type FoodItem,
   type RecipeComponent,
   type Recipe,
   type Portion,
+  type MealType,
   RecipeManager,
   CatalogSearchManager,
   convertPortionToGrams
@@ -12,27 +14,94 @@ import {
 import { dictionaries } from '@quomida/i18n-locales';
 import { RemoteCatalogService } from '../../services/RemoteCatalogService.js';
 import { RecipeComponentList } from './RecipeComponentList.js';
-import { X, Search, Plus, AlertCircle, Sparkles, ChefHat, Scale } from 'lucide-react';
+import { DateSelector } from '../DateSelector.js';
+import { X, Search, Plus, AlertCircle, Sparkles, ChefHat, Scale, ArrowLeft, Check, Coffee, Utensils, Moon, Apple, AlertTriangle } from 'lucide-react';
 
-interface RecipeBuilderProps {
+export interface RecipeBuilderProps {
   onClose: () => void;
-  onSave: (recipe: Recipe, portions?: { name: string; equivalent_weight_g: number }[]) => Promise<void>;
+  onBack?: () => void;
+  onSave: (recipe: Recipe, portions?: { name: string; equivalent_weight_g: number }[]) => Promise<void | string>;
+  initialRecipe?: any;
+  mode?: 'catalog' | 'diary';
+  targetMealType?: MealType;
+  initialDate?: string;
+  onSaveAndLog?: (
+    recipe: Recipe,
+    portions: { name: string; equivalent_weight_g: number }[] | undefined,
+    mealType: MealType,
+    date?: string
+  ) => Promise<void>;
 }
 
-export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave }) => {
-  const { ingredients = [], recipeFoods = [], db, t } = useApp();
+const mealOptions: Array<{
+  id: MealType;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'meal_breakfast', icon: Coffee },
+  { id: 'meal_lunch', icon: Utensils },
+  { id: 'meal_dinner', icon: Moon },
+  { id: 'meal_snack', icon: Apple }
+];
+
+const getMealTitle = (meal: MealType, dict: any) => {
+  switch (meal) {
+    case 'meal_breakfast':
+      return dict?.dashboard?.meals?.breakfast || 'Breakfast';
+    case 'meal_lunch':
+      return dict?.dashboard?.meals?.lunch || 'Lunch';
+    case 'meal_dinner':
+      return dict?.dashboard?.meals?.dinner || 'Dinner';
+    case 'meal_snack':
+      return dict?.dashboard?.meals?.snack || 'Snack';
+  }
+};
+
+export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
+  onClose,
+  onBack,
+  onSave,
+  initialRecipe,
+  mode = 'catalog',
+  targetMealType,
+  initialDate,
+  onSaveAndLog
+}) => {
+  const { ingredients = [], recipeFoods = [], db, t, selectedDate, setSelectedDate, dailyLogs } = useApp();
   const dict = t || dictionaries.en;
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [modalDate, setModalDate] = useState<string>(initialDate || selectedDate || todayStr);
+
+  const isPastDate = modalDate < todayStr;
+  const logsOnModalDate = useMemo(() => {
+    return (dailyLogs || []).filter((l) => l.date === modalDate);
+  }, [dailyLogs, modalDate]);
+  const foodCountOnDate = logsOnModalDate.length;
+
   const [recipeManager] = useState(() => new RecipeManager());
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
 
+  const [selectedMeal, setSelectedMeal] = useState<MealType>(() => targetMealType || 'meal_lunch');
+
+  const initialComponents = useMemo(() => {
+    if (!initialRecipe) return [];
+    return initialRecipe.recipe?.ingredients || initialRecipe.ingredients || [];
+  }, [initialRecipe]);
+
   // Form State
-  const [recipeName, setRecipeName] = useState('');
-  const [components, setComponents] = useState<RecipeComponent[]>([]);
+  const [recipeName, setRecipeName] = useState(() => initialRecipe?.name || '');
+  const [components, setComponents] = useState<RecipeComponent[]>(initialComponents);
   const [rawWeightSum, setRawWeightSum] = useState<number>(0);
-  const [cookedWeight, setCookedWeight] = useState<string>('');
-  const [isCookedWeightManual, setIsCookedWeightManual] = useState(false);
-  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>([]);
+  const [cookedWeight, setCookedWeight] = useState<string>(() => {
+    if (initialRecipe?.cooked_weight_g) return String(initialRecipe.cooked_weight_g);
+    return '';
+  });
+  const [isCookedWeightManual, setIsCookedWeightManual] = useState(() => {
+    return Boolean(initialRecipe?.cooked_weight_g && initialRecipe.cooked_weight_g !== initialRecipe.raw_weight_g);
+  });
+  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>(() => {
+    return initialRecipe?.portions || [];
+  });
   const [servingsCount, setServingsCount] = useState<number>(4);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +114,27 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
   const [componentPortions, setComponentPortions] = useState<Portion[]>([]);
   const [chosenPortionName, setChosenPortionName] = useState<string>('g');
   const [componentQuantity, setComponentQuantity] = useState<number>(100);
+
+  useEffect(() => {
+    if (targetMealType) {
+      setSelectedMeal(targetMealType);
+    }
+  }, [targetMealType]);
+
+  useEffect(() => {
+    if (initialRecipe) {
+      setRecipeName(initialRecipe.name || '');
+      const comps = initialRecipe.recipe?.ingredients || initialRecipe.ingredients || [];
+      setComponents(comps);
+      if (initialRecipe.cooked_weight_g) {
+        setCookedWeight(String(initialRecipe.cooked_weight_g));
+        setIsCookedWeightManual(Boolean(initialRecipe.cooked_weight_g !== initialRecipe.raw_weight_g));
+      }
+      if (initialRecipe.portions) {
+        setPortions(initialRecipe.portions);
+      }
+    }
+  }, [initialRecipe]);
 
   // Update raw weight sum and auto-cooked weight when components change
   useEffect(() => {
@@ -174,8 +264,8 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
   };
 
   // Save recipe
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePerformSave = async (e?: React.FormEvent, andLog = false) => {
+    if (e) e.preventDefault();
     setErrorMsg(null);
 
     const trimmedName = recipeName.trim();
@@ -202,7 +292,15 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
         yield_factor: yieldFactor
       });
 
-      await onSave(newRecipe, portions);
+      if (initialRecipe && initialRecipe.id) {
+        newRecipe.id = initialRecipe.id;
+      }
+
+      if (andLog && onSaveAndLog) {
+        await onSaveAndLog(newRecipe, portions, selectedMeal, modalDate);
+      } else {
+        await onSave(newRecipe, portions);
+      }
       onClose();
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to create recipe');
@@ -211,24 +309,115 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <ChefHat className="w-5 h-5 text-purple-400" />
-            <h2 className="text-xl font-extrabold text-white">{dict.recipes.newRecipe}</h2>
+  const modalNode = (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={recipeName || dict.recipes.newRecipe}
+      className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right slide-in-from-right overflow-y-auto"
+    >
+      {/* Top Sticky Navigation Bar with Back Button */}
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
+        <button
+          id="btn-close-recipe-builder"
+          data-testid="btn-back-recipe-builder"
+          onClick={onBack || onClose}
+          aria-label="Back"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="text-center flex-1 mx-2 min-w-0">
+          <div className="flex items-center justify-center gap-1.5 text-purple-400">
+            <ChefHat className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">
+              {initialRecipe ? (dict.catalog?.edit || 'Edit') : (dict.recipes?.recipeBadge || 'Recipe')}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 id="recipe-builder-title" className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs mx-auto">
+            {dict.recipes.newRecipe}
+          </h2>
         </div>
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
+
+      {/* Main Content Form Container */}
+      <div className="max-w-lg mx-auto w-full p-4 sm:p-6 space-y-5 flex-1">
+        {/* In Diary Mode: Date Selector & Meal Type Switcher */}
+        {mode === 'diary' && (
+          <div className="space-y-3 pb-3 border-b border-slate-800/80">
+            <div className="flex justify-center pt-1">
+              <DateSelector
+                value={modalDate}
+                onChange={(d) => {
+                  setModalDate(d);
+                  setSelectedDate(d);
+                }}
+              />
+            </div>
+
+            {isPastDate && (
+              <div
+                data-testid="banner-past-date-warning"
+                className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 animate-in fade-in duration-200"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-xs text-amber-200 font-medium">
+                    {foodCountOnDate > 0
+                      ? (dict.portionModal?.pastDateWarningWithCount || 'Logging to past date: {{date}} ({{count}} foods already logged)')
+                          .replace('{{date}}', modalDate)
+                          .replace('{{count}}', String(foodCountOnDate))
+                      : (dict.portionModal?.pastDateWarning || 'Logging to past date: {{date}}')
+                          .replace('{{date}}', modalDate)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="btn-switch-to-today"
+                  data-testid="btn-switch-to-today"
+                  onClick={() => {
+                    setModalDate(todayStr);
+                    setSelectedDate(todayStr);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg shrink-0 shadow-sm transition-all active:scale-95 min-h-[36px] flex items-center justify-center cursor-pointer"
+                >
+                  {dict.portionModal?.switchToToday || 'Switch to Today'}
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-1.5 pt-1">
+              <span className="text-xs font-semibold text-slate-400">
+                {dict.ai?.selectMeal || 'Meal Time'}
+              </span>
+              <div className="grid grid-cols-4 gap-2">
+              {mealOptions.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = selectedMeal === opt.id;
+                const title = getMealTitle(opt.id, dict);
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedMeal(opt.id)}
+                    aria-pressed={isSelected}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
+                      isSelected
+                        ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-md'
+                        : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-700/80'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                    <span className="truncate max-w-[70px] text-[11px]">{title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        )}
 
         {errorMsg && (
           <div className="p-3 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
@@ -237,7 +426,7 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => handlePerformSave(e, false)} className="space-y-4">
           
           {/* Recipe Name */}
           <div>
@@ -268,34 +457,28 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
                   placeholder={dict.recipes.searchFoodPlaceholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 min-h-[44px]"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 min-h-[44px]"
                 />
+                {isSearching && (
+                  <div className="absolute right-3 top-3 text-[11px] text-slate-400 animate-pulse">
+                    Searching...
+                  </div>
+                )}
 
-                {/* Autocomplete dropdown */}
+                {/* Dropdown Results */}
                 {searchResults.length > 0 && (
-                  <div className="absolute left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-800 shadow-2xl z-30">
-                    {searchResults.map((item) => (
+                  <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl shadow-2xl divide-y divide-slate-800/60">
+                    {searchResults.map((f) => (
                       <button
-                        key={item.id}
+                        key={f.id}
                         type="button"
-                        onClick={() => handleSelectFood(item)}
-                        className="w-full p-2.5 text-left hover:bg-slate-800 transition-colors flex items-center justify-between"
+                        onClick={() => handleSelectFood(f)}
+                        className="w-full p-2.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between min-h-[44px]"
                       >
                         <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-white">{item.name}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                              item.kind === 'recipe'
-                                ? 'bg-purple-950 text-purple-400 border border-purple-800/50'
-                                : item.source === 'custom'
-                                ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
-                                : 'bg-slate-800 text-slate-400'
-                            }`}>
-                              {item.kind === 'recipe' ? dict.recipes.recipeBadge : item.source}
-                            </span>
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
+                          <div className="text-xs font-semibold text-white">{f.name}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {f.calories_100g} kcal/100g • P: {f.protein_100g}g | C: {f.carbs_100g}g | F: {f.fats_100g}g
                           </div>
                         </div>
                         <Plus className="w-4 h-4 text-purple-400" />
@@ -305,120 +488,144 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
                 )}
               </div>
             ) : (
-              /* Selected Food Quantity & Portion Configurator */
-              <div className="bg-slate-900 p-3 rounded-xl border border-purple-500/40 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-white">{selectedFood.name}</span>
-                    {selectedFood.kind === 'recipe' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-purple-950 text-purple-400 border border-purple-800/50">
-                        {dict.recipes.recipeBadge}
-                      </span>
-                    )}
-                  </div>
+              /* Selected Food Configuration Box */
+              <div className="bg-slate-900/90 p-3 rounded-xl border border-purple-500/30 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-white">{selectedFood.name}</span>
                   <button
                     type="button"
                     onClick={() => setSelectedFood(null)}
-                    className="text-slate-400 hover:text-white p-1"
+                    aria-label="Cancel component selection"
+                    className="text-slate-400 hover:text-white min-h-[32px] min-w-[32px] flex items-center justify-center"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Portion</label>
-                    <select
-                      value={chosenPortionName}
-                      onChange={(e) => setChosenPortionName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none min-h-[44px]"
-                    >
-                      <option value="g">Grams (g)</option>
-                      {componentPortions.map((p) => (
-                        <option key={p.name} value={p.name}>
-                          {p.name} ({p.equivalent_weight_g}g)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.1"
-                      value={componentQuantity}
-                      onChange={(e) => setComponentQuantity(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none min-h-[44px] text-center font-bold"
-                    />
-                  </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="any"
+                    value={componentQuantity}
+                    onChange={(e) => setComponentQuantity(parseFloat(e.target.value) || 0)}
+                    className="w-20 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white text-center font-bold min-h-[44px]"
+                  />
+                  <select
+                    value={chosenPortionName}
+                    onChange={(e) => setChosenPortionName(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white min-h-[44px]"
+                  >
+                    <option value="g">Grams (g)</option>
+                    {componentPortions.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} ({p.equivalent_weight_g}g)
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAddComponent}
+                    className="px-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-colors min-h-[44px]"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{dict.recipes.addComponent}</span>
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddComponent}
-                  className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-colors min-h-[44px] flex items-center justify-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{dict.recipes.addComponent}</span>
-                </button>
               </div>
             )}
 
-            {/* Added Components List */}
-            <RecipeComponentList components={components} onRemove={handleRemoveComponent} />
+            {/* List of Constituent Foods Added */}
+            <div className="space-y-2 pt-1">
+              {components.map((comp, idx) => (
+                <div
+                  key={`${comp.food_id}-${idx}`}
+                  className="flex items-center justify-between bg-slate-900/60 border border-slate-800/80 p-2.5 rounded-xl text-xs"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="font-semibold text-white truncate">{comp.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {comp.weight_g}g ({Math.round((comp.weight_g * comp.calories_100g) / 100)} kcal | P: {Math.round(((comp.weight_g * comp.protein_100g) / 100) * 10) / 10}g | C: {Math.round(((comp.weight_g * comp.carbs_100g) / 100) * 10) / 10}g | F: {Math.round(((comp.weight_g * comp.fats_100g) / 100) * 10) / 10}g)
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveComponent(idx)}
+                    aria-label={`Remove component ${comp.name}`}
+                    className="text-rose-400 hover:text-rose-300 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-rose-950/30 transition-colors shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {components.length === 0 && (
+                <p className="text-center text-[11px] text-slate-400 py-3 italic">
+                  {dict.recipes.noComponents}
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* Weight & Yield Factor Section */}
-          <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 text-center">
-            <div>
-              <span className="text-[10px] text-slate-400 block">{dict.recipes.rawWeight}</span>
-              <span className="text-sm font-bold text-white">{Math.round(rawWeightSum)}g</span>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block">{dict.recipes.cookedWeight}</span>
-              <input
-                type="number"
-                value={cookedWeight}
-                onChange={(e) => {
-                  setIsCookedWeightManual(true);
-                  setCookedWeight(e.target.value);
-                }}
-                placeholder="g"
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white text-center font-bold min-h-[32px] focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block">{dict.recipes.yieldFactor}</span>
-              <span className="text-sm font-bold text-purple-400">
-                {rawWeightSum > 0 ? yieldFactor.toFixed(2) : '1.00'}x
+          {/* Weight & Yield Calculation */}
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5 text-purple-400" />
+                {dict.recipes.yieldFactor}
               </span>
+              <span className="text-xs font-mono text-purple-400 font-bold">
+                {rawWeightSum}g {dict.recipes.raw}
+              </span>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">
+                {dict.recipes.cookedWeight}
+              </label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  step="any"
+                  value={cookedWeight}
+                  onChange={(e) => {
+                    setCookedWeight(e.target.value);
+                    setIsCookedWeightManual(true);
+                  }}
+                  placeholder="e.g. 800"
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-purple-500 min-h-[44px]"
+                />
+                <span className="text-xs text-slate-400">g</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Yield factor: <span className="font-mono text-slate-300 font-semibold">{yieldFactor.toFixed(2)}x</span>
+                {yieldFactor < 1 && ' (water evaporation/reduction)'}
+                {yieldFactor > 1 && ' (water absorption/expansion)'}
+              </p>
             </div>
           </div>
 
-          {/* Live Nutrition Summary */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-purple-500/30 space-y-3">
-            <div>
-              <span className="text-[11px] font-bold text-purple-400 block mb-1">
-                {dict.recipes.nutritionPer100g}
-              </span>
-              <div className="grid grid-cols-4 gap-1 text-center">
-                <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <div className="text-[10px] text-slate-400">kcal</div>
-                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.calories_100g * 10) / 10}</div>
-                </div>
-                <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <div className="text-[10px] text-rose-400">P</div>
-                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.protein_100g * 10) / 10}g</div>
-                </div>
-                <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <div className="text-[10px] text-amber-400">C</div>
-                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.carbs_100g * 10) / 10}g</div>
-                </div>
-                <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <div className="text-[10px] text-cyan-400">F</div>
-                  <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.fats_100g * 10) / 10}g</div>
-                </div>
+          {/* Live Nutrition Density Preview */}
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 space-y-2">
+            <span className="text-xs font-bold text-slate-300 block">
+              {dict.recipes.nutritionPer100g}
+            </span>
+
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-slate-900 p-1.5 rounded-lg">
+                <div className="text-[10px] text-slate-400">kcal</div>
+                <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.calories_100g)}</div>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg">
+                <div className="text-[10px] text-rose-400">P</div>
+                <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.protein_100g * 10) / 10}g</div>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg">
+                <div className="text-[10px] text-amber-400">C</div>
+                <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.carbs_100g * 10) / 10}g</div>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg">
+                <div className="text-[10px] text-cyan-400">F</div>
+                <div className="text-xs font-bold text-white">{Math.round(nutritionPreview.density.fats_100g * 10) / 10}g</div>
               </div>
             </div>
 
@@ -473,26 +680,76 @@ export const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ onClose, onSave })
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            <button
-              type="submit"
-              disabled={isSaving || components.length === 0}
-              className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition-all min-h-[44px] flex items-center justify-center gap-2"
-            >
-              <ChefHat className="w-4 h-4" />
-              <span>{isSaving ? 'Saving...' : dict.recipes.saveRecipe}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-semibold text-sm rounded-xl transition-colors min-h-[44px]"
-            >
-              {dict.recipes.cancel}
-            </button>
-          </div>
+          {mode === 'diary' ? (
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                id="btn-save-and-log-recipe"
+                data-testid="btn-save-and-log-recipe"
+                disabled={isSaving || components.length === 0}
+                onClick={(e) => handlePerformSave(e, true)}
+                className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition-all min-h-[44px] flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                <span>
+                  {isSaving
+                    ? (dict.recipes?.saving || 'Saving...')
+                    : (dict.catalog?.saveAndLog || 'Save & Log to {{meal}}').replace('{{meal}}', getMealTitle(selectedMeal, dict))}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="btn-save-catalog-recipe"
+                data-testid="btn-save-catalog-recipe"
+                disabled={isSaving || components.length === 0}
+                onClick={(e) => handlePerformSave(e, false)}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-purple-400 hover:text-purple-300 font-semibold text-xs rounded-xl transition-colors min-h-[44px] border border-slate-700"
+              >
+                {dict.catalog?.saveCatalogOnly || 'Save to Catalog only'}
+              </button>
+              <button
+                type="button"
+                onClick={onBack || onClose}
+                disabled={isSaving}
+                className="py-3 px-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs rounded-xl transition-colors min-h-[44px]"
+              >
+                {dict.recipes?.cancel || 'Cancel'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2 pt-2">
+              <button
+                type="submit"
+                id="btn-save-recipe"
+                data-testid="btn-save-catalog-ai"
+                disabled={isSaving || components.length === 0}
+                className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition-all min-h-[44px] flex items-center justify-center gap-2"
+              >
+                <ChefHat className="w-4 h-4" />
+                <span>
+                  {isSaving
+                    ? (dict.recipes?.saving || 'Saving...')
+                    : (dict.ai?.saveRecipeToCatalog || dict.recipes.saveRecipe)}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={onBack || onClose}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-semibold text-sm rounded-xl transition-colors min-h-[44px]"
+              >
+                {dict.recipes.cancel}
+              </button>
+            </div>
+          )}
 
         </form>
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalNode, document.body);
+  }
+
+  return modalNode;
 };

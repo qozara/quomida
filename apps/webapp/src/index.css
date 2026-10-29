@@ -32,6 +32,72 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@utility animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@utility slide-in-from-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@utility animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@utility slide-in-from-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@utility animate-slide-in-up {
+  animation: slideInUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes slideOutDown {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@utility animate-slide-out-down {
+  animation: slideOutDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -53,4 +119,374 @@ body {
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+/* ==========================================================================
+   LIGHT THEME (Active when .dark class is NOT present on <html>)
+   ========================================================================== */
+html:not(.dark) {
+  color-scheme: light;
+
+  /* Redefine slate color variables for light mode so all Tailwind utilities & color-mix adapt */
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #ffffff;
+  --color-slate-850: #f8fafc;
+  --color-slate-800: #f1f5f9;
+  --color-slate-750: #e2e8f0;
+  --color-slate-700: #e2e8f0;
+  --color-slate-650: #cbd5e1;
+  --color-slate-600: #cbd5e1;
+  --color-slate-500: #64748b;
+  --color-slate-400: #64748b;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+  --color-slate-50: #f8fafc;
+}
+
+html:not(.dark) body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* 1. Surfaces, Panels, Dialogs & Cards */
+/* Main page/screen backgrounds (slate-950) */
+html:not(.dark) [class~="bg-slate-950"],
+html:not(.dark) [class*=" bg-slate-950/"],
+html:not(.dark) [class^="bg-slate-950/"],
+html:not(.dark) [class*="from-slate-950"],
+html:not(.dark) [class*="to-slate-950"] {
+  background-color: #f8fafc !important;
+  background-image: none !important;
+}
+
+/* Main card containers, modals, slide-overs, headers, and sheets (slate-900) -> Solid crisp white */
+html:not(.dark) [class~="bg-slate-900"],
+html:not(.dark) [class*=" bg-slate-900/"],
+html:not(.dark) [class^="bg-slate-900/"],
+html:not(.dark) [class~="bg-slate-850"],
+html:not(.dark) [class*=" bg-slate-850/"],
+html:not(.dark) [class^="bg-slate-850/"],
+html:not(.dark) [class*="from-slate-900"],
+html:not(.dark) [class*="via-slate-900"],
+html:not(.dark) [class*="to-slate-900"] {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+/* Sub-containers, insets, inner cards, inactive pills, and table wrappers (slate-800) -> Clean light slate */
+html:not(.dark) [class~="bg-slate-800"]:not(button):not(input):not(select):not(textarea),
+html:not(.dark) [class*=" bg-slate-800/"]:not(button):not(input):not(select):not(textarea),
+html:not(.dark) [class^="bg-slate-800/"]:not(button):not(input):not(select):not(textarea),
+html:not(.dark) [class~="bg-slate-750"]:not(button),
+html:not(.dark) [class~="bg-slate-700"]:not(button) {
+  background-color: #f1f5f9 !important;
+}
+
+/* Secondary & Ghost Buttons */
+html:not(.dark) button[class~="bg-slate-800"],
+html:not(.dark) button[class*=" bg-slate-800/"],
+html:not(.dark) button[class^="bg-slate-800/"] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) button[class~="bg-slate-800"]:hover,
+html:not(.dark) button[class*=" bg-slate-800/"]:hover,
+html:not(.dark) button[class^="bg-slate-800/"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800"]:hover,
+html:not(.dark) [class*="hover:bg-slate-750"]:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* 2. Inputs, Selects, and Textareas in Forms & Modals */
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  border-color: #10b981 !important;
+  outline: none !important;
+}
+html:not(.dark) select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Range sliders & checkboxes in light mode */
+html:not(.dark) input[type="range"] {
+  background-color: #e2e8f0 !important;
+}
+html:not(.dark) input[type="checkbox"] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* 3. Borders & Dividers */
+html:not(.dark) [class*="border-slate-800"],
+html:not(.dark) [class*="border-slate-700"] {
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) [class*="divide-slate-800"] > * + *,
+html:not(.dark) [class*="divide-slate-700"] > * + * {
+  border-color: #e2e8f0 !important;
+}
+
+/* 4. High-Contrast Typography in Light Mode */
+html:not(.dark) .text-slate-950,
+html:not(.dark) .text-slate-900,
+html:not(.dark) [class*="text-slate-900"],
+html:not(.dark) .text-slate-850 {
+  color: #0f172a !important;
+}
+html:not(.dark) .text-slate-800,
+html:not(.dark) [class*="text-slate-800"],
+html:not(.dark) .text-slate-750,
+html:not(.dark) .text-slate-700,
+html:not(.dark) [class*="text-slate-700"] {
+  color: #1e293b !important;
+}
+html:not(.dark) .text-slate-650,
+html:not(.dark) .text-slate-600 {
+  color: #334155 !important;
+}
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200 {
+  color: #0f172a !important;
+}
+html:not(.dark) .text-slate-300 {
+  color: #334155 !important;
+}
+html:not(.dark) .text-slate-400 {
+  color: #64748b !important;
+}
+html:not(.dark) .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Ensure any element styled with dark:text-white or dark:text-slate-* renders high-contrast dark text in light mode */
+html:not(.dark) [class*="dark:text-white"] {
+  color: #0f172a !important;
+}
+html:not(.dark) [class*="dark:text-slate-100"],
+html:not(.dark) [class*="dark:text-slate-200"] {
+  color: #0f172a !important;
+}
+
+/* Fix light/pastel fonts in edit dialogs & stats cards */
+html:not(.dark) .text-rose-300,
+html:not(.dark) .text-rose-200 {
+  color: #e11d48 !important; /* rose-600 */
+}
+html:not(.dark) .text-amber-300,
+html:not(.dark) .text-amber-200 {
+  color: #d97706 !important; /* amber-600 */
+}
+html:not(.dark) .text-cyan-300,
+html:not(.dark) .text-cyan-200 {
+  color: #0891b2 !important; /* cyan-600 */
+}
+html:not(.dark) .text-emerald-300,
+html:not(.dark) .text-emerald-200 {
+  color: #059669 !important; /* emerald-600 */
+}
+html:not(.dark) .text-sky-300,
+html:not(.dark) .text-sky-200 {
+  color: #0284c7 !important; /* sky-600 */
+}
+html:not(.dark) .text-purple-300,
+html:not(.dark) .text-purple-200 {
+  color: #7c3aed !important; /* purple-600 */
+}
+
+/* Contrast enhancement for 400 tints on light background */
+html:not(.dark) .text-emerald-400 {
+  color: #059669 !important;
+}
+html:not(.dark) .text-amber-400:not([class*="bg-amber-400"] *) {
+  color: #d97706 !important;
+}
+html:not(.dark) .text-rose-400 {
+  color: #e11d48 !important;
+}
+html:not(.dark) .text-cyan-400 {
+  color: #0891b2 !important;
+}
+html:not(.dark) .text-sky-400 {
+  color: #0284c7 !important;
+}
+html:not(.dark) .text-purple-400 {
+  color: #7c3aed !important;
+}
+
+/* Headings & Labels styled with text-white should turn dark slate when on white cards */
+html:not(.dark) .text-white {
+  color: #0f172a !important;
+}
+
+/* Explicit exceptions: ONLY solid colored CTA buttons and solid badges retain crisp white text */
+html:not(.dark) button.bg-emerald-500,
+html:not(.dark) button.bg-emerald-600,
+html:not(.dark) button.bg-emerald-700,
+html:not(.dark) button.bg-rose-500,
+html:not(.dark) button.bg-rose-600,
+html:not(.dark) button.bg-purple-500,
+html:not(.dark) button.bg-purple-600,
+html:not(.dark) button.bg-blue-600,
+html:not(.dark) a.bg-emerald-500,
+html:not(.dark) a.bg-emerald-600,
+html:not(.dark) a.bg-rose-500,
+html:not(.dark) a.bg-purple-600,
+html:not(.dark) a.bg-blue-600,
+html:not(.dark) button.bg-emerald-500 *,
+html:not(.dark) button.bg-emerald-600 *,
+html:not(.dark) button.bg-emerald-700 *,
+html:not(.dark) button.bg-rose-500 *,
+html:not(.dark) button.bg-rose-600 *,
+html:not(.dark) button.bg-purple-500 *,
+html:not(.dark) button.bg-purple-600 *,
+html:not(.dark) button.bg-blue-600 *,
+html:not(.dark) a.bg-emerald-500 *,
+html:not(.dark) a.bg-emerald-600 *,
+html:not(.dark) a.bg-rose-500 *,
+html:not(.dark) a.bg-purple-600 *,
+html:not(.dark) a.bg-blue-600 * {
+  color: #ffffff !important;
+}
+
+/* Ensure text-slate-950 on bright buttons (emerald/amber) stays dark */
+html:not(.dark) .text-slate-950 {
+  color: #020617 !important;
+}
+
+/* Mobile & Desktop Hover Fixes: prevent hover states from inverting text into unreadable light shades */
+html:not(.dark) .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html:not(.dark) [class*="group-hover:text-emerald-300"]:hover,
+html:not(.dark) .group:hover [class*="group-hover:text-emerald-300"],
+html:not(.dark) [class*="hover:text-emerald-300"]:hover {
+  color: #059669 !important;
+}
+html:not(.dark) [class*="hover:bg-slate-900"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800\/40"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800\/50"]:hover,
+html:not(.dark) [class*="hover:bg-slate-800"]:hover {
+  background-color: #f1f5f9 !important;
+}
+html:not(.dark) [class*="group-hover:bg-emerald-950"]:hover,
+html:not(.dark) .group:hover [class*="group-hover:bg-emerald-950"] {
+  background-color: #ecfdf5 !important;
+}
+
+/* 5. Colored Badges & Highlights */
+html:not(.dark) [class*="bg-emerald-950"] {
+  background-color: #ecfdf5 !important;
+}
+html:not(.dark) [class*="border-emerald-800"] {
+  border-color: #a7f3d0 !important;
+}
+
+html:not(.dark) [class*="bg-rose-950"] {
+  background-color: #fff1f2 !important;
+}
+html:not(.dark) [class*="border-rose-800"] {
+  border-color: #fecdd3 !important;
+}
+
+html:not(.dark) [class*="bg-amber-950"] {
+  background-color: #fffbeb !important;
+}
+html:not(.dark) [class*="border-amber-800"] {
+  border-color: #fde68a !important;
+}
+
+html:not(.dark) [class*="bg-purple-950"] {
+  background-color: #faf5ff !important;
+}
+html:not(.dark) [class*="border-purple-800"] {
+  border-color: #e9d5ff !important;
+}
+
+/* 6. Charts & SVG Visualizations */
+html:not(.dark) .glass-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  background-image: none !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03) !important;
+}
+
+html:not(.dark) svg line[stroke="#334155"] {
+  stroke: #e2e8f0 !important;
+}
+html:not(.dark) svg text.fill-slate-400 {
+  fill: #64748b !important;
+}
+html:not(.dark) svg circle.fill-slate-300\/80 {
+  fill: #059669 !important;
+  stroke: #ffffff !important;
+}
+html:not(.dark) svg circle.fill-slate-900 {
+  fill: #ffffff !important;
+  stroke: #64748b !important;
+}
+html:not(.dark) svg path.text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+/* Shadows for Elevation */
+html:not(.dark) .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+html:not(.dark) .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
+}
+html:not(.dark) .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04) !important;
+}
+html:not(.dark) .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+html:not(.dark) .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 7. Floating Bottom Navigation Bar (iOS / Android Modern UI) */
+.floating-bottom-nav {
+  background-color: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}
+
+html:not(.dark) .floating-bottom-nav {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(226, 232, 240, 0.85) !important;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06) !important;
+}
+
+html:not(.dark) .floating-bottom-nav .active-nav-pill {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html:not(.dark) .floating-bottom-nav .active-nav-label {
+  color: #047857 !important;
 }

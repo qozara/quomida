@@ -42,20 +42,36 @@ export class DatabaseBootstrapper {
         await writable.close();
       } else if (typeof (tmpHandle as any).createSyncAccessHandle === 'function') {
         const accessHandle = await (tmpHandle as any).createSyncAccessHandle();
-        accessHandle.write(new Uint8Array(buffer));
+        accessHandle.write(new Uint8Array(buffer), { at: 0 });
         accessHandle.flush();
         accessHandle.close();
       }
 
       // Atomic swap / promotion from tmp to target
+      let moved = false;
       if (typeof (tmpHandle as any).move === 'function') {
         try {
-          await opfsRoot.removeEntry('catalog.sqlite');
-        } catch (err: any) {
-          if (err.name !== 'NotFoundError') throw err;
+          try {
+            await opfsRoot.removeEntry('catalog.sqlite');
+          } catch (err: any) {
+            if (err.name !== 'NotFoundError') throw err;
+          }
+          try {
+            // WebKit/Safari requires destination directory handle as 1st argument: move(directory, newName)
+            await (tmpHandle as any).move(opfsRoot, 'catalog.sqlite');
+            moved = true;
+          } catch {
+            // Chromium single-argument fallback
+            await (tmpHandle as any).move('catalog.sqlite');
+            moved = true;
+          }
+        } catch (moveErr) {
+          console.warn('[DatabaseBootstrapper] tmpHandle.move failed, falling back to copy:', moveErr);
+          moved = false;
         }
-        await (tmpHandle as any).move('catalog.sqlite');
-      } else {
+      }
+
+      if (!moved) {
         const targetHandle = await opfsRoot.getFileHandle('catalog.sqlite', { create: true });
         const tmpFile = typeof tmpHandle.getFile === 'function'
           ? await tmpHandle.getFile()
@@ -69,6 +85,12 @@ export class DatabaseBootstrapper {
             await writable.write(buf);
             await writable.close();
           }
+        } else if (tmpFile && typeof (targetHandle as any).createSyncAccessHandle === 'function') {
+          const accessHandle = await (targetHandle as any).createSyncAccessHandle();
+          const buf = await tmpFile.arrayBuffer();
+          accessHandle.write(new Uint8Array(buf), { at: 0 });
+          accessHandle.flush();
+          accessHandle.close();
         }
         if (typeof opfsRoot.removeEntry === 'function') {
           await opfsRoot.removeEntry('catalog.sqlite.tmp').catch(() => {});

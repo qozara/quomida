@@ -266,6 +266,155 @@ describe('PWA Service Worker Update Lifecycle (Prompt, Visibility Resume & Setti
     });
   });
 
+  describe('Trigger 4: Update Execution & Reload Resilience (Dialog & Settings)', () => {
+    it('messages waiting service worker with SKIP_WAITING and triggers window.location.reload on controllerchange', async () => {
+      const mockPostMessage = vi.fn();
+      const mockWaitingWorker = {
+        postMessage: mockPostMessage,
+        state: 'installed'
+      };
+
+      const mockRegistration: any = {
+        waiting: mockWaitingWorker,
+        installing: null,
+        update: vi.fn()
+      };
+
+      let controllerChangeHandler: (() => void) | null = null;
+      const mockServiceWorkerContainer = {
+        addEventListener: vi.fn((event: string, handler: any) => {
+          if (event === 'controllerchange') {
+            controllerChangeHandler = handler;
+          }
+        }),
+        removeEventListener: vi.fn(),
+        getRegistration: vi.fn().mockResolvedValue(mockRegistration)
+      };
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: mockServiceWorkerContainer
+      });
+
+      const originalReload = window.location.reload;
+      const reloadMock = vi.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: {
+          ...window.location,
+          reload: reloadMock
+        }
+      });
+
+      const mockUpdateSW = vi.fn().mockResolvedValue(undefined);
+      const cleanupListeners = registerPwaServiceWorker((options?: any) => {
+        options?.onRegisteredSW?.('/sw.js', mockRegistration);
+        return mockUpdateSW;
+      });
+
+      render(<PwaUpdatePrompt />);
+
+      const updateBtn = screen.getByTestId('btn-pwa-update-reload');
+      expect(updateBtn).toBeDefined();
+
+      await act(async () => {
+        fireEvent.click(updateBtn);
+      });
+
+      // Verify button disabled state and feedback
+      expect(updateBtn.hasAttribute('disabled')).toBe(true);
+      expect(mockUpdateSW).toHaveBeenCalledWith(true);
+      expect(mockPostMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+
+      // Simulate controllerchange event firing from activated ServiceWorker
+      expect(controllerChangeHandler).toBeDefined();
+      act(() => {
+        controllerChangeHandler!();
+      });
+
+      expect(reloadMock).toHaveBeenCalledTimes(1);
+
+      cleanupListeners();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: {
+          ...window.location,
+          reload: originalReload
+        }
+      });
+    });
+
+    it('triggers fallback window.location.reload when controllerchange does not fire (dev or uncontrolled mode)', async () => {
+      vi.useFakeTimers();
+
+      const originalReload = window.location.reload;
+      const reloadMock = vi.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: {
+          ...window.location,
+          reload: reloadMock
+        }
+      });
+
+      const mockUpdateSW = vi.fn().mockResolvedValue(undefined);
+      const cleanupListeners = registerPwaServiceWorker((options?: any) => {
+        options?.onNeedRefresh?.();
+        return mockUpdateSW;
+      });
+
+      render(<PwaUpdatePrompt />);
+
+      const updateBtn = screen.getByTestId('btn-pwa-update-reload');
+      await act(async () => {
+        fireEvent.click(updateBtn);
+      });
+
+      expect(mockUpdateSW).toHaveBeenCalledWith(true);
+      expect(reloadMock).not.toHaveBeenCalled();
+
+      // Fast-forward past 500ms fallback timer
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
+
+      expect(reloadMock).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+      cleanupListeners();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: {
+          ...window.location,
+          reload: originalReload
+        }
+      });
+    });
+
+    it('disables Update & Reload button in SettingsModal while update application is in progress', async () => {
+      const mockUpdateSW = vi.fn().mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      const cleanupListeners = registerPwaServiceWorker((options?: any) => {
+        options?.onNeedRefresh?.();
+        return mockUpdateSW;
+      });
+
+      render(<SettingsModal />);
+      const aboutHeader = screen.getByTestId('accordion-header-about-legal');
+      fireEvent.click(aboutHeader);
+
+      const installBtn = await screen.findByTestId('btn-install-app-update');
+      expect(installBtn.hasAttribute('disabled')).toBe(false);
+
+      await act(async () => {
+        fireEvent.click(installBtn);
+      });
+
+      expect(installBtn.hasAttribute('disabled')).toBe(true);
+      expect(mockUpdateSW).toHaveBeenCalledWith(true);
+
+      cleanupListeners();
+    });
+  });
+
   describe('Dual-Language i18n Key Parity for PWA Update Lifecycle', () => {
     it('verifies en and es dictionaries contain all pwaUpdate and settings app update keys', () => {
       expect(en.pwaUpdate.bannerTitle).toBeDefined();

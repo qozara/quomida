@@ -6,8 +6,11 @@
   "nav": {
     "dashboard": "Dashboard",
     "catalog": "My Foods",
-    "analytics": "Analytics",
-    "settings": "Settings"
+    "analytics": "Progress",
+    "progress": "Progress",
+    "settings": "Settings",
+    "goals": "Goals",
+    "profileGoals": "Goals"
   },
   "dashboard": {
     "title": "Daily Summary",
@@ -47,13 +50,26 @@
     "downloadFullCatalog": "Download Full Catalog",
     "searchingLocal": "Searching catalog..."
   },
+  "date": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "back": "Back",
+    "jumpToToday": "Back to Today",
+    "previousDay": "Previous day",
+    "nextDay": "Next day"
+  },
   "portionModal": {
     "title": "Portion & Quantity",
     "unitLabel": "Portion Unit",
     "quantityLabel": "Quantity",
     "logAction": "Log to Diary",
     "calculatedMacros": "Calculated Nutrition",
-    "customGrams": "Grams (g)"
+    "customGrams": "Grams (g)",
+    "pastDateWarning": "Logging to past date: {{date}}",
+    "pastDateWarningWithCount": "Logging to past date: {{date}} ({{count}} foods already logged)",
+    "switchToToday": "Switch to Today",
+    "logToPastDate": "Log to {{date}}"
   },
   "settings": {
     "title": "Profile & Settings",
@@ -73,6 +89,9 @@
     "saveTargets": "Save Targets",
     "targetsSaved": "Goals Saved!",
     "language": "Language",
+    "languageSystem": "System default",
+    "languageEs": "Spanish",
+    "languageEn": "English",
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
@@ -287,8 +306,10 @@
     "nutritionPer100g": "Nutritional Density (per 100g cooked)",
     "totalNutrition": "Total Recipe Nutrition",
     "saveRecipe": "Save Recipe",
+    "saving": "Saving...",
     "cancel": "Cancel",
     "deleteConfirm": "Are you sure you want to delete this recipe?",
+    "deleteConfirmTitle": "Delete Recipe?",
     "noComponents": "No foods added yet. Search and add constituent foods above.",
     "recipeBadge": "Recipe",
     "customBadge": "Custom",
@@ -297,21 +318,33 @@
     "breakdownTitle": "Recipe Ingredients Breakdown",
     "cooked": "cooked",
     "raw": "raw",
-    "totalDish": "Total Recipe"
+    "totalDish": "Total Recipe",
+    "editRecipe": "Edit Recipe"
   },
   "catalog": {
-    "title": "Food Catalog Manager",
+    "title": "My Foods",
     "newFood": "New",
     "newCustomIngredient": "New Single Food (100g base)",
+    "editCustomIngredient": "Edit Single Food (100g base)",
     "combineFoods": "Combine Foods (Recipe)",
     "searchPlaceholder": "Search catalog...",
+    "filterRecent": "Recently used",
     "filterAll": "All",
     "filterIngredients": "Ingredients",
     "filterRecipes": "Recipes",
     "deleteCustomConfirm": "Are you sure you want to delete this custom food?",
+    "deleteCustomTitle": "Delete Custom Food?",
     "deleteRecipeConfirm": "Are you sure you want to delete this recipe?",
     "noFoodsFound": "No foods found",
-    "noCustomFoodsYet": "No custom foods or recipes added yet"
+    "noCustomFoodsYet": "No custom foods or recipes added yet",
+    "noRecentFoods": "No recently used foods or recipes in the last 60 days",
+    "composeDishAi": "✨ Compose dish or estimate with AI for \"{query}\"",
+    "composeDishAiSubtitle": "Decompose into ingredients and save as a new recipe in your catalog",
+    "saveAndLog": "Save & Log to {{meal}}",
+    "saveCatalogOnly": "Save to Catalog only",
+    "addToLog": "Add to diary",
+    "edit": "Edit",
+    "delete": "Delete"
   },
   "ai": {
     "title": "Intelligence & Edge AI",
@@ -358,12 +391,16 @@
     "noItemsParsed": "Could not extract food items from description.",
     "batchReviewTitle": "Review Parsed Meal",
     "batchReviewSubtitle": "Review detected foods and portions before logging",
+    "composeRecipeTitle": "Compose Recipe",
+    "composeRecipeSubtitle": "Review detected foods and portions before saving to catalog",
+    "saveRecipeToCatalog": "Save Recipe to Catalog",
     "logBatchAction": "Log {count} Items to Diary",
     "logSingleAction": "Log to Diary",
     "unmatchedNotice": "Food not found in catalog",
     "unmatchedBadge": "Unmatched",
     "mealTotal": "Total Meal Macros",
     "removeItemAria": "Remove item from meal",
+    "cannotRemoveLastItem": "At least one food must remain in the meal",
     "searchSubstitute": "Search catalog for substitute",
     "changeItem": "Change food match",
     "selectMeal": "Meal Time",
@@ -389,10 +426,46 @@
     "notePlaceholder": "e.g., post-barbecue, sodium retention...",
     "saveWeight": "Save Weight",
     "deleteWeight": "Delete Entry",
-    "unitKg": "kg"
+    "unitKg": "kg",
+    "pastDateWarning": "Logging weight to past date: {{date}}",
+    "pastDateOverwriteWarning": "A weight of {{weight}} kg is already logged for {{date}}. Saving will update it.",
+    "switchToToday": "Log to Today instead",
+    "saveWeightPast": "Save Weight for {{date}}",
+    "updateWeightPast": "Update Weight for {{date}}"
+  },
+  "goals": {
+    "title": "Goals",
+    "subtitle": "Calorie and macronutrient targets",
+    "editGoals": "Edit Goals",
+    "switchModeConfirmTitle": "Switch Target Mode?",
+    "switchToSmartMessage": "Switching to Smart / Adaptive will calculate your daily calories and macros automatically based on your biometrics and weight goal. Would you like to proceed?",
+    "switchToManualMessage": "Switching to Manual allows you to set custom fixed calorie and macronutrient targets. Adaptive adjustments will be paused. Would you like to proceed?",
+    "confirmSwitch": "Confirm & Switch",
+    "cancel": "Cancel",
+    "biometricsSummary": "Biometrics & Activity",
+    "strategySummary": "Goal Strategy",
+    "activeMode": "Active Mode",
+    "manualModeDescription": "You have full manual control over calorie and macronutrient targets.",
+    "adaptiveActive": "Adaptive algorithm active (adjusts weekly)",
+    "adaptiveDeterministic": "Deterministic baseline (fixed calculation)",
+    "currentStats": "Current Stats",
+    "age": "{{age}} years old",
+    "targetKcal": "Daily Target",
+    "ratePerWeek": "{{rate}}% / week",
+    "editBiometrics": "Edit Biometrics",
+    "editManualTitle": "Edit Manual Targets",
+    "editAdaptiveTitle": "Edit Goal Strategy",
+    "biometricsTitle": "Biometrics",
+    "saveBiometrics": "Save Biometrics",
+    "saveGoals": "Save Goals",
+    "saveTargets": "Save Targets",
+    "macroDistribution": "Macro Distribution",
+    "weightNotice": "Updating your weight here records a new weigh-in for today."
   },
   "analytics": {
-    "title": "Expenditure & Weight Trend",
+    "title": "Progress",
+    "navTitle": "Progress",
+    "cardTitle": "Expenditure & Weight Trend",
     "subtitle": "14-day adaptive energy balance & EWMA smoothed weight",
     "estimatedTdee": "Estimated TDEE",
     "kcalPerDay": "kcal/day",
@@ -427,5 +500,11 @@
     "recentEnergyEntries": "Recent Daily Energy Logs",
     "qualifyingDayBadge": "Complete",
     "partialDayBadge": "Partial (<800 kcal)"
+  },
+  "dialog": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete"
   }
 }

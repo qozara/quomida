@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MockCloudSyncProvider } from '../src/MockCloudSyncProvider.js';
+import { MockCloudSyncProvider } from '../src/testing/MockCloudSyncProvider.js';
 
 describe('MockCloudSyncProvider', () => {
   let adapter: MockCloudSyncProvider;

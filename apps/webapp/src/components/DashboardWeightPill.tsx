@@ -31,7 +31,7 @@ export const DashboardWeightPill: React.FC = () => {
         <div className="flex flex-col min-w-0">
           {currentLog ? (
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-sm font-bold text-white">
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
                 {currentLog.weight_kg} {t.weight.unitKg}
               </span>
               <span className="text-xs text-slate-400">

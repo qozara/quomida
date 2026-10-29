@@ -96,12 +96,30 @@ describe('Wave 7 UI/UX Overhaul Specifications', () => {
       expect(screen.getByText(en.nav.dashboard)).toBeDefined();
       expect(screen.getByText(en.nav.analytics)).toBeDefined();
       expect(screen.getByText(en.nav.catalog)).toBeDefined();
-      expect(screen.getByText(en.nav.settings)).toBeDefined();
+      expect(screen.getByText(en.nav.profileGoals || en.nav.settings)).toBeDefined();
 
       // Check IDs for backward-compatible test hooks
       expect(screen.getByTestId('btn-open-analytics')).toBeDefined();
       expect(screen.getByTestId('btn-open-catalog')).toBeDefined();
       expect(screen.getByTestId('btn-open-settings')).toBeDefined();
+    });
+
+    it('renders with modern floating pill layout, rounded corners, and frosted glass transparency', () => {
+      const onSelectTab = vi.fn();
+      render(<BottomNav activeTab="diary" onSelectTab={onSelectTab} />);
+
+      const navElement = screen.getByRole('tablist');
+      expect(navElement).toBeDefined();
+
+      // Verify floating pill styling and rounded corners
+      expect(navElement.className).toMatch(/floating-bottom-nav/);
+      expect(navElement.className).toMatch(/rounded-\[28px\]|rounded-full/);
+      expect(navElement.className).toMatch(/max-w-md/);
+
+      // Verify outer wrapper provides floating fixed positioning
+      const wrapper = navElement.parentElement;
+      expect(wrapper?.className).toMatch(/fixed bottom-/);
+      expect(wrapper?.className).toMatch(/z-30/);
     });
 
     it('switches tabs on click', () => {
@@ -165,8 +183,8 @@ describe('Wave 7 UI/UX Overhaul Specifications', () => {
     });
   });
 
-  describe('3. SettingsModal 5-Segment Accordion Architecture', () => {
-    it('renders 5 distinct accordion headers with subtitles', () => {
+  describe('3. SettingsModal Accordion Architecture (Profile & Goals moved to dedicated top-level page)', () => {
+    it('renders 4 distinct accordion headers with subtitles (profile-goals moved to main page)', () => {
       vi.spyOn(AppContext, 'useApp').mockReturnValue({
         ...baseContext,
         isSettingsOpen: true
@@ -176,7 +194,7 @@ describe('Wave 7 UI/UX Overhaul Specifications', () => {
 
       // Accordion headers
       expect(screen.getByTestId('accordion-header-app-settings')).toBeDefined();
-      expect(screen.getByTestId('accordion-header-profile-goals')).toBeDefined();
+      expect(screen.queryByTestId('accordion-header-profile-goals')).toBeNull();
       expect(screen.getByTestId('accordion-header-ai')).toBeDefined();
       expect(screen.getByTestId('accordion-header-data-sync')).toBeDefined();
       expect(screen.getByTestId('accordion-header-about-legal')).toBeDefined();

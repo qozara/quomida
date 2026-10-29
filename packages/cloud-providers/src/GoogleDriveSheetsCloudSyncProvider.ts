@@ -15,6 +15,7 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
   private accessToken: string | null = null;
   private userEmail: string | null = null;
   private userName: string | null = null;
+  private userPicture: string | null = null;
   private httpClient?: GoogleHttpClient;
   private onTokenRefresh?: () => Promise<string>;
 
@@ -99,17 +100,23 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
     return 'google-user@drive.google.com';
   }
 
+  override getUserPicture(): string | null {
+    return this.userPicture;
+  }
+
   override async initialize(credentials?: string | Record<string, any>): Promise<void> {
     if (typeof credentials === 'string') {
       this.accessToken = credentials;
       this.userEmail = null;
       this.userName = null;
+      this.userPicture = null;
     } else if (credentials && typeof credentials === 'object') {
       if (credentials.accessToken) {
         this.accessToken = credentials.accessToken;
       }
       this.userEmail = credentials.userEmail || null;
       this.userName = credentials.userName || null;
+      this.userPicture = credentials.userPicture || null;
       if (credentials.httpClient) {
         this.httpClient = credentials.httpClient;
       }
@@ -139,6 +146,7 @@ export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvid
     this.accessToken = null;
     this.userEmail = null;
     this.userName = null;
+    this.userPicture = null;
     await super.disconnect();
   }
 

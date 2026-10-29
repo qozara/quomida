@@ -30,13 +30,69 @@ import {
 import { dictionaries, type LocaleKey } from '@quomida/i18n-locales';
 import { useCloudProviderRegistry } from '../cloud-providers/index.js';
 
+export type LanguagePreference = 'system' | 'es' | 'en';
+
+export function isSpanishLocale(lang?: string | null): boolean {
+  if (!lang) return false;
+  const normalized = lang.trim().toLowerCase();
+  return normalized === 'es' || normalized.startsWith('es-') || normalized.startsWith('es_');
+}
+
+export function resolveSystemLocale(): LocaleKey {
+  if (typeof navigator !== 'undefined') {
+    if (Array.isArray(navigator.languages)) {
+      for (const lang of navigator.languages) {
+        if (isSpanishLocale(lang)) {
+          return 'es';
+        }
+      }
+    }
+    if (isSpanishLocale(navigator.language)) {
+      return 'es';
+    }
+  }
+  return 'en';
+}
+
+export function parseLanguagePreference(storedLocale?: string | null): LanguagePreference {
+  if (!storedLocale || storedLocale === 'system') {
+    return 'system';
+  }
+  if (isSpanishLocale(storedLocale)) {
+    return 'es';
+  }
+  if (storedLocale.toLowerCase().startsWith('en')) {
+    return 'en';
+  }
+  return 'system';
+}
+
+export function resolveEffectiveLocale(preference: LanguagePreference): LocaleKey {
+  if (preference === 'system') {
+    return resolveSystemLocale();
+  }
+  return preference;
+}
+
+export function resolveSystemTheme(): 'dark' | 'light' {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'dark';
+}
+
+export function resolveEffectiveTheme(themePref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  return themePref === 'system' ? resolveSystemTheme() : themePref;
+}
+
 interface AppContextType {
   db: QuomidaDatabase | null;
   dbService: LocalDBService;
   selectedDate: string; // YYYY-MM-DD
   setSelectedDate: (date: string) => void;
   locale: LocaleKey;
-  setLocale: (lang: LocaleKey) => void;
+  languagePreference: LanguagePreference;
+  setLocale: (lang: LanguagePreference) => void;
   theme: 'dark' | 'light' | 'system';
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   t: typeof dictionaries['es'];
@@ -64,7 +120,8 @@ interface AppContextType {
     mealType: MealType,
     quantity: number,
     portionName: string,
-    passedPortions?: Portion[]
+    passedPortions?: Portion[],
+    dateOverride?: string
   ) => Promise<void>;
   logBatchFoodItems: (
     items: Array<{
@@ -77,7 +134,7 @@ interface AppContextType {
     mealType: MealType
   ) => Promise<void>;
   deleteLogItem: (id: string) => Promise<void>;
-  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<void>;
+  addCustomIngredient: (ing: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<string>;
   removeCustomIngredient: (id: string) => Promise<void>;
   addRecipe: (recipe: Recipe, portions?: { name: string, equivalent_weight_g: number }[]) => Promise<string>;
   removeRecipe: (id: string) => Promise<void>;
@@ -89,6 +146,8 @@ interface AppContextType {
   setIsStorageSettingsOpen: (open: boolean) => void;
   isAnalyticsOpen: boolean;
   setIsAnalyticsOpen: (open: boolean) => void;
+  isProfileOpen: boolean;
+  setIsProfileOpen: (open: boolean) => void;
   isWeightModalOpen: boolean;
   setIsWeightModalOpen: (open: boolean) => void;
   dbInitError: QuomidaDBError | null;
@@ -106,8 +165,8 @@ interface AppContextType {
 
 const defaultSettings: UserSettings = {
   id: 'global_settings',
-  locale: 'es-AR',
-  theme: 'dark',
+  locale: 'system',
+  theme: 'system',
   daily_calorie_target: 2000,
   custom_macros: { protein: 150, carbs: 200, fats: 65 },
   target_mode: 'manual',
@@ -178,8 +237,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [locale, setLocaleState] = useState<LocaleKey>('es');
-  const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('dark');
+  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
+  const [locale, setLocaleState] = useState<LocaleKey>(() => resolveSystemLocale());
+  const [theme, setThemeState] = useState<'dark' | 'light' | 'system'>('system');
   const [userSettings, setUserSettings] = useState<UserSettings>(defaultSettings);
   const [ingredients, setIngredients] = useState<BaseIngredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -196,6 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isStorageSettingsOpen, setIsStorageSettingsOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [dbInitError, setDbInitError] = useState<QuomidaDBError | null>(null);
   const [hydrationService] = useState(() => new CatalogHydrationService(dbService));
@@ -389,8 +450,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Load settings from repository
       const settings = await dbService.getSettings();
       setUserSettings(settings);
-      if (settings.locale?.startsWith('en')) setLocaleState('en');
-      else if (settings.locale?.startsWith('es')) setLocaleState('es');
+      const initialPref = parseLanguagePreference(settings?.locale);
+      setLanguagePreference(initialPref);
+      setLocaleState(resolveEffectiveLocale(initialPref));
       if (settings.theme) setThemeState(settings.theme as any);
 
       // Check if we need to auto-connect before running boot adaptive calibration
@@ -413,8 +475,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
                   const updated = await dbService.getSettings();
                   setUserSettings(updated);
-                  if (updated.locale?.startsWith('en')) setLocaleState('en');
-                  else if (updated.locale?.startsWith('es')) setLocaleState('es');
+                  const updatedPref = parseLanguagePreference(updated?.locale);
+                  setLanguagePreference(updatedPref);
+                  setLocaleState(resolveEffectiveLocale(updatedPref));
                   if (updated.theme) setThemeState(updated.theme as any);
                 } finally {
                   setSyncStatus(newAdapter.getStatus());
@@ -476,11 +539,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
                 return json;
               });
-              if (json.locale?.startsWith('en')) {
-                setLocaleState((prev) => (prev !== 'en' ? 'en' : prev));
-              } else if (json.locale?.startsWith('es')) {
-                setLocaleState((prev) => (prev !== 'es' ? 'es' : prev));
-              }
+              const streamPref = parseLanguagePreference(json?.locale);
+              setLanguagePreference(streamPref);
+              setLocaleState(resolveEffectiveLocale(streamPref));
               if (json.theme) {
                 setThemeState((prev) => (prev !== json.theme ? json.theme as any : prev));
               }
@@ -614,22 +675,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [db, dailyLogs.length, ingredients.length, recipes.length, updateItemCounts]);
 
-  // Update HTML tag lang & dark mode
+  // Update HTML tag lang
   useEffect(() => {
     document.documentElement.lang = locale;
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [locale, theme]);
+  }, [locale]);
 
-  const setLocale = useCallback((lang: LocaleKey) => {
-    setLocaleState((prev) => (prev !== lang ? lang : prev));
+  // Update HTML tag dark mode & listen to system scheme changes
+  useEffect(() => {
+    const applyTheme = () => {
+      const effective = resolveEffectiveTheme(theme);
+      if (effective === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    if (theme === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+      } else if ((mediaQuery as any).addListener) {
+        (mediaQuery as any).addListener(handleChange);
+        return () => (mediaQuery as any).removeListener(handleChange);
+      }
+    }
+  }, [theme]);
+
+  // Listen for browser language changes when system default is selected
+  useEffect(() => {
+    if (languagePreference !== 'system') return;
+    const handleLanguageChange = () => {
+      setLocaleState(resolveSystemLocale());
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('languagechange', handleLanguageChange);
+      return () => {
+        window.removeEventListener('languagechange', handleLanguageChange);
+      };
+    }
+  }, [languagePreference]);
+
+  const setLocale = useCallback((targetPref: LanguagePreference) => {
+    setLanguagePreference(targetPref);
+    setLocaleState(resolveEffectiveLocale(targetPref));
     dbService.getSettings().then(async (current) => {
-      const targetLocale = lang === 'es' ? 'es-AR' : 'en-US';
-      if (current.locale !== targetLocale) {
-        await dbService.saveSettings({ locale: targetLocale });
+      if (current.locale !== targetPref) {
+        await dbService.saveSettings({ locale: targetPref });
         const updated = await dbService.getSettings();
         setUserSettings(updated);
         forceSync().catch(console.error);
@@ -764,8 +860,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
           const updated = await dbService.getSettings();
           setUserSettings(updated);
-          if (updated.locale?.startsWith('en')) setLocaleState('en');
-          else if (updated.locale?.startsWith('es')) setLocaleState('es');
+          const syncPref = parseLanguagePreference(updated?.locale);
+          setLanguagePreference(syncPref);
+          setLocaleState(resolveEffectiveLocale(syncPref));
           if (updated.theme) setThemeState(updated.theme as any);
         } finally {
           setSyncStatus(adapter.getStatus());
@@ -780,8 +877,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mealType: MealType,
     quantity: number,
     portionName: string,
-    passedPortions?: Portion[]
+    passedPortions?: Portion[],
+    dateOverride?: string
   ) => {
+    const targetDate = dateOverride || selectedDate;
     let relevantPortions: Portion[] = passedPortions || [];
     
     if (dbService) {
@@ -814,7 +913,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const macrosSnapshot = createMacroSnapshot(rawMacros);
 
     await dbService.logFood({
-      date: selectedDate,
+      date: targetDate,
       meal_type: mealType,
       food_reference_id: food.id,
       food_name: food.name,
@@ -824,7 +923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     try {
-      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(selectedDate, true);
+      const updatedSettings = await dbService.runAdaptiveCalibrationIfNeeded(targetDate, true);
       if (updatedSettings) {
         setUserSettings(updatedSettings);
       }
@@ -941,9 +1040,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     forceSync().catch(console.error);
   };
 
-  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'>, portions?: { name: string, equivalent_weight_g: number }[]) => {
-    await dbService.saveCustomFood(ingData, portions);
+  const addCustomIngredient = async (ingData: Omit<BaseIngredient, 'id' | 'source'> & { id?: string }, portions?: { name: string, equivalent_weight_g: number }[]): Promise<string> => {
+    const id = await dbService.saveCustomFood(ingData, portions);
     forceSync().catch(console.error);
+    return id;
   };
 
   const removeCustomIngredient = async (id: string) => {
@@ -984,6 +1084,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedDate,
         setSelectedDate,
         locale,
+        languagePreference,
         setLocale,
         theme,
         setTheme,
@@ -1024,6 +1125,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsStorageSettingsOpen,
         isAnalyticsOpen,
         setIsAnalyticsOpen,
+        isProfileOpen,
+        setIsProfileOpen,
         isWeightModalOpen,
         setIsWeightModalOpen,
         dbInitError,

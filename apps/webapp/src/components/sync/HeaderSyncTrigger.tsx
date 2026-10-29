@@ -52,11 +52,12 @@ export const HeaderSyncTrigger: React.FC = () => {
       <button
         ref={triggerRef}
         id="sync-status-badge"
+        data-testid="sync-status-badge"
         onClick={togglePopover}
         aria-haspopup="dialog"
         aria-expanded={isPopoverOpen}
         aria-label={getAriaLabel()}
-        className="min-w-[44px] min-h-[44px] p-2 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-300 transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+        className="min-w-[44px] min-h-[44px] p-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 flex items-center justify-center text-slate-700 dark:text-slate-300 transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
       >
         <SyncGlyph state={uxSyncState} className="w-5 h-5" />
 

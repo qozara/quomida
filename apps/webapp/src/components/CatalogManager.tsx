@@ -1,79 +1,83 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import {
-  validateMacroAlignment,
+  CatalogSearchManager,
+  BatchMealResolver,
+  MealService,
+  addDaysToDate,
   type BaseIngredient,
   type FoodItem,
   type RecipeFoodItem,
-  type Recipe
+  type Recipe,
+  type RecipeComponent,
+  type Portion,
+  type ResolvedBatchMeal,
+  type DailyLog
 } from '@quomida/domain-core';
 import {
-  X,
   Plus,
-  Utensils,
-  AlertCircle,
   Search,
   Trash2,
-  PlusCircle,
   ChefHat,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MoreVertical,
+  Pencil,
+  Sparkles
 } from 'lucide-react';
 import { dictionaries } from '@quomida/i18n-locales';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { RecipeComponentList } from './recipes/RecipeComponentList.js';
+import { CustomDialog } from './common/CustomDialog.js';
+import { IngredientBuilder } from './IngredientBuilder.js';
+import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
+import { LlmRecipeDecomposer } from '@quomida/ai-services';
+import { AI_CONFIG } from '../config/ai.js';
 
 const EMPTY_ARRAY: any[] = [];
 
-export const CatalogManager: React.FC = () => {
+interface CatalogManagerProps {
+  onSelectFood?: (item: FoodItem | BaseIngredient) => void;
+}
+
+export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) => {
   const {
     ingredients = EMPTY_ARRAY,
     recipes = EMPTY_ARRAY,
     recipeFoods = EMPTY_ARRAY,
-    db,
     addCustomIngredient,
     removeCustomIngredient,
     addRecipe,
     removeRecipe,
     isCatalogOpen,
-    setIsCatalogOpen,
+    db,
+    userSettings,
+    locale,
     t
   } = useApp();
 
   const dict = t || dictionaries.en;
 
-  const [isAdding, setIsAdding] = useState(false);
+  const [isBuildingIngredient, setIsBuildingIngredient] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<FoodItem | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<'all' | 'ingredients' | 'recipes'>('all');
+  const [filterType, setFilterType] = useState<'recent' | 'all' | 'ingredients' | 'recipes'>('recent');
   const [expandedRecipeIds, setExpandedRecipeIds] = useState<Record<string, boolean>>({});
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>([]);
+  const [recentSystemFoods, setRecentSystemFoods] = useState<Record<string, BaseIngredient>>({});
+
+  const [searchManager] = useState(() => new CatalogSearchManager());
+  const [remoteService] = useState(() => RemoteCatalogService.getInstance());
+  const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // New Ingredient Form State
-  const [name, setName] = useState('');
-  const [calories, setCalories] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fats, setFats] = useState('');
-  const [portions, setPortions] = useState<{ name: string; equivalent_weight_g: number }[]>([]);
-  const [portionName, setPortionName] = useState('');
-  const [portionWeight, setPortionWeight] = useState('');
-
-  const handleAddPortion = () => {
-    if (portionName && portionWeight) {
-      setPortions([...portions, { name: portionName, equivalent_weight_g: parseFloat(portionWeight) }]);
-      setPortionName('');
-      setPortionWeight('');
-    }
-  };
-
-  const handleRemovePortion = (index: number) => {
-    setPortions(portions.filter((_, i) => i !== index));
-  };
+  const [isParsing, setIsParsing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'ingredient' | 'recipe'; name: string } | null>(null);
 
   const toggleRecipeExpand = (id: string) => {
     setExpandedRecipeIds(prev => ({
@@ -81,6 +85,182 @@ export const CatalogManager: React.FC = () => {
       [id]: !prev[id]
     }));
   };
+
+  // 60-day cutoff date calculation
+  const cutoffDate = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return addDaysToDate(today, -60);
+  }, []);
+
+  const cutoffTimestamp = useMemo(() => {
+    return Date.now() - 60 * 24 * 60 * 60 * 1000;
+  }, []);
+
+  // Subscribe to daily logs from the last 60 days
+  useEffect(() => {
+    if (!db?.daily_logs?.find) return;
+
+    let sub: any;
+    try {
+      sub = db.daily_logs
+        .find({
+          selector: {
+            date: {
+              $gte: cutoffDate
+            }
+          }
+        })
+        .$.subscribe((docs: any[]) => {
+          const mapped = docs.map((d: any) => (d.toJSON ? d.toJSON() : d) as DailyLog);
+          setRecentLogs(mapped);
+        });
+    } catch (e) {
+      console.warn('[CatalogManager] Failed to subscribe to recent daily logs:', e);
+    }
+
+    return () => {
+      sub?.unsubscribe?.();
+    };
+  }, [db, cutoffDate]);
+
+  // Batch-resolve system food items used in recent logs that are not in custom ingredients or recipes
+  useEffect(() => {
+    if (!recentLogs || recentLogs.length === 0) return;
+
+    const customIdSet = new Set<string>([
+      ...(ingredients || []).map(i => i.id),
+      ...(recipes || []).map(r => r.id)
+    ]);
+
+    const systemIdsToFetch = Array.from(
+      new Set(
+        recentLogs
+          .map(l => l.food_reference_id)
+          .filter(id => id && !customIdSet.has(id) && !recentSystemFoods[id])
+      )
+    );
+
+    if (systemIdsToFetch.length === 0) return;
+
+    let active = true;
+    remoteService
+      .getIngredientsByIds(systemIdsToFetch)
+      .then(items => {
+        if (!active || items.length === 0) return;
+        setRecentSystemFoods(prev => {
+          const next = { ...prev };
+          for (const item of items) {
+            next[item.id] = item;
+          }
+          return next;
+        });
+      })
+      .catch(err => {
+        console.warn('[CatalogManager] Failed to batch-fetch recent system ingredients:', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [recentLogs, ingredients, recipes, remoteService, recentSystemFoods]);
+
+  // Compute recently used items (foods/recipes created/edited or logged in daily log within the last 60 days)
+  const recentItems: FoodItem[] = useMemo(() => {
+    // Map to keep the most recent interaction timestamp per unique food ID
+    const interactionTimes = new Map<string, number>();
+
+    // 1. Process recent daily logs
+    for (const log of recentLogs) {
+      const foodId = log.food_reference_id;
+      if (!foodId) continue;
+      const logTime = log.updatedAt || (log.timestamp ? new Date(log.timestamp).getTime() : 0);
+      const currentTime = interactionTimes.get(foodId) || 0;
+      if (logTime > currentTime) {
+        interactionTimes.set(foodId, logTime);
+      }
+    }
+
+    // 2. Process custom recipes created/edited in the last 60 days
+    for (const recipe of recipes || []) {
+      const updatedTime = recipe.updatedAt || 0;
+      if (updatedTime >= cutoffTimestamp) {
+        const currentTime = interactionTimes.get(recipe.id) || 0;
+        if (updatedTime > currentTime) {
+          interactionTimes.set(recipe.id, updatedTime);
+        }
+      }
+    }
+
+    // 3. Process custom ingredients created/edited in the last 60 days
+    for (const ing of ingredients || []) {
+      const updatedTime = ing.updatedAt || 0;
+      if (updatedTime >= cutoffTimestamp) {
+        const currentTime = interactionTimes.get(ing.id) || 0;
+        if (updatedTime > currentTime) {
+          interactionTimes.set(ing.id, updatedTime);
+        }
+      }
+    }
+
+    if (interactionTimes.size === 0) return [];
+
+    // Map recipes and custom ingredients for quick lookup
+    const recipeFoodMap = new Map<string, RecipeFoodItem>();
+    for (const rf of recipeFoods || []) {
+      recipeFoodMap.set(rf.id, rf);
+    }
+
+    const ingredientMap = new Map<string, BaseIngredient>();
+    for (const ing of ingredients || []) {
+      ingredientMap.set(ing.id, ing);
+    }
+
+    // Also build fallback from recent daily logs snapshots for any system item not yet loaded in SQLite
+    const logFallbackMap = new Map<string, DailyLog>();
+    for (const log of recentLogs) {
+      if (log.food_reference_id && !logFallbackMap.has(log.food_reference_id)) {
+        logFallbackMap.set(log.food_reference_id, log);
+      }
+    }
+
+    const resolvedItems: { item: FoodItem; timestamp: number }[] = [];
+
+    for (const [id, timestamp] of interactionTimes.entries()) {
+      if (recipeFoodMap.has(id)) {
+        resolvedItems.push({ item: recipeFoodMap.get(id)!, timestamp });
+      } else if (ingredientMap.has(id)) {
+        const ing = ingredientMap.get(id)!;
+        resolvedItems.push({
+          item: { ...ing, kind: 'ingredient' },
+          timestamp
+        });
+      } else if (recentSystemFoods[id]) {
+        resolvedItems.push({
+          item: { ...recentSystemFoods[id], kind: 'ingredient' },
+          timestamp
+        });
+      } else if (logFallbackMap.has(id)) {
+        const log = logFallbackMap.get(id)!;
+        // Build resilient fallback food item from daily log snapshot
+        const fallbackIng: FoodItem = {
+          id,
+          name: log.food_name || id,
+          source: 'system',
+          lang: 'es',
+          kind: 'ingredient',
+          calories_100g: log.macros?.calories ?? 0,
+          protein_100g: log.macros?.protein ?? 0,
+          carbs_100g: log.macros?.carbs ?? 0,
+          fats_100g: log.macros?.fats ?? 0
+        };
+        resolvedItems.push({ item: fallbackIng, timestamp });
+      }
+    }
+
+    // Sort descending by interaction timestamp (most recently used/edited first)
+    resolvedItems.sort((a, b) => b.timestamp - a.timestamp);
+    return resolvedItems.map(r => r.item);
+  }, [recentLogs, recipes, ingredients, recipeFoods, recentSystemFoods, cutoffTimestamp]);
 
   // Build stable items list
   const customItems: FoodItem[] = useMemo(() => [
@@ -92,21 +272,34 @@ export const CatalogManager: React.FC = () => {
   ], [ingredients, recipeFoods]);
 
   const displayedItems = useMemo(() => {
-    let items = searchQuery.trim() ? searchResults : customItems;
+    if (searchQuery.trim()) {
+      let items = searchResults;
+      if (filterType === 'ingredients') {
+        return items.filter(item => item.kind === 'ingredient');
+      }
+      if (filterType === 'recipes') {
+        return items.filter(item => item.kind === 'recipe');
+      }
+      return items;
+    }
+
+    if (filterType === 'recent') {
+      return recentItems;
+    }
     if (filterType === 'ingredients') {
-      return items.filter(item => item.kind === 'ingredient');
+      return customItems.filter(item => item.kind === 'ingredient');
     }
     if (filterType === 'recipes') {
-      return items.filter(item => item.kind === 'recipe');
+      return customItems.filter(item => item.kind === 'recipe');
     }
-    return items;
-  }, [searchQuery, searchResults, customItems, filterType]);
+    return customItems;
+  }, [searchQuery, searchResults, customItems, recentItems, filterType]);
 
-  // Search effect (runs only when searchQuery or db changes)
+  // Search effect: searches custom recipes, custom ingredients AND system catalog items
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) {
-      setSearchResults(prev => prev.length > 0 ? [] : prev);
+      setSearchResults([]);
       return;
     }
 
@@ -114,32 +307,18 @@ export const CatalogManager: React.FC = () => {
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const queryLower = trimmed.toLowerCase();
-        const matchedCustom = customItems.filter(item =>
-          item.name.toLowerCase().includes(queryLower)
-        );
-
-        let systemDocs: FoodItem[] = [];
-        if (db && db.base_ingredients) {
-          try {
-            const docs = await db.base_ingredients.find({
-              selector: { name: { $regex: new RegExp(trimmed, 'i') } },
-              limit: 50
-            }).exec();
-            systemDocs = docs
-              .map((d: any) => d.toJSON ? d.toJSON() : d)
-              .filter((d: BaseIngredient) => d.source !== 'custom')
-              .map((d: BaseIngredient) => ({ ...d, kind: 'ingredient' as const }));
-          } catch (e) {
-            console.warn('DB search notice:', e);
-          }
-        }
+        const result = await searchManager.search({
+          query: trimmed,
+          customIngredients: ingredients,
+          customRecipes: recipeFoods,
+          limit: 50
+        }, remoteService);
 
         if (active) {
-          setSearchResults([...matchedCustom, ...systemDocs]);
+          setSearchResults(result.items);
         }
       } catch (err) {
-        console.error(err);
+        console.error('Catalog search failed:', err);
       } finally {
         if (active) setIsSearching(false);
       }
@@ -149,413 +328,542 @@ export const CatalogManager: React.FC = () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [searchQuery, customItems, db]);
+  }, [searchQuery, ingredients, recipeFoods, searchManager, remoteService]);
 
   if (!isCatalogOpen) return null;
 
-  const handleCreateIngredient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    if (!name || !calories) return;
+  const handleEditIngredient = (item: FoodItem) => {
+    setEditingIngredient(item);
+    setIsBuildingIngredient(true);
+    setIsBuildingRecipe(false);
+  };
 
-    const calNum = parseFloat(calories) || 0;
-    const pNum = parseFloat(protein) || 0;
-    const cNum = parseFloat(carbs) || 0;
-    const fNum = parseFloat(fats) || 0;
+  const handleEditRecipe = (recipeItem: FoodItem) => {
+    setEditingRecipe(recipeItem as RecipeFoodItem);
+    setIsBuildingRecipe(true);
+    setIsBuildingIngredient(false);
+  };
 
-    const validation = validateMacroAlignment(calNum, pNum, cNum, fNum);
-    if (!validation.valid) {
-      setErrorMsg(validation.reason || 'Invalid macro values');
-      return;
-    }
-
-    const finalPortions = [...portions];
-    if (portionName.trim() && portionWeight.trim() && !isNaN(parseFloat(portionWeight))) {
-      finalPortions.push({
-        name: portionName.trim(),
-        equivalent_weight_g: parseFloat(portionWeight)
-      });
-    }
-
+  const handleSaveIngredient = async (
+    ingredientData: {
+      id?: string;
+      name: string;
+      lang?: string;
+      calories_100g: number;
+      protein_100g: number;
+      carbs_100g: number;
+      fats_100g: number;
+    },
+    portions?: { name: string; equivalent_weight_g: number }[]
+  ) => {
     await addCustomIngredient({
-      name,
-      lang: 'es',
-      calories_100g: calNum,
-      protein_100g: pNum,
-      carbs_100g: cNum,
-      fats_100g: fNum
-    }, finalPortions);
-
-    setName('');
-    setCalories('');
-    setProtein('');
-    setCarbs('');
-    setFats('');
-    setPortionName('');
-    setPortionWeight('');
-    setPortions([]);
-    setIsAdding(false);
+      ...ingredientData,
+      lang: ingredientData.lang || 'es'
+    }, portions);
+    setIsBuildingIngredient(false);
+    setEditingIngredient(null);
   };
 
-  const handleRemoveIngredient = async (id: string) => {
-    if (confirm(dict.catalog.deleteCustomConfirm)) {
-      await removeCustomIngredient(id);
-    }
+  const handleRemoveIngredient = (id: string, name = '') => {
+    setDeleteTarget({ id, type: 'ingredient', name });
   };
 
-  const handleRemoveRecipe = async (id: string) => {
-    if (confirm(dict.recipes.deleteConfirm)) {
-      await removeRecipe(id);
-    }
+  const handleRemoveRecipe = (id: string, name = '') => {
+    setDeleteTarget({ id, type: 'recipe', name });
   };
 
   const handleSaveRecipe = async (recipe: Recipe, recipePortions?: { name: string; equivalent_weight_g: number }[]) => {
     await addRecipe(recipe, recipePortions);
+    setIsBuildingRecipe(false);
+    setEditingRecipe(null);
+  };
+
+  const handleAiParse = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    const query = searchQuery.trim();
+    if (!query || isParsing) return;
+
+    setIsParsing(true);
+    try {
+      const getAuthToken = async (): Promise<string | null> => {
+        const creds = userSettings?.active_cloud_provider?.credentials;
+        if (typeof creds === 'string' && creds.trim()) return creds.trim();
+        const token = creds?.accessToken || creds?.access_token || creds?.token;
+        if (typeof token === 'string' && token.trim()) return token.trim();
+        return null;
+      };
+
+      let customPortions: Portion[] = [];
+      if (db?.portions?.find) {
+        try {
+          const pdocs = await db.portions.find().exec();
+          customPortions = pdocs.map((d: any) => (d.toJSON ? d.toJSON() : d));
+        } catch (e) {
+          console.warn('[CatalogManager] Failed to query local portions for batch:', e);
+        }
+      }
+
+      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
+
+      const decomposer = isAiEnabled
+        ? new LlmRecipeDecomposer({
+            proxyUrl: AI_CONFIG.proxyUrl,
+            provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
+            ciphertext: userSettings?.ai_settings?.ciphertext,
+            ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
+            ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
+            getAuthToken
+          })
+        : undefined;
+
+      const mealService = new MealService({
+        decomposer,
+        searchManager,
+        batchResolver
+      });
+
+      const resolved = await mealService.processMeal({
+        input: query,
+        customIngredients: ingredients,
+        customRecipes: recipeFoods,
+        existingRecipes: recipes,
+        customPortions,
+        catalogProvider: remoteService,
+        locale,
+        aiEnabled: isAiEnabled
+      });
+
+      setIsParsing(false);
+
+      const isRecipe = Boolean(
+        resolved.synthesizedRecipe ||
+        resolved.compositeDishName ||
+        resolved.items.length > 1 ||
+        (resolved.items.length === 1 && resolved.items[0].food?.kind === 'recipe')
+      );
+
+      if (isRecipe) {
+        let recipeName = resolved.compositeDishName || resolved.synthesizedRecipe?.recipe?.name || resolved.rawInput;
+        let components: RecipeComponent[] = [];
+        let portions = (resolved.synthesizedRecipe?.foodItem as any)?.portions || [];
+
+        if (resolved.synthesizedRecipe) {
+          recipeName = resolved.compositeDishName || resolved.synthesizedRecipe.recipe.name;
+          components = resolved.synthesizedRecipe.recipe.ingredients || [];
+        } else {
+          components = resolved.items.filter(it => it.food).map(it => ({
+            food_id: it.food!.id,
+            name: it.food!.name,
+            weight_g: it.calculatedWeightGrams,
+            calories_100g: it.food!.calories_100g,
+            protein_100g: it.food!.protein_100g,
+            carbs_100g: it.food!.carbs_100g,
+            fats_100g: it.food!.fats_100g,
+            portion_name: it.selectedPortionName,
+            portion_quantity: it.quantity
+          }));
+        }
+
+        const rawWeight = components.reduce((sum, c) => sum + (c.weight_g || 0), 0);
+        const initialRecipeData = {
+          name: recipeName,
+          ingredients: components,
+          raw_weight_g: rawWeight,
+          cooked_weight_g: rawWeight,
+          portions
+        };
+
+        setEditingRecipe(initialRecipeData);
+        setIsBuildingRecipe(true);
+      } else {
+        const singleItem = resolved.items[0];
+        const initialFood: any = singleItem?.food ? { ...singleItem.food } : {
+          id: `custom_${Date.now()}`,
+          name: singleItem?.rawQuery || query,
+          calories_100g: 0,
+          protein_100g: 0,
+          carbs_100g: 0,
+          fats_100g: 0,
+          portions: []
+        };
+
+        setEditingIngredient(initialFood);
+        setIsBuildingIngredient(true);
+      }
+    } catch (err) {
+      console.error('[CatalogManager] AI Parse error:', err);
+      setIsParsing(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-      
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Utensils className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-extrabold text-white">{dict.catalog.title}</h2>
+    <section
+      role="region"
+      aria-label={dict.catalog.title}
+      data-testid="catalog-screen"
+      className="space-y-4 animate-in fade-in duration-200"
+    >
+      {/* Action Buttons & Search */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder={dict.catalog.searchPlaceholder}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
+            />
           </div>
+
           <button
-            onClick={() => setIsCatalogOpen(false)}
-            className="p-2 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            onClick={() => {
+              setEditingIngredient(null);
+              setIsBuildingIngredient(true);
+              setIsBuildingRecipe(false);
+            }}
+            className="p-2 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
           >
-            <X className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
+            <span>{dict.catalog.newFood}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingRecipe(null);
+              setIsBuildingRecipe(true);
+              setIsBuildingIngredient(false);
+            }}
+            className="p-2 px-3 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
+          >
+            <ChefHat className="w-4 h-4" />
+            <span>{dict.recipes.recipeBadge}</span>
           </button>
         </div>
 
-        {/* Action Buttons & Search */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder={dict.catalog.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-              />
-            </div>
-
-            <button
-              onClick={() => {
-                setIsAdding(!isAdding);
-                setIsBuildingRecipe(false);
-              }}
-              className="p-2 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{dict.catalog.newFood}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsBuildingRecipe(true);
-                setIsAdding(false);
-              }}
-              className="p-2 px-3 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/40 transition-all text-sm font-bold flex items-center gap-1 min-w-[44px] min-h-[44px]"
-            >
-              <ChefHat className="w-4 h-4" />
-              <span>{dict.recipes.recipeBadge}</span>
-            </button>
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex gap-1.5 pt-1">
-            <button
-              type="button"
-              onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
-                filterType === 'all'
-                  ? 'bg-slate-700 text-white'
-                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {dict.catalog.filterAll} ({recipeFoods.length + ingredients.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('recipes')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
-                filterType === 'recipes'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {dict.catalog.filterRecipes} ({recipeFoods.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('ingredients')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] ${
-                filterType === 'ingredients'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {dict.catalog.filterIngredients} ({ingredients.length})
-            </button>
-          </div>
+        {/* Filter Pills */}
+        <div className="flex gap-1.5 pt-1 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setFilterType('recent')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
+              filterType === 'recent'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {dict.catalog?.filterRecent || 'Recently used'} ({recentItems.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
+              filterType === 'all'
+                ? 'bg-slate-700 text-white'
+                : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {dict.catalog.filterAll} ({recipeFoods.length + ingredients.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('recipes')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
+              filterType === 'recipes'
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {dict.catalog.filterRecipes} ({recipeFoods.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('ingredients')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[32px] shrink-0 ${
+              filterType === 'ingredients'
+                ? 'bg-emerald-700 text-white'
+                : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {dict.catalog.filterIngredients} ({ingredients.length})
+          </button>
         </div>
+      </div>
 
-        <div aria-live="polite" className="sr-only">
-          {isSearching ? 'Searching...' : `Found ${searchResults.length} foods`}
-        </div>
+      <div aria-live="polite" className="sr-only">
+        {isSearching ? 'Searching...' : `Found ${searchResults.length} foods`}
+      </div>
 
-        {/* Create Custom Ingredient Form */}
-        {isAdding && (
-          <form onSubmit={handleCreateIngredient} className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/30 space-y-3 animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-              {dict.catalog.newCustomIngredient}
-            </h3>
-            
-            {errorMsg && (
-              <div className="p-2.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-            
-            <div>
-              <label className="text-[11px] text-slate-400 block mb-1">Food Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Milanesa de soya casera"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-              />
-            </div>
 
-            <div className="grid grid-cols-4 gap-2">
-              <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Calories</label>
-                <input
-                  type="number"
-                  placeholder="kcal"
-                  value={calories}
-                  onChange={(e) => setCalories(e.target.value)}
-                  required
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 text-center font-bold min-h-[44px]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-rose-400 block mb-1">Protein</label>
-                <input
-                  type="number"
-                  placeholder="g"
-                  value={protein}
-                  onChange={(e) => setProtein(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 text-center font-bold min-h-[44px]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-amber-400 block mb-1">Carbs</label>
-                <input
-                  type="number"
-                  placeholder="g"
-                  value={carbs}
-                  onChange={(e) => setCarbs(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 text-center font-bold min-h-[44px]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-cyan-400 block mb-1">Fats</label>
-                <input
-                  type="number"
-                  placeholder="g"
-                  value={fats}
-                  onChange={(e) => setFats(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 text-center font-bold min-h-[44px]"
-                />
-              </div>
-            </div>
+      {/* Backdrop for closing open context menu */}
+      {openMenuId !== null && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => setOpenMenuId(null)}
+          aria-hidden="true"
+        />
+      )}
 
-            <div className="pt-2">
-              <label className="text-xs text-slate-400 font-semibold mb-2 block">Custom Portions (Optional)</label>
-              
-              <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
-                {portions.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg p-2 px-3">
-                    <span className="text-sm font-medium text-white">{p.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-400">{p.equivalent_weight_g}g</span>
-                      <button type="button" onClick={() => handleRemovePortion(i)} className="text-rose-400 hover:text-rose-300 min-h-[32px] min-w-[32px] flex items-center justify-center">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="E.g., Slice, Cup, Tbsp"
-                  value={portionName}
-                  onChange={(e) => setPortionName(e.target.value)}
-                  className="flex-[2] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 min-h-[44px]"
-                />
-                <input
-                  type="number"
-                  placeholder="Grams"
-                  value={portionWeight}
-                  onChange={(e) => setPortionWeight(e.target.value)}
-                  className="flex-[1] bg-slate-900 border border-slate-800 rounded-xl px-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 text-center min-h-[44px]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddPortion}
-                  disabled={!portionName || !portionWeight}
-                  className="px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 font-bold rounded-xl flex items-center justify-center min-h-[44px]"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                type="submit"
-                className="flex-1 py-2 bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-md min-h-[44px]"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAdding(false)}
-                className="py-2 px-3 bg-slate-800 text-slate-400 hover:text-white font-semibold text-sm rounded-xl min-h-[44px]"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+      {/* Content List */}
+      <div className="space-y-2">
+        {displayedItems.length === 0 && !isSearching && (
+          <div className="text-center py-6 text-slate-500 text-sm">
+            {searchQuery
+              ? dict.catalog.noFoodsFound
+              : filterType === 'recent'
+              ? (dict.catalog?.noRecentFoods || 'No recently used foods or recipes in the last 60 days')
+              : dict.catalog.noCustomFoodsYet}
+          </div>
         )}
+        {displayedItems.map((item) => {
+          const isRecipe = item.kind === 'recipe';
+          const recipeFood = isRecipe ? (item as RecipeFoodItem) : null;
+          const isExpanded = isRecipe && Boolean(expandedRecipeIds[item.id]);
+          const isCustomItem = isRecipe || item.source === 'custom';
 
-        {/* Content List */}
-        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-          {displayedItems.length === 0 && !isSearching && (
-            <div className="text-center py-6 text-slate-500 text-sm">
-              {searchQuery ? dict.catalog.noFoodsFound : dict.catalog.noCustomFoodsYet}
-            </div>
-          )}
-          {displayedItems.map((item) => {
-            const isRecipe = item.kind === 'recipe';
-            const recipeFood = isRecipe ? (item as RecipeFoodItem) : null;
-            const isExpanded = isRecipe && Boolean(expandedRecipeIds[item.id]);
-
-            return (
-              <div
-                key={item.id}
-                className="rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors group overflow-hidden"
-              >
-                <div className="flex items-center justify-between p-3">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-semibold text-white truncate">{item.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                        isRecipe
-                          ? 'bg-purple-950 text-purple-400 border border-purple-800/50'
-                          : item.source === 'custom'
-                          ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {isRecipe ? dict.recipes.recipeBadge : item.source}
-                      </span>
+          return (
+            <div
+              key={item.id}
+              className="rounded-xl bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition-colors group overflow-visible relative"
+            >
+              <div className="flex items-center justify-between p-3">
+                <div className="flex-1 min-w-0 pr-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-semibold text-white truncate">{item.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                      isRecipe
+                        ? 'bg-purple-950 text-purple-400 border border-purple-800/50'
+                        : item.source === 'custom'
+                        ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {isRecipe ? dict.recipes.recipeBadge : item.source}
+                    </span>
+                  </div>
+                  {isRecipe && recipeFood ? (
+                    <div className="text-xs text-slate-400 mt-0.5 space-y-0.5">
+                      <div>
+                        <span className="font-semibold text-white">
+                          {dict.recipes.totalDish || 'Total'}: {Math.round(recipeFood.total_macros.calories)} kcal
+                        </span>
+                        <span className="text-slate-400"> ({recipeFood.cooked_weight_g}g {dict.recipes.cooked})</span>
+                        <span className="text-slate-600"> • </span>
+                        <span className="text-rose-400">P: {Math.round(recipeFood.total_macros.protein * 10) / 10}g</span>
+                        <span className="text-slate-600"> | </span>
+                        <span className="text-amber-400">C: {Math.round(recipeFood.total_macros.carbs * 10) / 10}g</span>
+                        <span className="text-slate-600"> | </span>
+                        <span className="text-cyan-400">F: {Math.round(recipeFood.total_macros.fats * 10) / 10}g</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {Math.round(recipeFood.calories_100g * 10) / 10} kcal/100g • P: {Math.round(recipeFood.protein_100g * 10) / 10}g | C: {Math.round(recipeFood.carbs_100g * 10) / 10}g | F: {Math.round(recipeFood.fats_100g * 10) / 10}g
+                      </div>
                     </div>
-                    {isRecipe && recipeFood ? (
-                      <div className="text-xs text-slate-400 mt-0.5 space-y-0.5">
-                        <div>
-                          <span className="font-semibold text-white">
-                            {dict.recipes.totalDish || 'Total'}: {Math.round(recipeFood.total_macros.calories)} kcal
-                          </span>
-                          <span className="text-slate-400"> ({recipeFood.cooked_weight_g}g {dict.recipes.cooked})</span>
-                          <span className="text-slate-600"> • </span>
-                          <span className="text-rose-400">P: {Math.round(recipeFood.total_macros.protein * 10) / 10}g</span>
-                          <span className="text-slate-600"> | </span>
-                          <span className="text-amber-400">C: {Math.round(recipeFood.total_macros.carbs * 10) / 10}g</span>
-                          <span className="text-slate-600"> | </span>
-                          <span className="text-cyan-400">F: {Math.round(recipeFood.total_macros.fats * 10) / 10}g</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {Math.round(recipeFood.calories_100g * 10) / 10} kcal/100g • P: {Math.round(recipeFood.protein_100g * 10) / 10}g | C: {Math.round(recipeFood.carbs_100g * 10) / 10}g | F: {Math.round(recipeFood.fats_100g * 10) / 10}g
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    {isRecipe && (
-                      <button
-                        type="button"
-                        onClick={() => toggleRecipeExpand(item.id)}
-                        aria-label={isExpanded ? 'Collapse recipe ingredients' : 'Expand recipe ingredients'}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white transition-colors"
-                      >
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    )}
-
-                    {isRecipe ? (
-                      <button
-                        onClick={() => handleRemoveRecipe(item.id)}
-                        aria-label="Delete recipe"
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : item.source === 'custom' ? (
-                      <button
-                        onClick={() => handleRemoveIngredient(item.id)}
-                        aria-label="Delete custom ingredient"
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : null}
-                  </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {item.calories_100g} kcal/100g • P: {item.protein_100g}g | C: {item.carbs_100g}g | F: {item.fats_100g}g
+                    </div>
+                  )}
                 </div>
 
-                {/* Expanded Recipe Breakdown */}
-                {isRecipe && isExpanded && recipeFood && (
-                  <div className="p-3 bg-slate-900/80 border-t border-slate-800/80 space-y-2">
-                    <span className="text-[11px] font-bold text-purple-400 block">
-                      {dict.recipes.breakdownTitle}
-                    </span>
-                    <RecipeComponentList
-                      components={recipeFood.recipe?.ingredients || (recipeFood as any).ingredients || []}
-                      cookedWeightGrams={recipeFood.cooked_weight_g}
-                      totalMacros={recipeFood.total_macros}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Expand Recipe Breakdown Chevron */}
+                  {isRecipe && (
+                    <button
+                      type="button"
+                      onClick={() => toggleRecipeExpand(item.id)}
+                      aria-label={isExpanded ? 'Collapse recipe ingredients' : 'Expand recipe ingredients'}
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white transition-colors"
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  )}
 
+                  {/* Context Menu for Custom Items (Recipes & Custom Ingredients) */}
+                  {isCustomItem && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                        aria-label="Item options"
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuId === item.id}
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {openMenuId === item.id && (
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-full mt-1 z-20 w-32 bg-slate-850 border border-slate-700 rounded-xl shadow-2xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            aria-label={isRecipe ? 'Edit recipe' : 'Edit custom ingredient'}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              if (isRecipe) {
+                                handleEditRecipe(item);
+                              } else {
+                                handleEditIngredient(item);
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-750 hover:text-white transition-colors min-h-[36px]"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{dict.catalog?.edit || 'Edit'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            aria-label={isRecipe ? 'Delete recipe' : 'Delete custom ingredient'}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              if (isRecipe) {
+                                handleRemoveRecipe(item.id);
+                              } else {
+                                handleRemoveIngredient(item.id);
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors min-h-[36px]"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>{dict.catalog?.delete || 'Delete'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Primary Add to Diary (+) Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectFood?.(item)}
+                    aria-label={isRecipe ? 'Add recipe to log' : 'Add food to log'}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded Recipe Breakdown (Redundant totals omitted per spec) */}
+              {isRecipe && isExpanded && recipeFood && (
+                <div className="p-3 bg-slate-950/80 border-t border-slate-800/80 space-y-2 rounded-b-xl">
+                  <span className="text-[11px] font-bold text-purple-400 block">
+                    {dict.recipes.breakdownTitle}
+                  </span>
+                  <RecipeComponentList
+                    components={recipeFood.recipe?.ingredients || (recipeFood as any).ingredients || []}
+                    cookedWeightGrams={recipeFood.cooked_weight_g}
+                    totalMacros={recipeFood.total_macros}
+                    showSummary={false}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* At the bottom of search results, render the "✨ Compose dish or estimate with AI" action card */}
+        {searchQuery.trim().length > 0 && (
+          <button
+            type="button"
+            id="btn-catalog-compose-ai"
+            data-testid="btn-catalog-compose-ai"
+            onClick={handleAiParse}
+            disabled={isParsing}
+            className="w-full p-3.5 text-left bg-gradient-to-r from-emerald-950/30 to-purple-950/20 hover:from-emerald-950/50 hover:to-purple-950/40 border border-emerald-500/30 hover:border-emerald-500/60 rounded-xl transition-all flex items-center justify-between group min-h-[44px]"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-emerald-400 group-hover:text-emerald-300 transition-colors flex items-center gap-1.5">
+                  <span>
+                    {(dict.catalog?.composeDishAi || '✨ Compose dish or estimate with AI for "{query}"').replace('{query}', searchQuery.trim())}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {dict.catalog?.composeDishAiSubtitle || 'Decompose into ingredients and save as a new recipe in your catalog'}
+                </div>
+              </div>
+            </div>
+            {isParsing && (
+              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Recipe Builder Modal */}
       {isBuildingRecipe && (
         <RecipeBuilder
-          onClose={() => setIsBuildingRecipe(false)}
+          initialRecipe={editingRecipe}
+          mode="catalog"
+          onBack={() => {
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+          }}
+          onClose={() => {
+            setIsBuildingRecipe(false);
+            setEditingRecipe(null);
+          }}
           onSave={handleSaveRecipe}
         />
       )}
-    </div>
+
+      {/* Custom Ingredient Builder Modal */}
+      {isBuildingIngredient && (
+        <IngredientBuilder
+          initialIngredient={editingIngredient}
+          mode="catalog"
+          onBack={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+          }}
+          onClose={() => {
+            setIsBuildingIngredient(false);
+            setEditingIngredient(null);
+          }}
+          onSave={handleSaveIngredient}
+        />
+      )}
+
+      {/* Mobile-Friendly Delete Confirmation Dialog */}
+      <CustomDialog
+        isOpen={deleteTarget !== null}
+        variant="danger"
+        title={
+          deleteTarget?.type === 'recipe'
+            ? ((dict.recipes as any).deleteConfirmTitle || dict.catalog?.delete || 'Delete Recipe?')
+            : ((dict.catalog as any).deleteCustomTitle || dict.catalog?.delete || 'Delete Custom Food?')
+        }
+        message={
+          deleteTarget?.type === 'recipe'
+            ? dict.recipes.deleteConfirm
+            : dict.catalog.deleteCustomConfirm
+        }
+        confirmText={dict.catalog?.delete || 'Delete'}
+        cancelText={dict.recipes?.cancel || 'Cancel'}
+        confirmTestId="btn-confirm-delete"
+        cancelTestId="btn-cancel-delete"
+        dialogTestId="confirm-delete-dialog"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          const { id, type } = deleteTarget;
+          setDeleteTarget(null);
+          if (type === 'recipe') {
+            await removeRecipe(id);
+          } else {
+            await removeCustomIngredient(id);
+          }
+        }}
+      />
+    </section>
   );
 };

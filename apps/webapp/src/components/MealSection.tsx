@@ -49,7 +49,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
             {mealIcons[mealType]}
           </div>
           <div>
-            <h3 className="text-base font-bold text-white tracking-wide">{title}</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-wide">{title}</h3>
             <p className="text-xs text-slate-400">
               {logs.length} {logs.length === 1 ? 'item' : 'items'}
             </p>
@@ -57,7 +57,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-800/40">
+          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/40">
             {Math.round(totalCalories)} kcal
           </span>
 
@@ -105,7 +105,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
                 className="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 hover:bg-slate-800/40 border border-slate-800/50 transition-all group"
               >
                 <div>
-                  <div className="text-sm font-medium text-slate-200">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-200">
                     {log.food_name || getIngredientName(log.food_reference_id)}
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">
@@ -114,7 +114,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-slate-200">
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-200">
                     {Math.round(log.macros.calories)} kcal
                   </span>
                   <button

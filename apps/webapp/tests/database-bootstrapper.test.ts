@@ -117,6 +117,84 @@ describe('DatabaseBootstrapper', () => {
     expect(mockCloseSync).toHaveBeenCalled();
   });
 
+  it('calls move(opfsRoot, "catalog.sqlite") for atomic promotion in WebKit / modern browsers', async () => {
+    const mockMove = vi.fn().mockResolvedValue(undefined);
+    const mockRemoveEntry = vi.fn().mockResolvedValue(undefined);
+    const mockWritable = { write: vi.fn().mockResolvedValue(undefined), close: vi.fn().mockResolvedValue(undefined) };
+
+    const mockOpfsRoot: any = {
+      removeEntry: mockRemoveEntry,
+      getFileHandle: vi.fn().mockImplementation((name, options) => {
+        if (name === 'catalog.sqlite.tmp') {
+          return Promise.resolve({
+            createWritable: vi.fn().mockResolvedValue(mockWritable),
+            move: mockMove
+          });
+        }
+        const err = new Error('Not found');
+        err.name = 'NotFoundError';
+        return Promise.reject(err);
+      })
+    };
+
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue(mockOpfsRoot)
+      }
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10))
+    });
+
+    await DatabaseBootstrapper.ensureSystemCatalogOPFS();
+
+    expect(mockOpfsRoot.removeEntry).toHaveBeenCalledWith('catalog.sqlite');
+    expect(mockMove).toHaveBeenCalledWith(mockOpfsRoot, 'catalog.sqlite');
+  });
+
+  it('falls back to single-argument move("catalog.sqlite") if 2-arg move throws', async () => {
+    const mockMove = vi.fn().mockImplementation((...args: any[]) => {
+      if (args.length === 2) {
+        throw new TypeError('Not enough arguments');
+      }
+      return Promise.resolve();
+    });
+    const mockRemoveEntry = vi.fn().mockResolvedValue(undefined);
+    const mockWritable = { write: vi.fn().mockResolvedValue(undefined), close: vi.fn().mockResolvedValue(undefined) };
+
+    const mockOpfsRoot: any = {
+      removeEntry: mockRemoveEntry,
+      getFileHandle: vi.fn().mockImplementation((name, options) => {
+        if (name === 'catalog.sqlite.tmp') {
+          return Promise.resolve({
+            createWritable: vi.fn().mockResolvedValue(mockWritable),
+            move: mockMove
+          });
+        }
+        const err = new Error('Not found');
+        err.name = 'NotFoundError';
+        return Promise.reject(err);
+      })
+    };
+
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue(mockOpfsRoot)
+      }
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10))
+    });
+
+    await DatabaseBootstrapper.ensureSystemCatalogOPFS();
+
+    expect(mockMove).toHaveBeenCalledWith('catalog.sqlite');
+  });
+
   it('removes catalog.sqlite from OPFS and reseeds system.sqlite', async () => {
     const mockRemoveEntry = vi.fn().mockResolvedValue(undefined);
     const mockWrite = vi.fn().mockResolvedValue(undefined);

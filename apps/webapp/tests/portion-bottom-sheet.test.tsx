@@ -48,9 +48,13 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
       }
     };
 
+    const setSelectedDateMock = vi.fn();
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
       db: mockDb as any,
       logFoodItem: logFoodItemMock,
+      selectedDate: '2026-10-20',
+      setSelectedDate: setSelectedDateMock,
+      locale: 'es',
       t: dictionaries.es
     } as any);
 
@@ -73,6 +77,10 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
       />
     );
 
+    // Verify DateSelector is rendered at the top of the modal
+    const dateSelector = screen.getByTestId('date-selector');
+    expect(dateSelector).toBeDefined();
+
     // Wait for the portion to be resolved and selected
     await waitFor(() => {
       const select = screen.getByRole('combobox') as HTMLSelectElement;
@@ -83,8 +91,8 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     const qtyInput = screen.getByRole('spinbutton') as HTMLInputElement;
     expect(qtyInput.value).toBe('1');
 
-    // Click "Registrar en Diario" button
-    const logButton = screen.getByText(dictionaries.es.portionModal.logAction);
+    // Click confirm / log action button
+    const logButton = screen.getByTestId('btn-log-item');
     fireEvent.click(logButton);
 
     expect(logFoodItemMock).toHaveBeenCalledWith(
@@ -94,7 +102,8 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
       'Pechuga entera',
       expect.arrayContaining([
         expect.objectContaining({ name: 'Pechuga entera', equivalent_weight_g: 200 })
-      ])
+      ]),
+      '2026-10-20'
     );
     await waitFor(() => {
       expect(onCloseMock).toHaveBeenCalled();
@@ -243,7 +252,132 @@ describe('PortionBottomSheet - Custom Portion Resolution & Selection', () => {
     });
     expect(callArgs[1]).toBe('meal_lunch');
     expect(callArgs[3]).toBe('Whole recipe');
-    expect(onCloseMock).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onCloseMock).toHaveBeenCalled();
+    });
+  });
+
+  it('renders as a modern full-screen slide-over modal with accessible back button', async () => {
+    const mockDb = {
+      portions: {
+        find: vi.fn().mockReturnValue({
+          exec: vi.fn().mockResolvedValue([])
+        })
+      }
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      db: mockDb as any,
+      logFoodItem: logFoodItemMock,
+      t: dictionaries.es
+    } as any);
+
+    const testIngredient = {
+      id: 'custom_apple',
+      name: 'Manzana Fuji',
+      source: 'custom' as const,
+      lang: 'es',
+      calories_100g: 52,
+      protein_100g: 0.3,
+      carbs_100g: 14,
+      fats_100g: 0.2
+    };
+
+    render(
+      <PortionBottomSheet
+        ingredient={testIngredient}
+        defaultMealType="meal_snack"
+        onClose={onCloseMock}
+      />
+    );
+
+    // Dialog container
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeDefined();
+    expect(dialog.className).toContain('rounded-t-3xl');
+    expect(dialog.className).toContain('animate-slide-in-up');
+
+    // Title
+    expect(screen.getByText(dictionaries.es.portionModal.title)).toBeDefined();
+
+    // Back button
+    const backBtn = screen.getByRole('button', { name: 'Back' });
+    expect(backBtn).toBeDefined();
+    expect(backBtn.className).toContain('min-w-[44px]');
+    expect(backBtn.className).toContain('min-h-[44px]');
+
+    fireEvent.click(backBtn);
+    await waitFor(() => {
+      expect(onCloseMock).toHaveBeenCalled();
+    });
+  });
+
+  it('allows changing date via DateSelector and logs food item to the newly selected date', async () => {
+    const mockDb = {
+      portions: {
+        find: vi.fn().mockReturnValue({
+          exec: vi.fn().mockResolvedValue([])
+        })
+      }
+    };
+
+    const logFoodItemMock = vi.fn().mockResolvedValue(undefined);
+    const onCloseMock = vi.fn();
+    const setSelectedDateMock = vi.fn();
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      db: mockDb as any,
+      logFoodItem: logFoodItemMock,
+      selectedDate: '2026-10-20',
+      setSelectedDate: setSelectedDateMock,
+      locale: 'es',
+      t: dictionaries.es
+    } as any);
+
+    const testIngredient = {
+      id: 'custom_banana',
+      name: 'Banana',
+      source: 'custom' as const,
+      lang: 'es',
+      calories_100g: 89,
+      protein_100g: 1.1,
+      carbs_100g: 22.8,
+      fats_100g: 0.3
+    };
+
+    render(
+      <PortionBottomSheet
+        ingredient={testIngredient}
+        defaultMealType="meal_breakfast"
+        onClose={onCloseMock}
+      />
+    );
+
+    // Verify initial date selector is present
+    expect(screen.getByTestId('date-selector')).toBeDefined();
+
+    // Click Previous Day button
+    const prevDayBtn = screen.getByTestId('btn-date-prev');
+    fireEvent.click(prevDayBtn);
+
+    // Verify setSelectedDate was called with previous day (2026-10-19)
+    expect(setSelectedDateMock).toHaveBeenCalledWith('2026-10-19');
+
+    // Click confirm / log action button
+    const logButton = screen.getByTestId('btn-log-item');
+    fireEvent.click(logButton);
+
+    expect(logFoodItemMock).toHaveBeenCalledWith(
+      testIngredient,
+      'meal_breakfast',
+      1,
+      'g',
+      [],
+      '2026-10-19'
+    );
+    await waitFor(() => {
+      expect(onCloseMock).toHaveBeenCalled();
+    });
   });
 });
 

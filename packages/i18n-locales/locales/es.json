@@ -6,8 +6,11 @@
   "nav": {
     "dashboard": "Diario",
     "catalog": "Mis Alimentos",
-    "analytics": "Analíticas",
-    "settings": "Ajustes"
+    "analytics": "Progreso",
+    "progress": "Progreso",
+    "settings": "Ajustes",
+    "goals": "Metas",
+    "profileGoals": "Metas"
   },
   "dashboard": {
     "title": "Resumen Diario",
@@ -47,13 +50,26 @@
     "downloadFullCatalog": "Descargar Catálogo Completo",
     "searchingLocal": "Buscando en catálogo..."
   },
+  "date": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "tomorrow": "Mañana",
+    "back": "Volver",
+    "jumpToToday": "Volver a Hoy",
+    "previousDay": "Día anterior",
+    "nextDay": "Día siguiente"
+  },
   "portionModal": {
     "title": "Porción y Cantidad",
     "unitLabel": "Unidad de Porción",
     "quantityLabel": "Cantidad",
     "logAction": "Registrar en Diario",
     "calculatedMacros": "Nutrición Calculada",
-    "customGrams": "Gramos (g)"
+    "customGrams": "Gramos (g)",
+    "pastDateWarning": "Registrando en fecha pasada: {{date}}",
+    "pastDateWarningWithCount": "Registrando en fecha pasada: {{date}} ({{count}} alimentos ya registrados)",
+    "switchToToday": "Cambiar a Hoy",
+    "logToPastDate": "Registrar en {{date}}"
   },
   "settings": {
     "title": "Perfil y Configuración",
@@ -73,6 +89,9 @@
     "saveTargets": "Guardar Objetivos",
     "targetsSaved": "¡Objetivos Guardados!",
     "language": "Idioma",
+    "languageSystem": "Predeterminado del sistema",
+    "languageEs": "Español",
+    "languageEn": "Inglés",
     "theme": "Tema",
     "themeLight": "Claro",
     "themeDark": "Oscuro",
@@ -287,8 +306,10 @@
     "nutritionPer100g": "Densidad Nutricional (por 100g cocido)",
     "totalNutrition": "Nutrición Total de la Receta",
     "saveRecipe": "Guardar Receta",
+    "saving": "Guardando...",
     "cancel": "Cancelar",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
+    "deleteConfirmTitle": "¿Eliminar receta?",
     "noComponents": "Aún no se agregaron alimentos. Busca y agrega componentes arriba.",
     "recipeBadge": "Receta",
     "customBadge": "Personalizado",
@@ -297,21 +318,33 @@
     "breakdownTitle": "Desglose de Ingredientes de la Receta",
     "cooked": "cocido",
     "raw": "crudo",
-    "totalDish": "Total Receta"
+    "totalDish": "Total Receta",
+    "editRecipe": "Editar Receta"
   },
   "catalog": {
-    "title": "Administrador de Catálogo de Alimentos",
+    "title": "Mis Alimentos",
     "newFood": "Nuevo",
     "newCustomIngredient": "Nuevo Alimento Simple (base 100g)",
+    "editCustomIngredient": "Editar Alimento Simple (base 100g)",
     "combineFoods": "Combinar Alimentos (Receta)",
     "searchPlaceholder": "Buscar en el catálogo...",
+    "filterRecent": "Usados recientemente",
     "filterAll": "Todos",
     "filterIngredients": "Ingredientes",
     "filterRecipes": "Recetas",
     "deleteCustomConfirm": "¿Estás seguro de que deseas eliminar este alimento personalizado?",
+    "deleteCustomTitle": "¿Eliminar alimento personalizado?",
     "deleteRecipeConfirm": "¿Estás seguro de que deseas eliminar esta receta?",
     "noFoodsFound": "No se encontraron alimentos",
-    "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas"
+    "noCustomFoodsYet": "Aún no has creado alimentos o recetas personalizadas",
+    "noRecentFoods": "No hay alimentos o recetas usados en los últimos 60 días",
+    "composeDishAi": "✨ Componer plato o estimar con IA para \"{query}\"",
+    "composeDishAiSubtitle": "Descomponer en ingredientes y guardar como nueva receta en tu catálogo",
+    "saveAndLog": "Guardar y Registrar en {{meal}}",
+    "saveCatalogOnly": "Solo Guardar en Catálogo",
+    "addToLog": "Añadir al diario",
+    "edit": "Editar",
+    "delete": "Eliminar"
   },
   "ai": {
     "title": "Inteligencia y Edge AI",
@@ -358,12 +391,16 @@
     "noItemsParsed": "No se pudieron extraer alimentos de la descripción.",
     "batchReviewTitle": "Revisar Comida Detectada",
     "batchReviewSubtitle": "Revisa los alimentos y porciones detectadas antes de registrar",
+    "composeRecipeTitle": "Componer Receta",
+    "composeRecipeSubtitle": "Revisa los alimentos detectados y porciones antes de guardar en el catálogo",
+    "saveRecipeToCatalog": "Guardar Receta en Catálogo",
     "logBatchAction": "Registrar {count} Alimentos en Diario",
     "logSingleAction": "Registrar en Diario",
     "unmatchedNotice": "Alimento no encontrado en el catálogo",
     "unmatchedBadge": "No Encontrado",
     "mealTotal": "Macros Totales de la Comida",
     "removeItemAria": "Eliminar alimento de la comida",
+    "cannotRemoveLastItem": "Debe permanecer al menos un alimento en la comida",
     "searchSubstitute": "Buscar sustituto en el catálogo",
     "changeItem": "Cambiar alimento",
     "selectMeal": "Momento del día",
@@ -389,10 +426,46 @@
     "notePlaceholder": "ej., post-asado, retención...",
     "saveWeight": "Guardar Peso",
     "deleteWeight": "Eliminar Registro",
-    "unitKg": "kg"
+    "unitKg": "kg",
+    "pastDateWarning": "Registrando peso en fecha pasada: {{date}}",
+    "pastDateOverwriteWarning": "Ya hay un peso de {{weight}} kg registrado para el {{date}}. Guardar lo actualizará.",
+    "switchToToday": "Registrar en Hoy",
+    "saveWeightPast": "Guardar Peso para {{date}}",
+    "updateWeightPast": "Actualizar Peso para {{date}}"
+  },
+  "goals": {
+    "title": "Metas",
+    "subtitle": "Objetivos de calorías y macronutrientes",
+    "editGoals": "Editar Metas",
+    "switchModeConfirmTitle": "¿Cambiar Modo de Objetivos?",
+    "switchToSmartMessage": "Cambiar a Inteligente / Adaptativo calculará tus calorías y macros automáticamente según tus datos biométricos y objetivo de peso. ¿Deseas continuar?",
+    "switchToManualMessage": "Cambiar a Manual te permite definir objetivos fijos de calorías y macronutrientes. Los ajustes adaptativos se pausarán. ¿Deseas continuar?",
+    "confirmSwitch": "Confirmar y Cambiar",
+    "cancel": "Cancelar",
+    "biometricsSummary": "Biometría y Actividad",
+    "strategySummary": "Estrategia de Objetivo",
+    "activeMode": "Modo Activo",
+    "manualModeDescription": "Tienes control manual total sobre los objetivos de calorías y macronutrientes.",
+    "adaptiveActive": "Algoritmo adaptativo activo (se ajusta semanalmente)",
+    "adaptiveDeterministic": "Base determinista (cálculo fijo)",
+    "currentStats": "Estadísticas Actuales",
+    "age": "{{age}} años",
+    "targetKcal": "Objetivo Diario",
+    "ratePerWeek": "{{rate}}% / semana",
+    "editBiometrics": "Editar Biometría",
+    "editManualTitle": "Editar Objetivos Manuales",
+    "editAdaptiveTitle": "Editar Estrategia de Objetivos",
+    "biometricsTitle": "Biometría",
+    "saveBiometrics": "Guardar Biometría",
+    "saveGoals": "Guardar Objetivos",
+    "saveTargets": "Guardar Objetivos",
+    "macroDistribution": "Distribución de Macros",
+    "weightNotice": "Actualizar tu peso aquí registra un nuevo pesaje para hoy."
   },
   "analytics": {
-    "title": "Gasto Energético y Tendencia",
+    "title": "Progreso",
+    "navTitle": "Progreso",
+    "cardTitle": "Gasto Energético y Tendencia",
     "subtitle": "Balance energético adaptativo de 14 días y peso suavizado EWMA",
     "estimatedTdee": "TDEE Estimado",
     "kcalPerDay": "kcal/día",
@@ -427,5 +500,11 @@
     "recentEnergyEntries": "Registros Energéticos Recientes",
     "qualifyingDayBadge": "Completo",
     "partialDayBadge": "Parcial (<800 kcal)"
+  },
+  "dialog": {
+    "ok": "Aceptar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar"
   }
 }
