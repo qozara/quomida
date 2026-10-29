@@ -103,7 +103,7 @@ export const DashboardContent: React.FC = () => {
     setTargetMealType(mealType);
   };
 
-  const handlePortionBack = () => {
+  const handlePortionDismiss = () => {
     setSelectedIngredient(null);
     if (portionOrigin === 'add_food') {
       setIsAddFoodModalOpen(true);
@@ -114,7 +114,7 @@ export const DashboardContent: React.FC = () => {
     }
   };
 
-  const handlePortionClose = () => {
+  const handlePortionSuccess = () => {
     setSelectedIngredient(null);
     setIsAddFoodModalOpen(false);
   };
@@ -314,8 +314,9 @@ export const DashboardContent: React.FC = () => {
       <PortionBottomSheet
         ingredient={selectedIngredient}
         defaultMealType={targetMealType}
-        onClose={handlePortionClose}
-        onBack={handlePortionBack}
+        onClose={handlePortionDismiss}
+        onBack={handlePortionDismiss}
+        onSuccess={handlePortionSuccess}
       />
       <SettingsModal onBack={handleSettingsBack} />
       <WeightQuickLogModal />

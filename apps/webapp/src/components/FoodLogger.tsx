@@ -334,7 +334,6 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
                 type="button"
                 onClick={() => {
                   onSelectIngredient(ing, 'meal_lunch');
-                  setSearchQuery('');
                 }}
                 className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
               >

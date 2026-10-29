@@ -13,6 +13,7 @@ interface PortionBottomSheetProps {
   defaultMealType: MealType;
   onClose: () => void;
   onBack?: () => void;
+  onSuccess?: () => void;
   initialDate?: string;
 }
 
@@ -21,6 +22,7 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
   defaultMealType,
   onClose,
   onBack,
+  onSuccess,
   initialDate
 }) => {
   const { db, logFoodItem, selectedDate, setSelectedDate, dailyLogs, t } = useApp();
@@ -109,7 +111,11 @@ export const PortionBottomSheet: React.FC<PortionBottomSheetProps> = ({
 
   const handleLog = async () => {
     await logFoodItem(ingredient, mealType, quantity, selectedPortionName, availablePortions, modalDate);
-    onClose();
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      onClose();
+    }
   };
 
   return (

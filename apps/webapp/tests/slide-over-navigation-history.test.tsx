@@ -143,6 +143,38 @@ describe('Slide-Over Navigation History & Contextual Back Button', () => {
     });
   });
 
+  it('Journey 1b: dismissing PortionModal via backdrop or close preserves AddFoodModal and search query', async () => {
+    renderWithProviders(<DashboardContent />);
+
+    // 1. Open AddFoodModal
+    const addLunchBtn = screen.getByLabelText(en.dashboard.meals.addFoodToMealAria.replace('{{meal}}', en.dashboard.meals.lunch));
+    fireEvent.click(addLunchBtn);
+
+    // 2. Type search query
+    const searchInput = screen.getByPlaceholderText(en.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'Apple' } });
+
+    // 3. Select food item
+    const foodItem = await screen.findByText('Fresh Red Apple');
+    fireEvent.click(foodItem);
+
+    // 4. PortionModal opens
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: en.portionModal.title })).toBeDefined();
+    });
+
+    // 5. Dismiss via backdrop click
+    const backdrop = screen.getByTestId('bottom-sheet-backdrop');
+    fireEvent.click(backdrop);
+
+    // 6. PortionModal closes, AddFoodModal remains with search query intact
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: en.portionModal.title })).toBeNull();
+      expect(screen.getByRole('dialog', { name: new RegExp(en.dashboard.meals.lunch, 'i') })).toBeDefined();
+      expect((screen.getByPlaceholderText(en.search.unifiedPlaceholder) as HTMLInputElement).value).toBe('Apple');
+    });
+  });
+
   it('Journey 2: opens PortionModal from AddFoodModal and confirming log closes both dialogs', async () => {
     renderWithProviders(<DashboardContent />);
 

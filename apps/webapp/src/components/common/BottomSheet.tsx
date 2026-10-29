@@ -21,6 +21,7 @@ export interface BottomSheetProps {
   hideCloseButton?: boolean;
   disableBackdropClick?: boolean;
   className?: string;
+  animationDuration?: number;
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -42,12 +43,50 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   closeId,
   hideCloseButton = false,
   disableBackdropClick = false,
-  className = ''
+  className = '',
+  animationDuration = 200
 }) => {
   const [dragOffsetY, setDragOffsetY] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isDismissing, setIsDismissing] = useState<boolean>(false);
+  const isDismissingRef = useRef<boolean>(false);
+  const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const startYRef = useRef<number>(0);
   const currentYRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
+
+  // When isOpen changes to true, reset state
+  useEffect(() => {
+    if (isOpen) {
+      setIsDismissing(false);
+      isDismissingRef.current = false;
+      setDragOffsetY(0);
+      setIsDragging(false);
+    }
+    return () => {
+      if (dismissTimeoutRef.current) {
+        clearTimeout(dismissTimeoutRef.current);
+      }
+    };
+  }, [isOpen]);
+
+  const triggerDismiss = useCallback(
+    (callback: () => void = onClose) => {
+      if (isDismissingRef.current) return;
+      isDismissingRef.current = true;
+      setIsDismissing(true);
+
+      if (dismissTimeoutRef.current) {
+        clearTimeout(dismissTimeoutRef.current);
+      }
+
+      dismissTimeoutRef.current = setTimeout(() => {
+        callback();
+      }, animationDuration);
+    },
+    [onClose, animationDuration]
+  );
 
   // Close on Escape key
   useEffect(() => {
@@ -55,55 +94,90 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        triggerDismiss(onClose);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, triggerDismiss]);
 
   // Touch gesture handlers for swipe-down-to-dismiss
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    startYRef.current = e.touches[0].clientY;
-    currentYRef.current = e.touches[0].clientY;
-    setIsDragging(true);
-  }, []);
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length !== 1 || isDismissingRef.current) return;
+      startYRef.current = e.touches[0].clientY;
+      currentYRef.current = e.touches[0].clientY;
+      startTimeRef.current = Date.now();
+      setIsDragging(true);
+    },
+    []
+  );
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const currentY = e.touches[0].clientY;
-    currentYRef.current = currentY;
-    const deltaY = currentY - startYRef.current;
-    if (deltaY > 0) {
-      setDragOffsetY(deltaY);
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length !== 1 || !isDragging || isDismissingRef.current) return;
+      const currentY = e.touches[0].clientY;
+      currentYRef.current = currentY;
+      const deltaY = currentY - startYRef.current;
+      if (deltaY > 0) {
+        setDragOffsetY(deltaY);
+      } else {
+        setDragOffsetY(deltaY * 0.15);
+      }
+    },
+    [isDragging]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging || isDismissingRef.current) return;
+    setIsDragging(false);
+    const deltaY = currentYRef.current - startYRef.current;
+    const timeDiff = Date.now() - startTimeRef.current;
+    const velocity = timeDiff > 0 ? deltaY / timeDiff : 0;
+    const isFlick = timeDiff >= 40 && timeDiff < 400 && velocity > 0.5 && deltaY > 30;
+
+    if (deltaY > 70 || isFlick) {
+      triggerDismiss(onClose);
     } else {
       setDragOffsetY(0);
     }
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false);
-    const deltaY = currentYRef.current - startYRef.current;
-    if (deltaY > 80) {
-      onClose();
-    }
-    setDragOffsetY(0);
-  }, [onClose]);
+  }, [isDragging, triggerDismiss, onClose]);
 
   if (!isOpen) return null;
+
+  // Dynamic inline styles for smooth animations
+  const sheetStyle: React.CSSProperties = {
+    overscrollBehavior: 'contain'
+  };
+
+  if (isDismissing) {
+    sheetStyle.transform = 'translate3d(0, 100%, 0)';
+    sheetStyle.transition = `transform ${animationDuration}ms cubic-bezier(0.32, 0.72, 0, 1)`;
+    sheetStyle.animation = 'none';
+  } else if (isDragging) {
+    sheetStyle.transform = `translate3d(0, ${Math.max(0, dragOffsetY)}px, 0)`;
+    sheetStyle.transition = 'none';
+    sheetStyle.animation = 'none';
+  } else if (dragOffsetY === 0) {
+    sheetStyle.transition = 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+  }
 
   return (
     <div
       className={`fixed inset-0 ${zIndex} flex flex-col justify-end overscroll-contain animate-fade-in`}
       style={{ overscrollBehavior: 'contain' }}
     >
-      {/* Dimmed Backdrop (Light Dismiss) */}
+      {/* Dimmed Backdrop (Light Dismiss with smooth fade-out) */}
       <div
         data-testid="bottom-sheet-backdrop"
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-200"
-        onClick={disableBackdropClick ? undefined : onClose}
+        style={{
+          transition: `opacity ${animationDuration}ms ease-out`
+        }}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-xs ${
+          isDismissing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        onClick={disableBackdropClick ? undefined : () => triggerDismiss(onClose)}
         aria-hidden="true"
       />
 
@@ -113,13 +187,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         data-testid={testId}
-        style={{
-          transform: dragOffsetY > 0 ? `translate3d(0, ${dragOffsetY}px, 0)` : undefined,
-          transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-          overscrollBehavior: 'contain'
-        }}
+        style={sheetStyle}
         onClick={(e) => e.stopPropagation()}
-        className={`relative z-10 w-full max-w-lg mx-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col ${maxHeight} animate-slide-in-up overflow-hidden ${className}`}
+        className={`relative z-10 w-full max-w-lg mx-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col ${maxHeight} ${
+          !isDismissing && !isDragging ? 'animate-slide-in-up' : ''
+        } overflow-hidden ${className}`}
       >
         {/* Drag Handle Bar */}
         {showHandle && (
@@ -178,7 +250,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 type="button"
                 id={closeId}
                 data-testid={closeTestId}
-                onClick={onClose}
+                onClick={() => triggerDismiss(onClose)}
                 aria-label={closeAriaLabel}
                 className="min-w-[44px] min-h-[44px] p-2 -mr-2 rounded-full text-slate-400 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
               >
