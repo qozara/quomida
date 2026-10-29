@@ -50,7 +50,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
           type="button"
           onClick={onBack || onClose}
           aria-label={t.sync?.panel?.back || 'Back'}
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full text-slate-600 dark:text-slate-400 transition-colors flex items-center justify-center active:scale-95"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -83,7 +83,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
             type="button"
             onClick={() => setShowResetConfirm(true)}
             id="btn-empty-local-db"
-            className="w-full py-2.5 px-3 min-h-[44px] rounded-xl bg-slate-50 dark:bg-slate-950 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-300 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-800/60 text-slate-700 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
+            className="w-full py-2.5 px-3 min-h-[44px] rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 text-xs font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>{(t.sync?.panel?.emptyDatabase || `Empty Local Database (v${dbVersion})`).replace('(v0)', `(v${dbVersion})`)}</span>
@@ -120,7 +120,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               id="link-storage-privacy"
-              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium py-1"
+              className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium py-1"
             >
               <span>{t.settings?.privacyPolicy || 'Privacy Policy'}</span>
               <ExternalLink className="w-3 h-3" />
@@ -130,7 +130,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               id="link-storage-tos"
-              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium py-1"
+              className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium py-1"
             >
               <span>{t.settings?.termsOfService || 'Terms of Service'}</span>
               <ExternalLink className="w-3 h-3" />
@@ -165,14 +165,14 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setDisconnectTarget(null)}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
               >
                 {t.sync?.panel?.cancelAction || 'Cancel'}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDisconnect}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 text-white text-xs font-bold transition-colors shadow-sm"
               >
                 {t.sync?.panel?.confirmAction || 'Disconnect'}
               </button>
@@ -204,7 +204,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(false)}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
               >
                 {t.sync?.panel?.cancelAction || 'Cancel'}
               </button>
@@ -215,7 +215,7 @@ export const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                   setShowResetConfirm(false);
                   await clearLocalDatabase();
                 }}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-rose-600 text-white text-xs font-bold transition-colors shadow-sm"
               >
                 {t.sync?.panel?.emptyDatabaseAction || 'Empty Database'}
               </button>

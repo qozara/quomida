@@ -186,17 +186,17 @@ export const DashboardContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-28">
       {/* Sticky Header Navigation */}
       {activeTab === 'diary' ? (
         <DashboardDateBar />
       ) : (
-        <div className="sticky top-0 z-30 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/40">
+        <div className="sticky top-0 z-30 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/40">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
             <div className="w-10 flex items-center justify-start shrink-0">
               <HeaderAvatarButton />
             </div>
-            <h1 className="text-sm font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+            <h1 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center justify-center gap-1.5">
               {activeTab === 'analytics' ? (
                 <>
                   <BarChart3 className="w-4 h-4 text-emerald-400" />
@@ -233,10 +233,10 @@ export const DashboardContent: React.FC = () => {
           <>
             {/* Onboarding Banner for Fresh Devices */}
             {uxSyncState === 'local' && itemCounts.logs === 0 && !isBannerDismissed && !activeProvider && !userSettings?.active_cloud_provider && (
-              <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">
+              <div className="bg-white dark:bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 relative">
                 <button 
                   onClick={handleDismissBanner}
-                  className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-200 transition-colors"
+                  className="absolute top-2 right-2 p-1 text-slate-400 dark:text-slate-500 transition-colors"
                   aria-label="Dismiss"
                 >
                   <X className="w-4 h-4" />
@@ -246,8 +246,8 @@ export const DashboardContent: React.FC = () => {
                     <Cloud className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">{t.dashboard.onboarding?.title || 'Returning User?'}</h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t.dashboard.onboarding?.title || 'Returning User?'}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {t.dashboard.onboarding?.description || 'Connect a cloud storage provider to restore your data and sync seamlessly across devices.'}
                     </p>
                   </div>

@@ -156,7 +156,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             className={`flex-1 min-h-[44px] py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
               activeMode === 'manual'
                 ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             {t.settings.targetModeManual}
@@ -170,7 +170,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             className={`flex-1 min-h-[44px] py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
               activeMode === 'smart'
                 ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             {t.settings.targetModeSmart}
@@ -263,7 +263,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             data-testid="btn-edit-goals"
             onClick={handleEditGoalsClick}
             aria-label={t.goals?.editGoals || 'Edit Goals'}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-750 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <Pencil className="w-3.5 h-3.5" />
             <span>{t.goals?.editGoals || 'Edit Goals'}</span>
@@ -353,7 +353,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             data-testid="btn-edit-biometrics"
             onClick={handleEditBiometricsClick}
             aria-label={t.goals?.editBiometrics || 'Edit Biometrics'}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-750 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <Pencil className="w-3.5 h-3.5" />
             <span>{t.goals?.editBiometrics || 'Edit'}</span>
@@ -432,7 +432,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
                 id="btn-cancel-mode-switch"
                 data-testid="btn-cancel-mode-switch"
                 onClick={() => setPendingModeSwitch(null)}
-                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
               >
                 {t.goals?.cancel || 'Cancel'}
               </button>
@@ -441,7 +441,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
                 id="btn-confirm-mode-switch"
                 data-testid="btn-confirm-mode-switch"
                 onClick={handleConfirmModeSwitch}
-                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-md active:scale-95"
+                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs transition-all shadow-md active:scale-95"
               >
                 {t.goals?.confirmSwitch || 'Confirm & Switch'}
               </button>

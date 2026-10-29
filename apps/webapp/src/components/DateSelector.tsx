@@ -91,8 +91,8 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
       {/* Oval container around date text and arrow buttons (stays strictly anchored) */}
       <div
         data-testid="date-selector-oval"
-        className={`flex items-center justify-between bg-slate-900/90 px-1 py-0.5 rounded-full border shadow-md backdrop-blur-md transition-colors w-[156px] sm:w-[168px] shrink-0 ${
-          !isToday ? 'border-amber-500/40 bg-slate-900' : 'border-slate-800'
+        className={`flex items-center justify-between bg-white/90 dark:bg-slate-900/90 px-1 py-0.5 rounded-full border shadow-md backdrop-blur-md transition-colors w-[156px] sm:w-[168px] shrink-0 ${
+          !isToday ? 'border-amber-500/40 bg-white dark:bg-slate-900' : 'border-slate-200 dark:border-slate-800'
         }`}
       >
         <button
@@ -101,7 +101,7 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           data-testid="btn-date-prev"
           onClick={handlePrevDay}
           aria-label={t.date?.previousDay || 'Previous day'}
-          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95 shrink-0"
+          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-500 dark:text-slate-400 transition-colors active:scale-95 shrink-0"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -116,7 +116,7 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           data-testid="btn-date-next"
           onClick={handleNextDay}
           aria-label={t.date?.nextDay || 'Next day'}
-          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors active:scale-95 shrink-0"
+          className="w-8 sm:w-9 min-h-[40px] sm:min-h-[44px] flex items-center justify-center p-1 text-slate-500 dark:text-slate-400 transition-colors active:scale-95 shrink-0"
         >
           <ChevronRight className="w-4 h-4" />
         </button>

@@ -27,21 +27,21 @@ export const HeaderAvatarButton: React.FC = () => {
       data-testid="btn-open-settings-avatar"
       onClick={() => setIsSettingsOpen(true)}
       aria-label={t.settings.title}
-      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all active:scale-95 group focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-0.5 rounded-full text-slate-500 dark:text-slate-400 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
     >
       {isCloudConnected && userPicture ? (
         <img
           src={userPicture}
           alt="Profile"
-          className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500/50 group-hover:border-emerald-400 shadow-md transition-colors"
+          className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500/50 shadow-md transition-colors"
           referrerPolicy="no-referrer"
         />
       ) : isCloudConnected ? (
-        <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-xs shadow-md group-hover:bg-emerald-500/30 transition-colors">
+        <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-500 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shadow-md transition-colors">
           <Cloud className="w-4 h-4" />
         </div>
       ) : (
-        <div className="w-8 h-8 rounded-full bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-1 shadow-md group-hover:border-emerald-400/50 transition-colors">
+        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-1 shadow-md transition-colors">
           <img src="/favicon.svg" alt="Quomida" className="w-5 h-5 object-contain" />
         </div>
       )}
