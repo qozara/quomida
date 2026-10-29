@@ -24,10 +24,10 @@ export const CloudProviderList: React.FC<CloudProviderListProps> = ({ onDisconne
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-bold text-slate-200 tracking-wide">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 tracking-wide">
           {t.sync?.panel?.remoteTitle || 'Remote Synchronization (BYOS)'}
         </h3>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
           {t.sync?.panel?.remoteDescription ||
             'Connect a storage provider to back up your logs and sync across devices.'}
         </p>

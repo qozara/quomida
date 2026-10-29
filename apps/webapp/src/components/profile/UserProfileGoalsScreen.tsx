@@ -146,7 +146,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
     <div data-testid="user-profile-goals-screen" className="space-y-4 pb-4">
       {/* 1. Mode Switcher Segmented Control */}
       {!isAnyModalOpen && (
-        <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-sm">
+        <div className="flex bg-slate-100 dark:bg-slate-900/90 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <button
             type="button"
             id="btn-target-mode-manual"
@@ -156,7 +156,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             className={`flex-1 min-h-[44px] py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
               activeMode === 'manual'
                 ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {t.settings.targetModeManual}
@@ -170,7 +170,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             className={`flex-1 min-h-[44px] py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
               activeMode === 'smart'
                 ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {t.settings.targetModeSmart}
@@ -181,11 +181,11 @@ export const UserProfileGoalsScreen: React.FC = () => {
       {/* 2. Goal Strategy Card (Placed directly below mode switcher with unified Target icon & title) */}
       <div
         data-testid="strategy-summary-card"
-        className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3"
+        className="rounded-3xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3"
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-            <Target className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+            <Target className="w-4 h-4 text-emerald-500" />
             <span>{t.goals?.strategySummary || 'Goal Strategy'}</span>
           </div>
 
@@ -194,8 +194,8 @@ export const UserProfileGoalsScreen: React.FC = () => {
               data-testid="adaptive-status-badge"
               className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                 isAdaptive
-                  ? 'bg-emerald-950 text-emerald-400 border-emerald-800/50'
-                  : 'bg-slate-800 text-slate-300 border-slate-700'
+                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/50'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
               }`}
             >
               {isAdaptive
@@ -203,17 +203,17 @@ export const UserProfileGoalsScreen: React.FC = () => {
                 : (t.goals?.adaptiveDeterministic || 'Deterministic')}
             </span>
           ) : (
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-slate-800 text-slate-300 border-slate-700">
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700">
               {t.settings.targetModeManual}
             </span>
           )}
         </div>
 
         {activeMode === 'smart' ? (
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 text-xs">
             <div>
               <span className="font-bold text-slate-900 dark:text-white block text-sm">{goalTypeLabel}</span>
-              <span className="text-slate-400 text-[11px]">
+              <span className="text-slate-500 dark:text-slate-400 text-[11px]">
                 {goalConfig?.goal_type === 'lose' && goalConfig.weekly_rate_pct !== undefined
                   ? `${goalConfig.weekly_rate_pct}% / week`
                   : goalConfig?.goal_type === 'gain' && goalConfig.weekly_rate_pct !== undefined
@@ -223,7 +223,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             </div>
 
             <div className="text-right font-mono">
-              <span className="text-[11px] text-slate-400 block">Baseline TDEE</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">Baseline TDEE</span>
               <span className="font-bold text-emerald-600 dark:text-emerald-300">
                 {userSettings?.adaptive_state?.estimated_tdee || userSettings?.adaptive_state?.prior_tdee || calories} kcal
               </span>
@@ -232,7 +232,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
         ) : (
           <div
             data-testid="manual-mode-summary-card"
-            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300 leading-relaxed"
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-300 leading-relaxed"
           >
             {t.goals?.manualModeDescription || 'You have full manual control over calorie and macronutrient targets.'}
           </div>
@@ -242,18 +242,18 @@ export const UserProfileGoalsScreen: React.FC = () => {
       {/* 3. Daily Target Card (Contains Calorie target, macro breakdown, and Activity config badge) */}
       <div
         data-testid="goals-summary-card"
-        className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-4"
+        className="rounded-3xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-4"
       >
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
               {t.goals?.targetKcal || 'Daily Target'}
             </span>
             <div className="flex items-baseline gap-2">
               <span data-testid="summary-calories-value" className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
                 {calories.toLocaleString()}
               </span>
-              <span className="text-sm font-semibold text-emerald-400">kcal</span>
+              <span className="text-sm font-semibold text-emerald-500">kcal</span>
             </div>
           </div>
 
@@ -263,7 +263,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             data-testid="btn-edit-goals"
             onClick={handleEditGoalsClick}
             aria-label={t.goals?.editGoals || 'Edit Goals'}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 text-emerald-400 hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-750 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <Pencil className="w-3.5 h-3.5" />
             <span>{t.goals?.editGoals || 'Edit Goals'}</span>
@@ -274,17 +274,17 @@ export const UserProfileGoalsScreen: React.FC = () => {
         {activeMode === 'smart' && (
           <div
             data-testid="target-activity-badge"
-            className="flex items-center gap-2 p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs"
+            className="flex items-center gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 text-xs"
           >
-            <Activity className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="text-slate-400 text-[11px]">{t.settings.activityLevelLabel}:</span>
+            <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.settings.activityLevelLabel}:</span>
             <span className="font-semibold text-slate-900 dark:text-white truncate">{activityLevelLabel}</span>
           </div>
         )}
 
         {/* Macro Distribution Bars & Pills */}
-        <div className="space-y-2 pt-2 border-t border-slate-800/80">
-          <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden flex gap-0.5">
+        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+          <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex gap-0.5">
             <div
               style={{ width: `${proteinPct}%` }}
               className="bg-rose-500 transition-all duration-300"
@@ -303,34 +303,34 @@ export const UserProfileGoalsScreen: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-            <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
+            <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">
                 {t.dashboard.protein}
               </span>
-              <div className="font-mono text-sm font-bold text-rose-300">
+              <div className="font-mono text-sm font-bold text-rose-600 dark:text-rose-300">
                 {protein}g
               </div>
-              <span className="text-[10px] text-slate-400">{proteinPct}%</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{proteinPct}%</span>
             </div>
 
-            <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
+            <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">
                 {t.dashboard.carbs}
               </span>
-              <div className="font-mono text-sm font-bold text-amber-300">
+              <div className="font-mono text-sm font-bold text-amber-600 dark:text-amber-300">
                 {carbs}g
               </div>
-              <span className="text-[10px] text-slate-400">{carbsPct}%</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{carbsPct}%</span>
             </div>
 
-            <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
+            <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">
                 {t.dashboard.fats}
               </span>
-              <div className="font-mono text-sm font-bold text-cyan-300">
+              <div className="font-mono text-sm font-bold text-cyan-600 dark:text-cyan-300">
                 {fats}g
               </div>
-              <span className="text-[10px] text-slate-400">{fatsPct}%</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{fatsPct}%</span>
             </div>
           </div>
         </div>
@@ -339,11 +339,11 @@ export const UserProfileGoalsScreen: React.FC = () => {
       {/* 4. Biometrics Card (Dedicated Physical Profile with its own Edit button) */}
       <div
         data-testid="biometrics-summary-card"
-        className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3.5"
+        className="rounded-3xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/70 p-5 shadow-lg relative overflow-hidden space-y-3.5"
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-            <User className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+            <User className="w-4 h-4 text-emerald-500" />
             <span>{t.goals?.biometricsTitle || t.settings.biometricsTitle || 'Biometrics'}</span>
           </div>
 
@@ -353,7 +353,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
             data-testid="btn-edit-biometrics"
             onClick={handleEditBiometricsClick}
             aria-label={t.goals?.editBiometrics || 'Edit Biometrics'}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 text-emerald-400 hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-750 border border-slate-300 dark:border-slate-700/80 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
           >
             <Pencil className="w-3.5 h-3.5" />
             <span>{t.goals?.editBiometrics || 'Edit'}</span>
@@ -361,8 +361,8 @@ export const UserProfileGoalsScreen: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+          <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
               <User className="w-3 h-3 text-slate-400" />
               {t.settings.sexLabel}
             </span>
@@ -371,8 +371,8 @@ export const UserProfileGoalsScreen: React.FC = () => {
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+          <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
               <User className="w-3 h-3 text-slate-400" />
               {t.goals?.age?.replace('{{age}}', '') || 'Age'}
             </span>
@@ -381,8 +381,8 @@ export const UserProfileGoalsScreen: React.FC = () => {
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+          <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
               <Ruler className="w-3 h-3 text-slate-400" />
               {t.settings.heightCmLabel}
             </span>
@@ -391,8 +391,8 @@ export const UserProfileGoalsScreen: React.FC = () => {
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-            <span className="text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
+          <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-0.5 flex items-center gap-1">
               <Scale className="w-3 h-3 text-slate-400" />
               {t.settings.currentWeightKgLabel}
             </span>
@@ -410,17 +410,17 @@ export const UserProfileGoalsScreen: React.FC = () => {
           aria-modal="true"
           data-testid="confirm-mode-switch-modal"
           aria-labelledby="confirm-switch-mode-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
         >
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-emerald-500 font-bold">
               <Target className="w-5 h-5" />
               <h3 id="confirm-switch-mode-title" className="text-base text-slate-900 dark:text-white font-bold">
                 {t.goals?.switchModeConfirmTitle || 'Switch Target Mode?'}
               </h3>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
               {pendingModeSwitch === 'smart'
                 ? (t.goals?.switchToSmartMessage || 'Switching to Smart / Adaptive will calculate your daily calories and macros automatically based on your biometrics and weight goal. Would you like to proceed?')
                 : (t.goals?.switchToManualMessage || 'Switching to Manual allows you to set custom fixed calorie and macronutrient targets. Adaptive adjustments will be paused. Would you like to proceed?')}
@@ -432,7 +432,7 @@ export const UserProfileGoalsScreen: React.FC = () => {
                 id="btn-cancel-mode-switch"
                 data-testid="btn-cancel-mode-switch"
                 onClick={() => setPendingModeSwitch(null)}
-                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
               >
                 {t.goals?.cancel || 'Cancel'}
               </button>

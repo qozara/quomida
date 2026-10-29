@@ -354,20 +354,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-screen-title"
-      className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
+      className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
     >
       {/* Modern Sticky Navigation Header */}
-      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
+      <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
         <button
           id="btn-close-settings"
           data-testid="btn-back-settings"
           onClick={handleBack}
           aria-label="Back"
-          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-800/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center active:scale-95"
+          className="min-w-[44px] min-h-[44px] p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center active:scale-95"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 id="settings-screen-title" className="text-base sm:text-lg font-bold text-white tracking-tight">
+        <h1 id="settings-screen-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
           {t.settings.title}
         </h1>
         <div className="w-[44px]" aria-hidden="true" />
@@ -377,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       <div className="max-w-lg mx-auto w-full px-4 py-5 space-y-5 flex-1">
         {/* Top Hero: Connected Cloud User Info OR App Name */}
         {isCloudConnected ? (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/80 border border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/80 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
             <div className="absolute -right-8 -top-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
             {userPicture ? (
@@ -388,14 +388,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border-2 border-emerald-500/40 text-emerald-300 font-extrabold text-2xl flex items-center justify-center shadow-md shrink-0">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border-2 border-emerald-500/40 text-emerald-600 dark:text-emerald-300 font-extrabold text-2xl flex items-center justify-center shadow-md shrink-0">
                 {displayUserName.charAt(0).toUpperCase()}
               </div>
             )}
 
             <div className="min-w-0 flex-1 space-y-1">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{displayUserName}</h2>
-              <p className="text-xs text-slate-400 truncate">{displayUserEmail}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{displayUserEmail}</p>
 
               {/* Cloud Sync Status Pill */}
               <div className="pt-1 flex items-center gap-2">
@@ -407,18 +407,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
             </div>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/80 border border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
-            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-2.5 shadow-md shrink-0">
+          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/80 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-2.5 shadow-md shrink-0">
               <img src="/favicon.svg" alt="Quomida" className="w-9 h-9 object-contain" />
             </div>
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Quomida</h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-400">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                   Local-first
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {t.settings?.accountLocalSubtitle || 'Offline mode (no cloud connected)'}
               </p>
             </div>
@@ -429,7 +429,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
         <div className="space-y-3">
           
           {/* SEGMENT 1: App Settings & User Account */}
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden shadow-sm transition-all">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 overflow-hidden shadow-sm transition-all">
             <button
               type="button"
               id="accordion-header-app-settings"
@@ -437,17 +437,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               aria-expanded={Boolean(openSections['app-settings'])}
               aria-controls="accordion-panel-app-settings"
               onClick={() => toggleSection('app-settings')}
-              className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60">
+                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-700/60">
                   <Globe className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {t.settings.accordionAppSettings || 'App Settings & User Account'}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {t.settings.accordionAppSettingsSubtitle || 'Language, theme, and user credentials'}
                   </p>
                 </div>
@@ -463,18 +463,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               id="accordion-panel-app-settings"
               role="region"
               aria-labelledby="accordion-header-app-settings"
-              className={openSections['app-settings'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
+              className={openSections['app-settings'] ? 'p-4 pt-1 border-t border-slate-200 dark:border-slate-800/60 space-y-4' : 'hidden'}
             >
               {/* Language & Theme Controls */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label htmlFor="select-language" className="text-xs text-slate-400 block mb-1.5 font-medium">{t.settings.language}</label>
+                  <label htmlFor="select-language" className="text-xs text-slate-600 dark:text-slate-400 block mb-1.5 font-medium">{t.settings.language}</label>
                   <select
                     id="select-language"
                     data-testid="select-language"
                     value={languagePreference || locale || 'system'}
                     onChange={(e) => setLocale(e.target.value as any)}
-                    className="w-full min-h-[44px] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[44px] bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                   >
                     <option value="system">{t.settings.languageSystem || 'System default'}</option>
                     <option value="es">{t.settings.languageEs || 'Spanish'}</option>
@@ -483,15 +483,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1.5 font-medium">{t.settings.theme}</label>
-                  <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 min-h-[44px] items-center gap-1">
+                  <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1.5 font-medium">{t.settings.theme}</label>
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-300 dark:border-slate-700 min-h-[44px] items-center gap-1">
                     <button
                       type="button"
                       id="btn-theme-system"
                       data-testid="btn-theme-system"
                       onClick={() => setTheme('system')}
                       className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        theme === 'system' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        theme === 'system' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                       aria-label={t.settings.themeSystem || 'System'}
                       title={t.settings.themeSystem || 'System'}
@@ -505,7 +505,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       data-testid="btn-theme-light"
                       onClick={() => setTheme('light')}
                       className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        theme === 'light' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        theme === 'light' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                       aria-label={t.settings.themeLight || 'Light'}
                       title={t.settings.themeLight || 'Light'}
@@ -519,7 +519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       data-testid="btn-theme-dark"
                       onClick={() => setTheme('dark')}
                       className={`flex-1 min-h-[36px] flex justify-center items-center gap-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        theme === 'dark' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        theme === 'dark' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                       aria-label={t.settings.themeDark || 'Dark'}
                       title={t.settings.themeDark || 'Dark'}
@@ -533,9 +533,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
             </div>
           </div>
 
-
           {/* SEGMENT 3: Intelligence & Edge AI */}
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden shadow-sm transition-all">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 overflow-hidden shadow-sm transition-all">
             <button
               type="button"
               id="accordion-header-ai"
@@ -543,17 +542,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               aria-expanded={Boolean(openSections['ai'])}
               aria-controls="accordion-panel-ai"
               onClick={() => toggleSection('ai')}
-              className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60">
+                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-700/60">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {t.settings.accordionAi || 'Intelligence & Edge AI'}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {t.settings.accordionAiSubtitle || 'Private edge AI, BYOK encryption, and models'}
                   </p>
                 </div>
@@ -569,16 +568,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               id="accordion-panel-ai"
               role="region"
               aria-labelledby="accordion-header-ai"
-              className={openSections['ai'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
+              className={openSections['ai'] ? 'p-4 pt-1 border-t border-slate-200 dark:border-slate-800/60 space-y-4' : 'hidden'}
             >
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 {/* Master AI Toggle */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+                <div className="flex items-center justify-between p-3.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl">
                   <div className="space-y-0.5 pr-3">
-                    <label htmlFor="toggle-ai-enabled" className="text-xs font-semibold text-slate-200 block cursor-pointer">
+                    <label htmlFor="toggle-ai-enabled" className="text-xs font-semibold text-slate-800 dark:text-slate-200 block cursor-pointer">
                       {t.ai?.enableAi || 'Enable AI Features'}
                     </label>
-                    <p className="text-[10px] text-slate-400 leading-tight">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
                       {t.ai?.enableAiDesc || 'Allows AI to estimate typical ingredients and recipes for uncataloged foods. When disabled, logging runs 100% locally.'}
                     </p>
                   </div>
@@ -589,9 +588,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     role="switch"
                     aria-checked={aiEnabled}
                     onClick={() => handleToggleAiEnabled(!aiEnabled)}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1 rounded-xl hover:bg-slate-800/60 transition-colors"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
                   >
-                    <div className={`w-11 h-6 rounded-full transition-colors relative p-0.5 pointer-events-none ${aiEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                    <div className={`w-11 h-6 rounded-full transition-colors relative p-0.5 pointer-events-none ${aiEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
                       <div className={`w-5 h-5 rounded-full bg-white transition-transform ${aiEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </div>
                   </button>
@@ -599,13 +598,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
                 {aiEnabled ? (
                   <>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
                       {t.ai?.description || 'Configure natural language meal logging with Qozara Intelligence edge AI or your private model.'}
                     </p>
 
                     {/* Provider Selection */}
                     <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300 block">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
                     {t.ai?.providerLabel || 'Active AI Provider'}
                   </label>
                   <div className="grid grid-cols-1 gap-2">
@@ -637,15 +636,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         onClick={() => handleSaveAiProvider(p.id)}
                         className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-0.5 ${
                           aiProvider === p.id
-                            ? 'bg-emerald-950/40 border-emerald-500/80 text-white'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/80 text-emerald-950 dark:text-white'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                         }`}
                       >
                         <span className="font-bold flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${aiProvider === p.id ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                          <span className={`w-2 h-2 rounded-full ${aiProvider === p.id ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} />
                           {p.title}
                         </span>
-                        <span className="text-[10px] text-slate-400 pl-3.5 leading-tight">{p.desc}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 pl-3.5 leading-tight">{p.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -653,17 +652,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
                 {/* BYOK Section */}
                 {aiProvider === 'byok' && (
-                  <form onSubmit={handleEncryptAndSaveKey} className="space-y-2 pt-2 border-t border-slate-900">
+                  <form onSubmit={handleEncryptAndSaveKey} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-900">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
-                        <Key className="w-3.5 h-3.5 text-emerald-400" />
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Key className="w-3.5 h-3.5 text-emerald-500" />
                         <span>{t.ai?.apiKeyLabel || 'Personal Gemini API Key'}</span>
                       </label>
                       {userSettings?.ai_settings?.ciphertext && (
                         <button
                           type="button"
                           onClick={handleClearApiKey}
-                          className="text-[10px] text-rose-400 hover:underline min-h-[44px] flex items-center"
+                          className="text-[10px] text-rose-500 hover:underline min-h-[44px] flex items-center"
                         >
                           {t.ai?.clearKeyBtn || 'Remove Key'}
                         </button>
@@ -671,8 +670,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     </div>
 
                     {userSettings?.ai_settings?.ciphertext && (
-                      <div className="bg-emerald-950/50 border border-emerald-800/60 rounded-xl p-2 text-[11px] text-emerald-300 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800/60 rounded-xl p-2 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 shrink-0 text-emerald-500" />
                         <span>{t.ai?.keyConfigured || 'Encrypted Personal Key configured'}</span>
                       </div>
                     )}
@@ -683,7 +682,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         value={apiKeyInput}
                         onChange={(e) => setApiKeyInput(e.target.value)}
                         placeholder={t.ai?.apiKeyPlaceholder || 'AIzaSy...'}
-                        className="flex-1 min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="flex-1 min-h-[44px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                       />
                       <button
                         type="submit"
@@ -701,13 +700,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
                 {/* Ollama Section */}
                 {aiProvider === 'ollama' && (
-                  <form onSubmit={handleSaveOllamaSettings} className="space-y-2 pt-2 border-t border-slate-900">
-                    <div className="flex items-center gap-1 text-xs font-semibold text-slate-300">
-                      <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                  <form onSubmit={handleSaveOllamaSettings} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-900">
+                    <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <Cpu className="w-3.5 h-3.5 text-emerald-500" />
                       <span>{t.ai?.providers?.ollama || 'Ollama Configuration'}</span>
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-0.5">
+                      <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
                         {t.ai?.ollamaUrlLabel || 'Ollama Endpoint URL'}
                       </label>
                       <input
@@ -715,11 +714,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         value={ollamaUrl}
                         onChange={(e) => setOllamaUrl(e.target.value)}
                         placeholder={t.ai?.ollamaUrlPlaceholder || 'http://localhost:11434/api'}
-                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full min-h-[44px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-0.5">
+                      <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
                         {t.ai?.ollamaModelLabel || 'Ollama Model Name'}
                       </label>
                       <input
@@ -727,12 +726,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         value={ollamaModel}
                         onChange={(e) => setOllamaModel(e.target.value)}
                         placeholder={t.ai?.ollamaModelPlaceholder || 'llama3.2'}
-                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full min-h-[44px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="w-full min-h-[44px] py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold rounded-xl text-xs transition-all"
+                      className="w-full min-h-[44px] py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-semibold rounded-xl text-xs transition-all border border-slate-300 dark:border-slate-700"
                     >
                       {t.ai?.saveOllamaBtn || 'Save Ollama Settings'}
                     </button>
@@ -740,15 +739,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 )}
                   </>
                 ) : (
-                  <div className="p-3 bg-slate-900/50 border border-slate-800/80 rounded-xl text-center">
-                    <p className="text-xs text-slate-400">
+                  <div className="p-3 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 rounded-xl text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       {t.ai?.aiDisabled || 'AI features are disabled. Quomida is running 100% locally.'}
                     </p>
                   </div>
                 )}
 
                 {aiFeedback && (
-                  <p className="text-[11px] text-emerald-400 font-medium pt-1 border-t border-slate-900">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-1 border-t border-slate-200 dark:border-slate-900">
                     {aiFeedback}
                   </p>
                 )}
@@ -757,7 +756,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
           </div>
 
           {/* SEGMENT 4: Data & Sync */}
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden shadow-sm transition-all">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 overflow-hidden shadow-sm transition-all">
             <button
               type="button"
               id="accordion-header-data-sync"
@@ -765,17 +764,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               aria-expanded={Boolean(openSections['data-sync'])}
               aria-controls="accordion-panel-data-sync"
               onClick={() => toggleSection('data-sync')}
-              className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60">
+                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-700/60">
                   <Cloud className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {t.settings.accordionDataSync || 'Data & Sync'}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {t.settings.accordionDataSyncSubtitle || 'Cloud backup, offline database, and storage'}
                   </p>
                 </div>
@@ -791,29 +790,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               id="accordion-panel-data-sync"
               role="region"
               aria-labelledby="accordion-header-data-sync"
-              className={openSections['data-sync'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
+              className={openSections['data-sync'] ? 'p-4 pt-1 border-t border-slate-200 dark:border-slate-800/60 space-y-4' : 'hidden'}
             >
               {/* BYOS Cloud Storage Card */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                <div className="text-xs text-slate-300 font-semibold flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="text-xs text-slate-700 dark:text-slate-300 font-semibold flex items-center justify-between">
                   <span>Storage Adapter</span>
-                  <span className="text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800/50">
+                  <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/50">
                     {activeProvider && activeProvider.isInitialized() && activeProvider.getStatus() !== 'disconnected'
                       ? activeProvider.name
                       : 'Local Only (No Adapter)'}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   Quomida runs 100% offline in your browser using RxDB IndexedDB. You can connect your personal Google Drive / Sheets account anytime.
                 </p>
-                <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-900 flex justify-between items-center">
+                <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-900 flex justify-between items-center">
                   <span>{t.settings.syncLastSynced.replace('{{time}}', lastSyncedTime || 'Now')}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setIsStorageSettingsOpen(true);
                     }}
-                    className="text-emerald-400 hover:underline text-[11px] font-medium min-h-[44px] flex items-center"
+                    className="text-emerald-600 dark:text-emerald-400 hover:underline text-[11px] font-medium min-h-[44px] flex items-center"
                   >
                     Manage Storage →
                   </button>
@@ -821,21 +820,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               </div>
 
               {/* Food Catalog Updates Check Button */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 text-emerald-400" />
+                    <RefreshCw className="w-4 h-4 text-emerald-500" />
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
                       {t.settings.catalogTitle || 'Food Catalog & Ingredients'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                  <span className="text-[10px] text-slate-600 dark:text-slate-500 font-mono uppercase bg-slate-200 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-800">
                     {downloadStatus === 'complete' && catalogVersion
                       ? `v: ${catalogVersion.substring(0, 8)}`
                       : (SYSTEM_CATALOG_META.catalogVersion ? `v: ${SYSTEM_CATALOG_META.catalogVersion.substring(0, 8)}` : 'v: base')}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   {catalogFeedback || (
                     downloadStatus === 'complete'
                       ? (catalogItemCount
@@ -854,7 +853,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   type="button"
                   onClick={handleCheckCatalogUpdates}
                   disabled={isChecking || !isOnline}
-                  className="w-full min-h-[44px] py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all disabled:opacity-50"
+                  className="w-full min-h-[44px] py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-700 transition-all disabled:opacity-50 shadow-sm"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
                   <span>{isChecking ? (t.settings.checkingCatalog || 'Checking...') : (t.settings.checkCatalogUpdates || 'Check for Catalog Updates')}</span>
@@ -862,21 +861,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               </div>
 
               {/* Offline Food Database */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-white">
-                  <Database className="w-4 h-4 text-emerald-400" />
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
+                  <Database className="w-4 h-4 text-emerald-500" />
                   <span>{(t.settings as any).offlineDbTitle || 'Offline Food Database'}</span>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
                   {(t.settings as any).offlineDbDescription || 'Quomida supports downloading the complete food database directly to your device for instant offline searches without using cellular data.'}
                 </p>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800/50">
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-slate-300">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {(t.settings as any).offlineDbAutoDownloadTitle || 'Auto-download updates'}
                     </span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                       {(t.settings as any).offlineDbAutoDownloadDesc || 'Automatically download database updates in background when under 10MB.'}
                     </span>
                   </div>
@@ -893,8 +892,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         setAutoDownloadEnabled(next);
                       }
                     }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                      autoDownloadEnabled ? 'bg-emerald-500' : 'bg-slate-700'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-100 dark:focus:ring-offset-slate-900 ${
+                      autoDownloadEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
                   >
                     <span
@@ -906,19 +905,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800/50">
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-slate-300">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {(t.settings as any).offlineDbStatus || 'Status'}
                     </span>
-                    <span className="text-[11px] font-mono mt-0.5 text-emerald-400">
+                    <span className="text-[11px] font-mono mt-0.5 text-emerald-600 dark:text-emerald-400">
                       {downloadStatus === 'idle' && ((t.settings as any).offlineDbNotDownloaded || 'Not Downloaded')}
                       {downloadStatus === 'fetching' && (((t.settings as any).offlineDbDownloading || 'Downloading {{progress}}%').replace('{{progress}}', String(downloadProgress)))}
                       {downloadStatus === 'decompressing_and_writing' && ((t.settings as any).offlineDbInstalling || 'Installing...')}
                       {downloadStatus === 'complete' && ((t.settings as any).offlineDbInstalled || 'Available Offline')}
                       {downloadStatus === 'error' && ((t.settings as any).offlineDbFailed || 'Download Failed')}
                     </span>
-                    {downloadError && <span className="text-[10px] text-rose-400 mt-1 max-w-[150px] truncate" title={downloadError}>{downloadError}</span>}
+                    {downloadError && <span className="text-[10px] text-rose-500 dark:text-rose-400 mt-1 max-w-[150px] truncate" title={downloadError}>{downloadError}</span>}
                   </div>
 
                   {downloadStatus === 'idle' || downloadStatus === 'error' ? (
@@ -929,8 +928,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       onClick={() => setShowConfirmDownload(true)}
                       className={`px-3 py-1.5 min-h-[44px] text-xs font-bold rounded-lg shadow transition-all flex items-center gap-1.5 ${
                         !isOnline
-                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                          : 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95'
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                       }`}
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -938,7 +937,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     </button>
                   ) : downloadStatus === 'complete' ? (
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1.5 min-h-[44px] text-xs font-bold bg-slate-800 text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-900/50">
+                      <span className="px-2.5 py-1.5 min-h-[44px] text-xs font-bold bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-300 dark:border-emerald-900/50">
                         <CheckCircle className="w-3.5 h-3.5" />
                         {(t.settings as any).offlineDbInstalled || 'Installed'}
                       </span>
@@ -947,14 +946,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                         onClick={() => setShowConfirmDelete(true)}
                         disabled={isDeleting}
                         aria-label={(t.settings as any).offlineDbDeleteBtn || 'Delete Database'}
-                        className="px-2.5 py-1.5 min-h-[44px] text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 border border-rose-900/40 rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-2.5 py-1.5 min-h-[44px] text-xs font-semibold bg-rose-100 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 hover:text-rose-800 dark:hover:text-rose-200 border border-rose-300 dark:border-rose-900/40 rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         {isDeleting ? ((t.settings as any).offlineDbDeleting || 'Removing...') : ((t.settings as any).offlineDbDeleteBtn || 'Delete')}
                       </button>
                     </div>
                   ) : (
-                    <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-emerald-500 transition-all duration-300" 
                         style={{ width: `${downloadProgress}%` }}
@@ -967,7 +966,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
           </div>
 
           {/* SEGMENT 5: About & Legal */}
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden shadow-sm transition-all">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 overflow-hidden shadow-sm transition-all">
             <button
               type="button"
               id="accordion-header-about-legal"
@@ -975,17 +974,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               aria-expanded={Boolean(openSections['about-legal'])}
               aria-controls="accordion-panel-about-legal"
               onClick={() => toggleSection('about-legal')}
-              className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left min-h-[44px]"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60">
+                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-700/60">
                   <Scale className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {t.settings.accordionAboutLegal || 'About & Legal'}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {t.settings.accordionAboutLegalSubtitle || 'Open-source license, terms, privacy, and support'}
                   </p>
                 </div>
@@ -1001,57 +1000,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
               id="accordion-panel-about-legal"
               role="region"
               aria-labelledby="accordion-header-about-legal"
-              className={openSections['about-legal'] ? 'p-4 pt-1 border-t border-slate-800/60 space-y-4' : 'hidden'}
+              className={openSections['about-legal'] ? 'p-4 pt-1 border-t border-slate-200 dark:border-slate-800/60 space-y-4' : 'hidden'}
             >
               {/* Support & Assistance */}
               <div className="space-y-2">
                 <a
                   href={`mailto:${supportEmail}`}
                   id="link-support-help"
-                  className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all group min-h-[44px]"
+                  className="flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group min-h-[44px]"
                   aria-label={(t.settings as any).supportHelp || 'Get Help & Support'}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-slate-900 group-hover:bg-emerald-950/60 text-emerald-400 border border-slate-800 transition-colors">
+                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-colors">
                       <LifeBuoy className="w-4 h-4" />
                     </div>
                     <div className="text-left">
                       <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">
                         {(t.settings as any).supportHelp || 'Get Help & Support'}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                         {supportEmail}
                       </div>
                     </div>
                   </div>
-                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                  <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                 </a>
 
                 <a
                   href={`mailto:${legalEmail}`}
                   id="link-support-legal"
-                  className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all group min-h-[44px]"
+                  className="flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group min-h-[44px]"
                   aria-label={(t.settings as any).supportLegal || 'Legal & Privacy Inquiries'}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-slate-900 group-hover:bg-emerald-950/60 text-emerald-400 border border-slate-800 transition-colors">
+                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-colors">
                       <Shield className="w-4 h-4" />
                     </div>
                     <div className="text-left">
                       <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">
                         {(t.settings as any).supportLegal || 'Legal & Privacy Inquiries'}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                         {legalEmail}
                       </div>
                     </div>
                   </div>
-                  <Mail className="w-4 h-4 text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                  <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                 </a>
               </div>
 
               {/* Legal Links */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5">
+              <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
                 <a
                   href={tosUrl}
                   target="_blank"
@@ -1063,10 +1062,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     {(t.settings as any).termsOfService || 'Terms of Service'}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-emerald-500" />
                 </a>
 
-                <div className="border-t border-slate-900" />
+                <div className="border-t border-slate-100 dark:border-slate-900" />
 
                 <a
                   href={privacyUrl}
@@ -1078,14 +1077,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   <div className="flex items-center gap-2 font-medium">
                     <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     <span>{(t.settings as any).privacyPolicy || 'Privacy Policy'}</span>
-                    <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono">
+                    <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/50 px-1.5 py-0.5 rounded font-mono">
                       {(t.settings as any).googleComplianceBadge || 'Google Limited Use Compliant'}
                     </span>
                   </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-emerald-500" />
                 </a>
 
-                <div className="border-t border-slate-900" />
+                <div className="border-t border-slate-100 dark:border-slate-900" />
 
                 <a
                   href={licenseUrl}
@@ -1098,21 +1097,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     <Scale className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
                     {(t.settings as any).license || 'Open Source License (Apache 2.0)'}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-500" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-emerald-500" />
                 </a>
               </div>
 
               {/* Attribution & Version Info */}
-              <div className="pt-2 text-center flex flex-col gap-1 text-slate-400">
-                <div className="text-xs font-medium text-slate-300">
+              <div className="pt-2 text-center flex flex-col gap-1 text-slate-600 dark:text-slate-400">
+                <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
                   <a
                     href="https://qozara.org"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-emerald-400 transition-colors inline-flex items-center gap-1 min-h-[44px] px-2 py-1 justify-center"
+                    className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1 min-h-[44px] px-2 py-1 justify-center"
                   >
                     <span>{(t.settings as any).aboutNotice || 'Quomida is a research project by Qozara Lab'}</span>
-                    <ExternalLink className="w-3 h-3 text-slate-500" />
+                    <ExternalLink className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                   </a>
                 </div>
                 <div className="text-[11px] text-slate-500">
@@ -1120,8 +1119,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 </div>
 
                 {/* App Version & Manual Update Check */}
-                <div className="mt-2 pt-2.5 border-t border-slate-800/60 flex flex-col items-center gap-2">
-                  <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                <div className="mt-2 pt-2.5 border-t border-slate-200 dark:border-slate-800/60 flex flex-col items-center gap-2">
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 font-mono flex items-center gap-2">
                     <span>
                       {((t.settings as any).appVersionLabel || 'Version {{version}}').replace(
                         '{{version}}',
@@ -1129,18 +1128,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       )}
                     </span>
                     {appUpdateCheckResult === 'up_to_date' && !isAppUpdateReady && (
-                      <span className="text-emerald-400 font-sans font-medium flex items-center gap-1">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" />
                         {(t.settings as any).appUpToDate || 'Quomida is up to date'}
                       </span>
                     )}
                     {isAppUpdateReady && (
-                      <span className="text-emerald-400 font-sans font-bold flex items-center gap-1">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-sans font-bold flex items-center gap-1">
                         {(t.settings as any).appUpdateAvailable || 'New version available!'}
                       </span>
                     )}
                     {appUpdateCheckResult === 'error' && !isAppUpdateReady && (
-                      <span className="text-rose-400 font-sans">
+                      <span className="text-rose-500 dark:text-rose-400 font-sans">
                         {(t.settings as any).appUpdateCheckError || 'Could not check for app updates'}
                       </span>
                     )}
@@ -1165,7 +1164,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       data-testid="btn-check-app-update"
                       onClick={() => handleCheckAppUpdate()}
                       disabled={isCheckingAppUpdate || !isOnline}
-                      className="min-h-[44px] px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-semibold rounded-xl text-xs inline-flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                      className="min-h-[44px] px-3.5 py-1.5 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 font-semibold rounded-xl text-xs inline-flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 shadow-sm"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isCheckingAppUpdate ? 'animate-spin' : ''}`} />
                       <span>
@@ -1186,27 +1185,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
       {/* Confirmation Dialog: Download Offline Database */}
       {showConfirmDownload && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-download-title"
-            className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
-            <div className="p-3 bg-emerald-950/60 text-emerald-400 rounded-full mb-3 border border-emerald-800/50">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full mb-3 border border-emerald-300 dark:border-emerald-800/50">
               <Wifi className="w-6 h-6" />
             </div>
-            <h3 id="confirm-download-title" className="text-base font-bold text-white mb-2">
+            <h3 id="confirm-download-title" className="text-base font-bold text-slate-900 dark:text-white mb-2">
               {(t.settings as any).offlineDbConfirmDownloadTitle || 'Download Offline Database?'}
             </h3>
-            <p className="text-xs text-slate-300 max-w-xs mb-6 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mb-6 leading-relaxed">
               {((t.settings as any).offlineDbConfirmDownloadDesc || 'You are about to download the complete offline food database (~{{size}}MB). We strongly recommend connecting to Wi-Fi to preserve mobile cellular data.').replace('{{size}}', approximateSizeMb)}
             </p>
             <div className="flex gap-3 w-full">
               <button
                 type="button"
                 onClick={() => setShowConfirmDownload(false)}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
               >
                 {(t.settings as any).offlineDbCancel || 'Cancel'}
               </button>
@@ -1231,27 +1230,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
       {/* Confirmation Dialog: Delete Offline Database */}
       {showConfirmDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
-            className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150"
           >
-            <div className="p-3 bg-rose-950/60 text-rose-400 rounded-full mb-3 border border-rose-800/50">
+            <div className="p-3 bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-full mb-3 border border-rose-300 dark:border-rose-800/50">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 id="confirm-delete-title" className="text-base font-bold text-white mb-2">
+            <h3 id="confirm-delete-title" className="text-base font-bold text-slate-900 dark:text-white mb-2">
               {(t.settings as any).offlineDbConfirmDeleteTitle || 'Delete Offline Database?'}
             </h3>
-            <p className="text-xs text-slate-300 max-w-xs mb-6 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mb-6 leading-relaxed">
               {((t.settings as any).offlineDbConfirmDeleteDesc || 'This will remove the downloaded database (~{{size}}MB) from local storage to free up disk space and revert to the lightweight built-in database.').replace('{{size}}', approximateSizeMb)}
             </p>
             <div className="flex gap-3 w-full">
               <button
                 type="button"
                 onClick={() => setShowConfirmDelete(false)}
-                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                className="flex-1 py-2.5 px-4 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
               >
                 {(t.settings as any).offlineDbCancel || 'Cancel'}
               </button>

@@ -78,41 +78,41 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
     <div
       className={`p-4 rounded-2xl border transition-all ${
         isError
-          ? 'bg-amber-950/20 border-amber-600/80 ring-1 ring-amber-500/50'
+          ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-500/80 ring-1 ring-amber-500/50'
           : isActive
-          ? 'bg-slate-800/80 border-emerald-500/40 ring-1 ring-emerald-500/20'
-          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700/80'
+          ? 'bg-emerald-50/50 dark:bg-slate-800/80 border-emerald-500/40 ring-1 ring-emerald-500/20'
+          : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700/80'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="p-2.5 rounded-xl bg-slate-800 border border-slate-700/50 flex-shrink-0">
+          <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 flex-shrink-0">
             {getIcon()}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm font-bold text-white tracking-wide truncate">{provider.name}</h4>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide truncate">{provider.name}</h4>
               {getStatusBadge()}
             </div>
 
             {isActive && accountInfo && (
-              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">{accountInfo}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-mono mt-0.5 truncate">{accountInfo}</p>
             )}
 
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">{provider.description}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">{provider.description}</p>
           </div>
         </div>
       </div>
 
       {/* Action footer */}
-      <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
         {isActive ? (
           <>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => onDisconnectClick(provider.id, provider.name)}
-                className="text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+                className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors"
               >
                 {t.sync?.panel?.disconnect || 'Disconnect'}
               </button>
@@ -123,7 +123,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                     links.forEach(link => window.open(link, '_blank'));
                   }
                 }}
-                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 cursor-pointer transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer transition-colors"
               >
                 <span>{t.sync?.panel?.configure || 'Configure'}</span>
                 <ExternalLink className="w-3 h-3" />
@@ -146,7 +146,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             <button
               type="button"
               onClick={() => onConnect(provider.id)}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95"
+              className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95"
             >
               {t.sync?.panel?.connect || 'Connect'}
             </button>
