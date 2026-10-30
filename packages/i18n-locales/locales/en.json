@@ -330,7 +330,6 @@
     "searchPlaceholder": "Search catalog...",
     "filterRecent": "Recently used",
     "ingredientMacrosRequired": "Please fill in calories, protein, carbs and fats (use 0 where none).",
-    "ingredientMacrosAllZero": "Nutritional values cannot all be zero. Enter the values per 100g.",
     "showAllRecent": "Show all recently used",
     "filterAll": "All",
     "filterIngredients": "Ingredients",

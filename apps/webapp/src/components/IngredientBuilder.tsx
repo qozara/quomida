@@ -169,14 +169,6 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
 
     const [calNum, pNum, cNum, fNum] = macroInputs.map((v) => parseFloat(v));
 
-    if (calNum === 0 && pNum === 0 && cNum === 0 && fNum === 0) {
-      setErrorMsg(
-        dict.catalog?.ingredientMacrosAllZero ||
-          'Nutritional values cannot all be zero. Enter the values per 100g.'
-      );
-      return;
-    }
-
     const validation = validateMacroAlignment(calNum, pNum, cNum, fNum);
     if (!validation.valid) {
       setErrorMsg(validation.reason || 'Invalid macro values');

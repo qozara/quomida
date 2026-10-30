@@ -63,15 +63,20 @@ describe('IngredientBuilder validations (diary and catalog modes)', () => {
     expect(onSaveAndLog).not.toHaveBeenCalled();
   });
 
-  it('blocks saving when all nutritional values are zero', async () => {
+  it('allows saving zero-calorie foods (all values explicitly 0)', async () => {
     renderDiary();
     fill({ cal: '0', p: '0', c: '0', f: '0' });
     fireEvent.click(screen.getByTestId('btn-save-catalog-ingredient'));
 
     await waitFor(() => {
-      expect(screen.getByText(en.catalog.ingredientMacrosAllZero)).toBeDefined();
+      expect(onSave).toHaveBeenCalled();
     });
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      calories_100g: 0,
+      protein_100g: 0,
+      carbs_100g: 0,
+      fats_100g: 0
+    });
   });
 
   it('blocks saving when total macro weight exceeds 100g', async () => {
@@ -101,7 +106,7 @@ describe('IngredientBuilder validations (diary and catalog modes)', () => {
     });
   });
 
-  it('applies the same validations in catalog mode', async () => {
+  it('applies the same required-field validation in catalog mode', async () => {
     render(
       <IngredientBuilder
         mode="catalog"
@@ -110,12 +115,11 @@ describe('IngredientBuilder validations (diary and catalog modes)', () => {
         onSave={onSave}
       />
     );
-    fill({ cal: '0', p: '0', c: '0', f: '0' });
+    fill({ cal: '10', p: '', c: '', f: '' });
     fireEvent.click(screen.getByTestId('btn-save-ingredient'));
 
-    await waitFor(() => {
-      expect(screen.getByText(en.catalog.ingredientMacrosAllZero)).toBeDefined();
-    });
+    // Native form validation (required fields) blocks the submit in catalog mode
+    await new Promise((r) => setTimeout(r, 20));
     expect(onSave).not.toHaveBeenCalled();
   });
 });
