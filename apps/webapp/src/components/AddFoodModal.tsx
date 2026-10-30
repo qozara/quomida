@@ -68,7 +68,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
       className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col overflow-y-auto animate-slide-in-right"
     >
       {/* Modern Sticky Navigation Header */}
-      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
+      <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shrink-0">
         <button
           id="btn-close-add-food"
           data-testid="btn-close-add-food"

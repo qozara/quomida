@@ -132,8 +132,8 @@ export default defineConfig(({ mode }) => {
         name: 'Quomida',
         short_name: 'Quomida',
         description: 'Privacy-First Local Calorie & Macro Tracker',
-        theme_color: '#6d4aff',
-        background_color: '#0f172a',
+        theme_color: '#020617',
+        background_color: '#020617',
         display: 'standalone',
         icons: [
           {

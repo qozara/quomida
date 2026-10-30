@@ -191,7 +191,7 @@ export const DashboardContent: React.FC = () => {
       {activeTab === 'diary' ? (
         <DashboardDateBar />
       ) : (
-        <div className="sticky top-0 z-30 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/40">
+        <div className="sticky top-0 z-30 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/40 pt-[env(safe-area-inset-top)]">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
             <div className="w-10 flex items-center justify-start shrink-0">
               <HeaderAvatarButton />

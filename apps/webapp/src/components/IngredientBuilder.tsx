@@ -216,7 +216,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
       className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right slide-in-from-right overflow-y-auto"
     >
       {/* Top Sticky Navigation Bar with Back Button */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md shrink-0">
         <button
           id="btn-close-ingredient-builder"
           data-testid="btn-back-ingredient-builder"

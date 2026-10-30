@@ -259,6 +259,45 @@ describe('Expanded Theme Options (System Default, Light, Dark)', () => {
 
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
+
+    it('synchronizes meta[name="theme-color"] with active theme (#020617 for dark, #ffffff for light)', async () => {
+      let meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        meta.setAttribute('content', '#020617');
+        document.head.appendChild(meta);
+      }
+
+      let triggerSetTheme: ((t: 'dark' | 'light' | 'system') => void) | null = null;
+      const Consumer = () => {
+        const { theme, setTheme } = useApp();
+        triggerSetTheme = setTheme;
+        return <div data-testid="theme-val">{theme}</div>;
+      };
+
+      render(
+        <GoogleOAuthProvider clientId="dummy_test_id">
+          <AppProvider>
+            <Consumer />
+          </AppProvider>
+        </GoogleOAuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('theme-val')).toBeDefined();
+      });
+
+      await act(async () => {
+        triggerSetTheme?.('light');
+      });
+      expect(meta.getAttribute('content')).toBe('#ffffff');
+
+      await act(async () => {
+        triggerSetTheme?.('dark');
+      });
+      expect(meta.getAttribute('content')).toBe('#020617');
+    });
   });
 
   describe('4. Light Mode CSS & Contrast Rules Verification', () => {

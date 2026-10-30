@@ -689,6 +689,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         document.documentElement.classList.remove('dark');
       }
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) {
+        themeMeta.setAttribute('content', effective === 'dark' ? '#020617' : '#ffffff');
+      }
     };
 
     applyTheme();

@@ -357,7 +357,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-y-auto animate-slide-in-left"
     >
       {/* Modern Sticky Navigation Header */}
-      <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 py-3 flex items-center justify-between shrink-0">
+      <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shrink-0">
         <button
           id="btn-close-settings"
           data-testid="btn-back-settings"
@@ -408,9 +408,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
           </div>
         ) : (
           <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/80 border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-xl flex items-center gap-4 relative overflow-hidden">
-            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-2.5 shadow-md shrink-0">
-              <img src="/favicon.svg" alt="Quomida" className="w-9 h-9 object-contain" />
-            </div>
+            <img
+              src="/favicon.svg"
+              alt="Quomida"
+              className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-md shrink-0"
+            />
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Quomida</h2>

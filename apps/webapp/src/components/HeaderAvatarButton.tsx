@@ -41,9 +41,11 @@ export const HeaderAvatarButton: React.FC = () => {
           <Cloud className="w-4 h-4" />
         </div>
       ) : (
-        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-900 border border-emerald-500/30 flex items-center justify-center p-1 shadow-md transition-colors">
-          <img src="/favicon.svg" alt="Quomida" className="w-5 h-5 object-contain" />
-        </div>
+        <img
+          src="/favicon.svg"
+          alt="Quomida"
+          className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500/50 shadow-md transition-colors"
+        />
       )}
     </button>
   );
