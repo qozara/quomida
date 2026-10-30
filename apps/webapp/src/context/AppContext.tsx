@@ -691,14 +691,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       document.documentElement.style.colorScheme = effective;
       const color = effective === 'dark' ? '#020617' : '#ffffff';
-      // Replace the node (not just the attribute) so iOS Safari re-reads it reliably
-      const oldMeta = document.querySelector('meta[name="theme-color"]');
-      const newMeta = document.createElement('meta');
-      newMeta.setAttribute('name', 'theme-color');
-      newMeta.setAttribute('content', color);
-      if (oldMeta) {
-        oldMeta.replaceWith(newMeta);
+      
+      // Update root and body background so iOS Safari / WebKit status bar sampling immediately picks up the color
+      document.documentElement.style.backgroundColor = color;
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.backgroundColor = color;
+      }
+
+      // Update theme-color meta tags
+      const metas = document.querySelectorAll('meta[name="theme-color"]');
+      if (metas.length > 0) {
+        metas.forEach((meta) => meta.setAttribute('content', color));
       } else {
+        const newMeta = document.createElement('meta');
+        newMeta.setAttribute('name', 'theme-color');
+        newMeta.setAttribute('content', color);
         document.head.appendChild(newMeta);
       }
     };
