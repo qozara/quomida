@@ -155,12 +155,19 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
   const handlePerformSave = async (e?: React.FormEvent, andLog = false) => {
     if (e) e.preventDefault();
     setErrorMsg(null);
-    if (!name.trim() || !calories.trim()) return;
+    if (!name.trim()) return;
 
-    const calNum = parseFloat(calories) || 0;
-    const pNum = parseFloat(protein) || 0;
-    const cNum = parseFloat(carbs) || 0;
-    const fNum = parseFloat(fats) || 0;
+    const macroInputs = [calories, protein, carbs, fats];
+    const allFilled = macroInputs.every((v) => v.trim() !== '' && Number.isFinite(parseFloat(v)));
+    if (!allFilled) {
+      setErrorMsg(
+        dict.catalog?.ingredientMacrosRequired ||
+          'Please fill in calories, protein, carbs and fats (use 0 where none).'
+      );
+      return;
+    }
+
+    const [calNum, pNum, cNum, fNum] = macroInputs.map((v) => parseFloat(v));
 
     const validation = validateMacroAlignment(calNum, pNum, cNum, fNum);
     if (!validation.valid) {
@@ -351,6 +358,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
                   value={calories}
                   onChange={(e) => setCalories(e.target.value)}
                   required
+                  min="0"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 text-center font-bold min-h-[44px]"
                 />
               </div>
@@ -362,6 +370,8 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
                   step="any"
                   value={protein}
                   onChange={(e) => setProtein(e.target.value)}
+                  required
+                  min="0"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 text-center font-bold min-h-[44px]"
                 />
               </div>
@@ -373,6 +383,8 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
                   step="any"
                   value={carbs}
                   onChange={(e) => setCarbs(e.target.value)}
+                  required
+                  min="0"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 text-center font-bold min-h-[44px]"
                 />
               </div>
@@ -384,6 +396,8 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
                   step="any"
                   value={fats}
                   onChange={(e) => setFats(e.target.value)}
+                  required
+                  min="0"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 text-center font-bold min-h-[44px]"
                 />
               </div>

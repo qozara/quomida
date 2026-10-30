@@ -9,14 +9,17 @@ import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
 
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
+import { useRecentFoods } from '../hooks/useRecentFoods.js';
 
 interface FoodLoggerProps {
   onSelectIngredient: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
   onClose?: () => void;
   targetMealType?: MealType;
+  /** When true, recently used foods ignore the target meal type filter. */
+  showAllRecent?: boolean;
 }
 
-export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType }) => {
+export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType, showAllRecent = false }) => {
   const {
     ingredients = [],
     recipes = [],
@@ -33,9 +36,12 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
     logBatchFoodItems
   } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
+  const { recentItems } = useRecentFoods(showAllRecent ? undefined : targetMealType);
+  const isRecentMode = searchQuery.trim().length < 2;
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [filteredIngredients, setFilteredIngredients] = useState<(FoodItem | BaseIngredient)[]>([]);
+  const listItems = isRecentMode ? recentItems : filteredIngredients;
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
@@ -302,9 +308,19 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         )}
 
         {/* Real-time Local Search Dropdown + "Find More / Compose Dish" Footer */}
-        {searchQuery.trim().length >= 2 && !isParsing && (
+        {!isParsing && (
           <div className="mt-2 bg-slate-900/95 border border-slate-800 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/60 shadow-2xl z-20" aria-live="polite">
-            {filteredIngredients.length === 0 && !isSearching && searchQuery.trim().length >= 3 && (
+            {isRecentMode && (
+              <div className="px-3.5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {t.catalog?.filterRecent || 'Recently used'}
+              </div>
+            )}
+            {isRecentMode && recentItems.length === 0 && (
+              <div className="p-4 text-center text-xs text-slate-500">
+                {t.catalog?.noRecentFoods || 'No recently used foods or recipes in the last 60 days'}
+              </div>
+            )}
+            {!isRecentMode && filteredIngredients.length === 0 && !isSearching && searchQuery.trim().length >= 3 && (
               <div className="p-4 text-center text-xs space-y-2.5">
                 {!isFullCatalog ? (
                   <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center gap-2">
@@ -328,12 +344,12 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
               </div>
             )}
 
-            {filteredIngredients.map((ing, idx) => (
+            {listItems.map((ing, idx) => (
               <button
                 key={`${ing.id}-${idx}`}
                 type="button"
                 onClick={() => {
-                  onSelectIngredient(ing, 'meal_lunch');
+                  onSelectIngredient(ing, targetMealType || 'meal_lunch');
                 }}
                 className="w-full p-3.5 text-left hover:bg-slate-800/80 transition-colors flex items-center justify-between group"
               >
@@ -371,7 +387,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
               </button>
             ))}
 
-            {isSearching && (
+            {!isRecentMode && isSearching && (
               <div className="p-3 text-center text-xs text-slate-500 flex justify-center items-center gap-2">
                 <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                 {t.search.searchingLocal}
@@ -379,7 +395,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
             )}
 
             {/* At the bottom of the dropdown list, ALWAYS render the "✨ Find more / Compose dish" action button */}
-            <button
+            {!isRecentMode && (<button
               type="button"
               id="btn-find-more-ai"
               onClick={handleAiParse}
@@ -396,7 +412,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
                   </div>
                 </div>
               </div>
-            </button>
+            </button>)}
           </div>
         )}
       </form>

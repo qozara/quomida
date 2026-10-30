@@ -329,6 +329,8 @@
     "combineFoods": "Combine Foods (Recipe)",
     "searchPlaceholder": "Search catalog...",
     "filterRecent": "Recently used",
+    "ingredientMacrosRequired": "Please fill in calories, protein, carbs and fats (use 0 where none).",
+    "showAllRecent": "Show all recently used",
     "filterAll": "All",
     "filterIngredients": "Ingredients",
     "filterRecipes": "Recipes",

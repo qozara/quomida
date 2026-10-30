@@ -30,6 +30,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
 }) => {
   const { t, selectedDate, setSelectedDate } = useApp();
   const [currentMeal, setCurrentMeal] = useState<MealType>(targetMealType);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   useEffect(() => {
     setCurrentMeal(targetMealType);
@@ -120,9 +121,32 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
           </div>
         </div>
 
+        {/* Toggle: ignore meal type when listing recently used foods */}
+        <div className="flex items-center justify-between gap-3 min-h-[44px]">
+          <span id="show-all-recent-label" className="text-sm font-medium text-slate-300">
+            {t.catalog?.showAllRecent || 'Show all recently used'}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showAllRecent}
+            aria-labelledby="show-all-recent-label"
+            onClick={() => setShowAllRecent((v) => !v)}
+            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors min-w-[44px] min-h-[28px] ${
+              showAllRecent ? 'bg-emerald-500' : 'bg-slate-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                showAllRecent ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Embedded Food Logger / Search Bar & AI Natural Parser */}
         <div className="pt-2">
-          <FoodLogger onSelectIngredient={handleSelect} onClose={onClose} targetMealType={currentMeal} />
+          <FoodLogger onSelectIngredient={handleSelect} onClose={onClose} targetMealType={currentMeal} showAllRecent={showAllRecent} />
         </div>
       </div>
     </div>
