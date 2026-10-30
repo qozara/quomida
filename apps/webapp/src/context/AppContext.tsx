@@ -689,9 +689,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         document.documentElement.classList.remove('dark');
       }
-      const themeMeta = document.querySelector('meta[name="theme-color"]');
-      if (themeMeta) {
-        themeMeta.setAttribute('content', effective === 'dark' ? '#020617' : '#ffffff');
+      document.documentElement.style.colorScheme = effective;
+      const color = effective === 'dark' ? '#020617' : '#ffffff';
+      // Replace the node (not just the attribute) so iOS Safari re-reads it reliably
+      const oldMeta = document.querySelector('meta[name="theme-color"]');
+      const newMeta = document.createElement('meta');
+      newMeta.setAttribute('name', 'theme-color');
+      newMeta.setAttribute('content', color);
+      if (oldMeta) {
+        oldMeta.replaceWith(newMeta);
+      } else {
+        document.head.appendChild(newMeta);
       }
     };
 

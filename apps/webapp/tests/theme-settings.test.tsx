@@ -291,12 +291,12 @@ describe('Expanded Theme Options (System Default, Light, Dark)', () => {
       await act(async () => {
         triggerSetTheme?.('light');
       });
-      expect(meta.getAttribute('content')).toBe('#ffffff');
+      expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#ffffff');
 
       await act(async () => {
         triggerSetTheme?.('dark');
       });
-      expect(meta.getAttribute('content')).toBe('#020617');
+      expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#020617');
     });
   });
 
