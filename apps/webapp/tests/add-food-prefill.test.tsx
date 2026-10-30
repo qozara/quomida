@@ -124,7 +124,7 @@ describe('AddFoodModal - Pre-filled Recently Used Foods by Meal Type', () => {
     expect(screen.getByText(/Add Food to Breakfast/i)).toBeDefined();
 
     // The pane shows "Recently used"
-    expect(screen.getByText(/Recently used/i)).toBeDefined();
+    expect(screen.getByText('Recently used')).toBeDefined();
 
     // Breakfast food is displayed
     expect(screen.getByText('Protein Oatmeal Pancakes')).toBeDefined();
@@ -215,5 +215,43 @@ describe('AddFoodModal - Pre-filled Recently Used Foods by Meal Type', () => {
     );
 
     expect(screen.getByText(dictionaries.en.catalog.noRecentFoods)).toBeDefined();
+  });
+
+  it('renders the "Show all recently used" toggle below meal pills, unchecked by default', () => {
+    render(
+      <AddFoodModal
+        isOpen={true}
+        targetMealType="meal_breakfast"
+        onClose={onCloseMock}
+        onSelectIngredient={onSelectIngredientMock}
+      />
+    );
+
+    const toggle = screen.getByRole('switch', { name: 'Show all recently used' });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('ignores the meal type filter when the toggle is enabled and restores it when disabled', () => {
+    render(
+      <AddFoodModal
+        isOpen={true}
+        targetMealType="meal_breakfast"
+        onClose={onCloseMock}
+        onSelectIngredient={onSelectIngredientMock}
+      />
+    );
+
+    expect(screen.queryByText('Roasted Turkey Breast')).toBeNull();
+
+    const toggle = screen.getByRole('switch', { name: 'Show all recently used' });
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText('Roasted Turkey Breast')).toBeDefined();
+    expect(screen.getByText('Protein Oatmeal Pancakes')).toBeDefined();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText('Roasted Turkey Breast')).toBeNull();
+    expect(screen.getByText('Protein Oatmeal Pancakes')).toBeDefined();
   });
 });

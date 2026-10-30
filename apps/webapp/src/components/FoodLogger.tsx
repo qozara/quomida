@@ -15,9 +15,11 @@ interface FoodLoggerProps {
   onSelectIngredient: (ingredient: FoodItem | BaseIngredient, mealType: MealType) => void;
   onClose?: () => void;
   targetMealType?: MealType;
+  /** When true, recently used foods ignore the target meal type filter. */
+  showAllRecent?: boolean;
 }
 
-export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType }) => {
+export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onClose, targetMealType, showAllRecent = false }) => {
   const {
     ingredients = [],
     recipes = [],
@@ -34,7 +36,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
     logBatchFoodItems
   } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
-  const { recentItems } = useRecentFoods(targetMealType);
+  const { recentItems } = useRecentFoods(showAllRecent ? undefined : targetMealType);
   const isRecentMode = searchQuery.trim().length < 2;
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
