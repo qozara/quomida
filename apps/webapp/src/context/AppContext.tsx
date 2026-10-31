@@ -689,6 +689,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         document.documentElement.classList.remove('dark');
       }
+      document.documentElement.style.colorScheme = effective;
+      const color = effective === 'dark' ? '#020617' : '#ffffff';
+      
+      // Update root and body background so iOS Safari / WebKit status bar sampling immediately picks up the color
+      document.documentElement.style.backgroundColor = color;
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.backgroundColor = color;
+      }
+
+      // Update theme-color meta tags
+      const metas = document.querySelectorAll('meta[name="theme-color"]');
+      if (metas.length > 0) {
+        metas.forEach((meta) => meta.setAttribute('content', color));
+      } else {
+        const newMeta = document.createElement('meta');
+        newMeta.setAttribute('name', 'theme-color');
+        newMeta.setAttribute('content', color);
+        document.head.appendChild(newMeta);
+      }
     };
 
     applyTheme();

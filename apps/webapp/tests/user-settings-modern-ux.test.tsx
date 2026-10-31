@@ -81,6 +81,11 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
       const img = avatarBtn.querySelector('img');
       expect(img).not.toBeNull();
       expect(img?.getAttribute('src')).toBe('/favicon.svg');
+      expect(img?.className).toContain('w-8');
+      expect(img?.className).toContain('h-8');
+      expect(img?.className).toContain('rounded-full');
+      expect(img?.className).toContain('object-cover');
+      expect(avatarBtn.querySelector('div')).toBeNull();
     });
 
     it('renders Google profile picture when user is connected with profile picture', () => {
@@ -243,6 +248,12 @@ describe('Modern User Settings & Home Avatar Action Specifications', () => {
       // Top hero displays app brand
       expect(screen.getByText('Quomida')).toBeDefined();
       expect(screen.getByText('Local-first')).toBeDefined();
+      const heroImg = screen.getByAltText('Quomida');
+      expect(heroImg.getAttribute('src')).toBe('/favicon.svg');
+      expect(heroImg.className).toContain('w-14');
+      expect(heroImg.className).toContain('h-14');
+      expect(heroImg.className).toContain('rounded-2xl');
+      expect(heroImg.className).toContain('object-cover');
     });
   });
 });

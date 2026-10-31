@@ -125,6 +125,16 @@ body {
   color-scheme: light dark;
 }
 
+/* Canvas colour painted behind the iOS status bar / Dynamic Island */
+html, body {
+  background-color: #020617;
+  color-scheme: dark;
+}
+html:not(.dark), html:not(.dark) body {
+  background-color: #ffffff;
+  color-scheme: light;
+}
+
 /* ==========================================================================
    LIGHT THEME (Active when .dark class is NOT present on <html>)
    ========================================================================== */
