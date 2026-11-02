@@ -402,6 +402,15 @@ export class LocalDBService {
     };
     await this.db!.base_ingredients.upsert(newFood);
 
+    // If updating an existing food, remove old custom portions for this food first so removed portions don't persist
+    if (foodInput.id) {
+      const existingPortions = await this.db!.portions.find({ selector: { base_food_id: id } }).exec();
+      for (const p of existingPortions) {
+        const patched = await p.patch({ updatedAt: Date.now() });
+        await patched.remove();
+      }
+    }
+
     if (portions && portions.length > 0) {
       const now = Date.now();
       const portionsToUpsert = portions.map((p, i) => ({
@@ -441,6 +450,15 @@ export class LocalDBService {
       updatedAt: Date.now()
     };
     await this.db!.recipes.upsert(newRecipe);
+
+    // If updating an existing recipe, remove old custom portions for this recipe first
+    if (recipeInput.id) {
+      const existingPortions = await this.db!.portions.find({ selector: { base_food_id: id } }).exec();
+      for (const p of existingPortions) {
+        const patched = await p.patch({ updatedAt: Date.now() });
+        await patched.remove();
+      }
+    }
 
     if (portions && portions.length > 0) {
       const now = Date.now();
