@@ -95,6 +95,18 @@ export class CatalogSearchManager {
     if (allowedKinds.has('ingredient') && catalogProvider) {
       try {
         catalogMatches = await catalogProvider.searchIngredients(rawQuery, limit);
+        if (normQuery && normQuery !== rawQuery.toLowerCase()) {
+          const normalizedMatches = await catalogProvider.searchIngredients(normQuery, limit);
+          if (normalizedMatches.length > 0) {
+            const seenCatalogIds = new Set(catalogMatches.map(m => m.id));
+            for (const item of normalizedMatches) {
+              if (!seenCatalogIds.has(item.id)) {
+                seenCatalogIds.add(item.id);
+                catalogMatches.push(item);
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error('[CatalogSearchManager] Provider search failed:', err);
       }
@@ -109,6 +121,57 @@ export class CatalogSearchManager {
       customCount: customMatches.length,
       catalogCount: catalogMatches.length
     };
+  }
+
+  /**
+   * Detects when a single-token query only matches as a secondary modifier or filling inside
+   * a multi-word composite product name (e.g. "rúcula" inside "Sorrentinos Jamon Crudo Y Rucula - Coto").
+   */
+  private isSecondaryModifierMatch(
+    normName: string,
+    normQuery: string,
+    normSingularQuery: string,
+    queryTokens: string[]
+  ): boolean {
+    if (normName === normQuery || normName === normSingularQuery) return false;
+    if (normName.startsWith(normQuery) || normName.startsWith(normSingularQuery)) return false;
+    if (queryTokens.length !== 1) return false;
+
+    const token = queryTokens[0];
+    const singToken = singularizeWord(token);
+    if (token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
+      return false;
+    }
+
+    const candidates = singToken !== token ? [token, singToken] : [token];
+    let matchIndex = -1;
+    for (const cand of candidates) {
+      const escaped = cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, 'i');
+      const m = regex.exec(normName);
+      if (m) {
+        matchIndex = m.index + (m[1]?.length || 0);
+        break;
+      }
+    }
+
+    if (matchIndex === -1) {
+      return true;
+    }
+
+    const prefixBeforeMatch = normName.slice(0, matchIndex).trim();
+    if (!prefixBeforeMatch) return false;
+
+    if (
+      /\b(?:de|del|con|y|e|al|sin|sabor|rellen[oa]s?|with|and|without|in|of|flavored)\b|[-–—,/]/i.test(
+        prefixBeforeMatch
+      )
+    ) {
+      return true;
+    }
+
+    const prefixWords = prefixBeforeMatch.split(/\s+/).filter(Boolean);
+    return prefixWords.length >= 2;
   }
 
   /**
@@ -131,10 +194,18 @@ export class CatalogSearchManager {
       .join(' ');
     const normSingularQuery = normalizeFoodName(singularQuery);
 
+    const queryTokens = normQuery
+      .split(/\s+/)
+      .filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|e|al|a|para|por|of|with|and|the|in|for|at|on)$/i.test(t));
+    const primaryToken = queryTokens[0] || normQuery;
+
     // 1. Check custom recipes
     if (customRecipes && customRecipes.length > 0) {
       const recipeMatch = customRecipes.find(r => {
         const normName = normalizeFoodName(r.name);
+        if (this.isSecondaryModifierMatch(normName, normQuery, normSingularQuery, queryTokens)) {
+          return false;
+        }
         return (
           normName === normQuery ||
           normName === normSingularQuery ||
@@ -149,6 +220,9 @@ export class CatalogSearchManager {
     // 2. Check custom ingredients
     const customMatch = customIngredients.find(item => {
       const normName = normalizeFoodName(item.name);
+      if (this.isSecondaryModifierMatch(normName, normQuery, normSingularQuery, queryTokens)) {
+        return false;
+      }
       return (
         normName === normQuery ||
         normName === normSingularQuery ||
@@ -168,11 +242,9 @@ export class CatalogSearchManager {
         if (catalogResults.length === 0 && singularQuery !== effectiveQuery) {
           catalogResults = await catalogProvider.searchIngredients(singularQuery, 10);
         }
-
-        const queryTokens = normQuery
-          .split(/\s+/)
-          .filter(t => !/^(de|del|con|en|la|el|los|las|un|una|y|e|al|a|para|por|of|with|and|the|in|for|at|on)$/i.test(t));
-        const primaryToken = queryTokens[0] || normQuery;
+        if (catalogResults.length === 0 && normQuery !== effectiveQuery.toLowerCase()) {
+          catalogResults = await catalogProvider.searchIngredients(normQuery, 10);
+        }
 
         // Only search 5-char prefix slice for single-word queries (e.g. typo tolerance like 'hamburquesa')
         if (catalogResults.length === 0 && queryTokens.length === 1 && effectiveQuery.length >= 6) {
@@ -215,21 +287,35 @@ export class CatalogSearchManager {
             const normName = normalizeFoodName(item.name);
             let score = 0;
 
+            const hasFullQueryMatch =
+              normName === normQuery ||
+              normName === normSingularQuery ||
+              normName.startsWith(normQuery) ||
+              normName.startsWith(normSingularQuery) ||
+              normName.includes(normQuery) ||
+              normName.includes(normSingularQuery);
+
             if (normName === normQuery || normName === normSingularQuery) score += 100;
             else if (normName.startsWith(normQuery) || normName.startsWith(normSingularQuery)) score += 60;
             else if (normName.includes(normQuery) || normName.includes(normSingularQuery)) score += 40;
 
-            if (normName.startsWith(primaryToken)) score += 50;
-            else if (queryTokens.length === 1 && primaryToken.length >= 6 && normName.startsWith(primaryToken.slice(0, 5))) score += 30;
-            else if (normName.includes(primaryToken)) score += 30;
+            if (queryTokens.length > 1 || !hasFullQueryMatch) {
+              if (normName.startsWith(primaryToken)) score += 50;
+              else if (queryTokens.length === 1 && primaryToken.length >= 6 && normName.startsWith(primaryToken.slice(0, 5))) score += 30;
+              else if (normName.includes(primaryToken)) score += 30;
 
-            for (const token of queryTokens) {
-              const singToken = singularizeWord(token);
-              if (normName.includes(token) || normName.includes(singToken)) {
-                score += 15;
-              } else if (queryTokens.length === 1 && token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
-                score += 25;
+              for (const token of queryTokens) {
+                const singToken = singularizeWord(token);
+                if (normName.includes(token) || normName.includes(singToken)) {
+                  score += 15;
+                } else if (queryTokens.length === 1 && token.length >= 6 && normName.startsWith(token.slice(0, 5))) {
+                  score += 25;
+                }
               }
+            }
+
+            if (this.isSecondaryModifierMatch(normName, normQuery, normSingularQuery, queryTokens)) {
+              score -= 100;
             }
 
             if (!queryHasDough && /^(tapa|tapas|masa|masas|disco|discos|dough|crust|pie crust)\b/i.test(normName)) {

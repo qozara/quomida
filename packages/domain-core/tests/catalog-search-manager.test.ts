@@ -740,6 +740,75 @@ describe('CatalogSearchManager', () => {
       expect(match).toBeNull();
     });
   });
+
+  describe('Diacritic-insensitive search and secondary modifier rejection', () => {
+    const sorrentinosRucula: BaseIngredient = {
+      id: 'ing-off-2513873000018',
+      name: 'Sorrentinos Jamon Crudo Y Rucula - Coto',
+      source: 'system',
+      lang: 'es-AR',
+      calories_100g: 243,
+      protein_100g: 14,
+      carbs_100g: 30,
+      fats_100g: 7.2
+    };
+
+    const unaccentedCatalogProvider: ICatalogProvider = {
+      searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+        // Simulate diacritic-sensitive SQLite index: only matches unaccented "rucula"
+        const q = query.toLowerCase();
+        if (q.includes('rucula') || q.includes('rucul')) {
+          if (q.includes('ú')) return [];
+          return [sorrentinosRucula];
+        }
+        return [];
+      }),
+      getPortionsForIngredient: vi.fn().mockResolvedValue([])
+    };
+
+    it('search() queries diacritic-normalized fallback so accented "rúcula" finds unaccented "Sorrentinos Jamon Crudo Y Rucula - Coto"', async () => {
+      const result = await manager.search({
+        query: 'rúcula',
+        customIngredients: [],
+        limit: 30
+      }, unaccentedCatalogProvider);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe('ing-off-2513873000018');
+      expect(result.items[0].name).toBe('Sorrentinos Jamon Crudo Y Rucula - Coto');
+    });
+
+    it('resolveAiMatch() rejects secondary modifier matches inside composite product names (e.g. "rúcula" vs "Sorrentinos Jamon Crudo Y Rucula - Coto")', async () => {
+      const match = await manager.resolveAiMatch('rúcula', [], unaccentedCatalogProvider);
+      expect(match).toBeNull();
+    });
+
+    it('resolveAiMatch() still matches a primary head-noun ingredient even with accents (e.g. "rúcula" vs "Rucula fresca")', async () => {
+      const ruculaFresca: BaseIngredient = {
+        id: 'sys-rucula-fresca',
+        name: 'Rucula fresca',
+        source: 'system',
+        lang: 'es',
+        calories_100g: 25,
+        protein_100g: 2.6,
+        carbs_100g: 3.7,
+        fats_100g: 0.7
+      };
+      const headNounProvider: ICatalogProvider = {
+        searchIngredients: vi.fn().mockImplementation(async (query: string) => {
+          const q = query.toLowerCase();
+          if (q.includes('ú')) return [];
+          if (q.includes('rucul')) return [sorrentinosRucula, ruculaFresca];
+          return [];
+        }),
+        getPortionsForIngredient: vi.fn().mockResolvedValue([])
+      };
+
+      const match = await manager.resolveAiMatch('rúcula', [], headNounProvider);
+      expect(match).not.toBeNull();
+      expect(match?.id).toBe('sys-rucula-fresca');
+    });
+  });
 });
 
 

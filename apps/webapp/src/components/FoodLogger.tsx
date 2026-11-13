@@ -165,7 +165,8 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         customPortions,
         catalogProvider: remoteService,
         locale,
-        aiEnabled: isAiEnabled
+        aiEnabled: isAiEnabled,
+        forceAiEscalation: true
       });
 
       setIsParsing(false);
@@ -213,15 +214,19 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         setIsBuildingRecipe(true);
       } else {
         const singleItem = resolved.items[0];
-        const initialFood: any = singleItem?.food ? { ...singleItem.food } : {
-          id: `custom_${Date.now()}`,
-          name: singleItem?.rawQuery || query,
-          calories_100g: 0,
-          protein_100g: 0,
-          carbs_100g: 0,
-          fats_100g: 0,
-          portions: []
-        };
+        const initialFood: any = singleItem?.food
+          ? singleItem.food.source === 'ai'
+            ? { ...singleItem.food, id: undefined }
+            : { ...singleItem.food }
+          : {
+              id: undefined,
+              name: singleItem?.rawQuery || query,
+              calories_100g: 0,
+              protein_100g: 0,
+              carbs_100g: 0,
+              fats_100g: 0,
+              portions: []
+            };
 
         setEditingIngredient(initialFood);
         setIsBuildingIngredient(true);

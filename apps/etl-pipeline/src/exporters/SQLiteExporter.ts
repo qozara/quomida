@@ -100,8 +100,8 @@ export async function exportSQLiteCatalog(
 ): Promise<CatalogMetaPayload> {
   const externalCatalogItems: { id: string; hash: string }[] = [];
 
-  const catalog = initDb(outCatalogPath, 'trigram');
-  const system = initDb(outSystemPath, 'trigram');
+  const catalog = initDb(outCatalogPath, 'trigram remove_diacritics 1');
+  const system = initDb(outSystemPath, 'trigram remove_diacritics 1');
 
   let externalExportedCount = 0;
   let systemExportedCount = 0;

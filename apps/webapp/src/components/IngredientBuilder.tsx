@@ -323,7 +323,7 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={name || (initialIngredient ? (dict.catalog?.editCustomIngredient || 'Edit Single Food') : (dict.catalog?.newCustomIngredient || 'New Single Food'))}
+      aria-label={name || (initialIngredient?.id ? (dict.catalog?.editCustomIngredient || 'Edit Single Food') : (dict.catalog?.newCustomIngredient || 'New Single Food'))}
       className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-slate-100 animate-slide-in-right slide-in-from-right overflow-y-auto"
     >
       {/* Top Sticky Navigation Bar with Back Button */}
@@ -341,11 +341,11 @@ export const IngredientBuilder: React.FC<IngredientBuilderProps> = ({
           <div className="flex items-center justify-center gap-1.5 text-emerald-400">
             <Sparkles className="w-3.5 h-3.5" />
             <span className="text-[11px] font-bold uppercase tracking-wider">
-              {initialIngredient ? (dict.catalog?.edit || 'Edit') : (dict.catalog?.newFood || 'New')}
+              {initialIngredient?.id ? (dict.catalog?.edit || 'Edit') : (dict.catalog?.newFood || 'New')}
             </span>
           </div>
           <h2 id="ingredient-builder-title" className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs mx-auto">
-            {name || (initialIngredient
+            {name || (initialIngredient?.id
               ? dict.catalog?.editCustomIngredient || 'Edit Single Food'
               : dict.catalog?.newCustomIngredient || 'New Single Food')}
           </h2>

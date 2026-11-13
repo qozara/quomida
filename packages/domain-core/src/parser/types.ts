@@ -30,16 +30,27 @@ export interface MealParserOptions {
   fallbackLocale?: string;
 }
 
+export interface InferredPortion {
+  name: string;
+  equivalent_weight_g: number;
+}
+
 export interface DecomposedDishIngredient {
   food_name: string;
   quantity: number;
   unit: string;
   search_alias?: string;
   notes?: string;
+  calories_100g?: number;
+  protein_100g?: number;
+  carbs_100g?: number;
+  fats_100g?: number;
+  portions?: InferredPortion[];
 }
 
 export interface DecomposedDishResult {
   dishName: string;
+  kind?: 'ingredient' | 'recipe';
   rationale?: string;
   estimatedTotalWeightGrams?: number;
   ingredients: DecomposedDishIngredient[];
