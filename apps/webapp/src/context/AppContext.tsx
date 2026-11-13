@@ -273,19 +273,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       console.log('[AppContext] Checking for catalog updates with options:', options);
       const currentOpfsStatus = await refreshCatalogDownloadStatus();
-      const shouldSaveMetadata = options?.saveMetadata !== undefined
-        ? options.saveMetadata
-        : currentOpfsStatus === 'complete';
+      const shouldSaveMetadata = options?.saveMetadata === true;
 
       const res = await hydrationService.hydrate({
         ...options,
         saveMetadata: shouldSaveMetadata
       });
       console.log('[AppContext] Catalog hydration result:', res);
-      if (shouldSaveMetadata) {
+      if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
+      if (shouldSaveMetadata || (currentOpfsStatus === 'complete' && res.status === 'UP_TO_DATE')) {
         if (res.version) setCatalogVersion(res.version);
         if (res.generatedAt) setCatalogGeneratedAt(res.generatedAt);
-        if (res.fileSizeBytes) setCatalogFileSizeBytes(res.fileSizeBytes);
         if (res.itemCount !== undefined || res.itemsUpserted !== undefined) {
           setCatalogItemCount(res.itemCount ?? res.itemsUpserted ?? null);
         }
@@ -317,7 +315,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('[AppContext] Detected catalog change event.');
       const status = await refreshCatalogDownloadStatus();
       if (status === 'complete') {
-        await refreshCatalog();
+        await refreshCatalog({ saveMetadata: true });
       } else {
         await resetCatalogState();
       }

@@ -89,6 +89,7 @@ export function startCatalogDownload(url: string): void {
 
   console.log('[CatalogDownload] Starting download from:', url);
   setSharedState({ status: 'fetching', progress: 0, error: null });
+  RemoteCatalogService.getInstance().reset().catch(() => {});
 
   if (activeWorker) {
     activeWorker.terminate();
@@ -104,6 +105,9 @@ export function startCatalogDownload(url: string): void {
       console.log('[CatalogDownload:Worker]', payload);
     } else if (type === 'STATUS') {
       console.log('[CatalogDownload] Worker status transition:', payload);
+      if (payload === 'decompressing_and_writing') {
+        RemoteCatalogService.getInstance().reset().catch(() => {});
+      }
       setSharedState({ status: payload });
     } else if (type === 'PROGRESS') {
       setSharedState({ progress: payload.percent });

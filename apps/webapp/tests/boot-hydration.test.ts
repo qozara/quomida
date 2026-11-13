@@ -6,15 +6,20 @@ import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppProvider, useApp } from '../src/context/AppContext.js';
 import { CatalogHydrationService } from '../src/services/CatalogHydrationService.js';
+import { RemoteCatalogService } from '../src/services/RemoteCatalogService.js';
+import { resetSharedCatalogDownloadState } from '../src/hooks/useCatalogDownload.js';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 describe('Application Boot Hydration [APP-207]', () => {
   beforeEach(() => {
+    resetSharedCatalogDownloadState();
     vi.stubGlobal('navigator', { onLine: true });
   });
 
   afterEach(() => {
     cleanup();
+    RemoteCatalogService.clearListeners();
+    resetSharedCatalogDownloadState();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -99,6 +104,51 @@ describe('Application Boot Hydration [APP-207]', () => {
     await vi.waitFor(() => {
       const count = Number(container.querySelector('[data-testid="ing-count"]')?.textContent || 0);
       expect(count).toBe(0);
+    }, { timeout: 1500 });
+  });
+
+  it('does not prematurely persist new catalog version metadata on boot before catalog.sqlite.gz download completes', async () => {
+    vi.stubGlobal('navigator', {
+      onLine: true,
+      storage: {
+        getDirectory: vi.fn().mockResolvedValue({
+          getFileHandle: vi.fn().mockResolvedValue({
+            getFile: vi.fn().mockResolvedValue({ size: 2 * 1024 * 1024 })
+          })
+        })
+      }
+    });
+
+    const hydrateSpy = vi.spyOn(CatalogHydrationService.prototype, 'hydrate').mockResolvedValue({
+      status: 'UPDATED',
+      version: 'v2.0.0',
+      fileSizeBytes: 25 * 1024 * 1024,
+      itemCount: 25000,
+      itemsUpserted: 25000
+    });
+
+    const TestComponent = () => {
+      const { isOnline } = useApp();
+      return React.createElement('div', { 'data-testid': 'boot-status' }, `ready-${isOnline}`);
+    };
+
+    render(
+      React.createElement(GoogleOAuthProvider as any, { clientId: 'test-client-id' },
+        React.createElement(AppProvider, null, React.createElement(TestComponent))
+      )
+    );
+
+    await vi.waitFor(() => {
+      expect(hydrateSpy).toHaveBeenCalled();
+    }, { timeout: 1500 });
+
+    expect(hydrateSpy).toHaveBeenCalledWith(expect.objectContaining({ saveMetadata: false }));
+    expect(hydrateSpy).not.toHaveBeenCalledWith(expect.objectContaining({ saveMetadata: true }));
+
+    RemoteCatalogService.notifyCatalogDownloaded();
+
+    await vi.waitFor(() => {
+      expect(hydrateSpy).toHaveBeenCalledWith(expect.objectContaining({ saveMetadata: true }));
     }, { timeout: 1500 });
   });
 });

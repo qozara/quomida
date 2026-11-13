@@ -29,7 +29,7 @@ export class CatalogHydrationService {
     const metaUrl = `${baseUrl}/catalog_meta.json${options?.force ? `?t=${Date.now()}` : ''}`;
     
     const fetchOptions: RequestInit = { 
-      cache: options?.force ? 'no-cache' : 'default',
+      cache: 'no-cache',
       signal: options?.signal
     };
 

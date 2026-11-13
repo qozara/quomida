@@ -137,4 +137,18 @@ describe('CatalogHydrationService [APP-206]', () => {
     const savedCount = await service.getMetadata('lastIngestedCatalogItemCount');
     expect(savedCount).toBe('19994');
   });
+
+  it('uses cache: no-cache by default so browser HTTP cache does not serve stale catalog_meta.json on boot', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ catalogVersion: 'v1.0.0', generatedAt: '2026-09-20T00:00:00Z' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    await hydrationService.hydrate();
+    const metaCall = fetchSpy.mock.calls.find(c => String(c[0]).includes('catalog_meta.json'));
+    expect(metaCall).toBeDefined();
+    expect(metaCall![1]?.cache).toBe('no-cache');
+  });
 });
