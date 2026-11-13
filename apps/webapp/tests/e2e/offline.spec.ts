@@ -4,7 +4,7 @@ test.describe('Quomida Service Worker & Offline Shell Support', () => {
   test('renders application shell and detects offline status when context goes offline', async ({ page, context }) => {
     // 1. Initial page load to register Service Worker and precache app shell
     await page.goto('/');
-    await expect(page.locator('header')).toBeVisible();
+    await expect(page.getByTestId('dashboard-date-bar')).toBeVisible({ timeout: 15000 });
 
     // Wait for Service Worker registration and active state
     await page.waitForFunction(async () => {
@@ -20,7 +20,7 @@ test.describe('Quomida Service Worker & Offline Shell Support', () => {
     await page.reload();
 
     // 4. Assert app shell renders successfully (header, dashboard title, meal sections)
-    await expect(page.locator('header')).toBeVisible();
+    await expect(page.getByTestId('dashboard-date-bar')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Calorías')).toBeVisible();
 
     // 5. Assert status indicator reflects offline state and announces via screen reader text

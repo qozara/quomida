@@ -177,4 +177,96 @@ describe('LlmRecipeDecomposer', () => {
 
     expect(mockChat).toHaveBeenCalledTimes(2);
   });
+
+  it('parses single-ingredient inference with kind, per-100g macros, and domestic portions', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Rúcula',
+        kind: 'ingredient',
+        estimated_total_weight_g: 100,
+        rationale: 'Fresh arugula leaves',
+        ingredients: [
+          {
+            food_name: 'Rúcula',
+            search_alias: 'arugula',
+            quantity: 100,
+            unit: 'g',
+            calories_100g: 25,
+            protein_100g: 2.6,
+            carbs_100g: 3.7,
+            fats_100g: 0.7,
+            portions: [
+              { name: '1 taza', equivalent_weight_g: 20 },
+              { name: '1 porción', equivalent_weight_g: 50 }
+            ]
+          }
+        ]
+      }
+    });
+
+    const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
+    const result = await decomposer.decomposeDish('rúcula', '1 unit', 'es');
+
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('ingredient');
+    expect(result!.dishName).toBe('Rúcula');
+    expect(result!.ingredients).toHaveLength(1);
+    expect(result!.ingredients[0]).toEqual({
+      food_name: 'Rúcula',
+      search_alias: 'arugula',
+      quantity: 100,
+      unit: 'g',
+      calories_100g: 25,
+      protein_100g: 2.6,
+      carbs_100g: 3.7,
+      fats_100g: 0.7,
+      portions: [
+        { name: '1 taza', equivalent_weight_g: 20 },
+        { name: '1 porción', equivalent_weight_g: 50 }
+      ]
+    });
+  });
+
+  it('parses composite recipe with kind="recipe" and fallback per-100g macros on constituent ingredients', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Ensalada de Rúcula y Parmesano',
+        kind: 'recipe',
+        estimated_total_weight_g: 120,
+        ingredients: [
+          {
+            food_name: 'Rúcula',
+            quantity: 80,
+            unit: 'g',
+            calories_100g: 25,
+            protein_100g: 2.6,
+            carbs_100g: 3.7,
+            fats_100g: 0.7
+          },
+          {
+            food_name: 'Queso parmesano',
+            quantity: 40,
+            unit: 'g',
+            calories_100g: 431,
+            protein_100g: 38,
+            carbs_100g: 4.1,
+            fats_100g: 29
+          }
+        ]
+      }
+    });
+
+    const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
+    const result = await decomposer.decomposeDish('ensalada de rucula y parmesano', '1 porción', 'es');
+
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('recipe');
+    expect(result!.ingredients).toHaveLength(2);
+    expect(result!.ingredients[0].calories_100g).toBe(25);
+    expect(result!.ingredients[1].protein_100g).toBe(38);
+  });
 });

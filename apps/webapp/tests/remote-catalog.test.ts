@@ -39,11 +39,26 @@ vi.mock('sqlite-wasm-http', () => {
             if (sql.toLowerCase().includes('avocado')) {
               return { result: { resultRows: [['1', 'Avocado Test', 'system', 'en', 160, 2, 8, 15, 'hash']] } };
             }
+            // Simulate SQLite FTS5 trigram without remove_diacritics: only unaccented "rucula" matches
+            if (sql.toLowerCase().includes('rucula') && !sql.toLowerCase().includes('ú')) {
+              return {
+                result: {
+                  resultRows: [['ing-off-2513873000018', 'Sorrentinos Jamon Crudo Y Rucula - Coto', 'system', 'es-AR', 243, 14, 30, 7.2, 'hash']]
+                }
+              };
+            }
             return { result: { resultRows: [] } };
           }
           if (sql.includes('WHERE name LIKE')) {
             if (sql.toLowerCase().includes('avocado')) {
               return { result: { resultRows: [['1', 'Avocado Test LIKE', 'system', 'en', 160, 2, 8, 15, 'hash']] } };
+            }
+            if (sql.toLowerCase().includes("'%rucula%'")) {
+              return {
+                result: {
+                  resultRows: [['ing-off-2513873000018', 'Sorrentinos Jamon Crudo Y Rucula - Coto', 'system', 'es-AR', 243, 14, 30, 7.2, 'hash']]
+                }
+              };
             }
             return { result: { resultRows: [] } };
           }
@@ -225,5 +240,17 @@ describe('RemoteCatalogService (Unified Single SQLite Architecture)', () => {
     service.destroy();
     await new Promise((r) => setTimeout(r, 10));
     expect(mockClosedCount).toBe(1);
+  });
+
+  it('retries FTS5 and LIKE queries with diacritic-stripped tokens when accented search yields 0 rows', async () => {
+    const service = RemoteCatalogService.getInstance();
+    const ftsResults = await service.searchIngredients('rúcula');
+    expect(ftsResults).toHaveLength(1);
+    expect(ftsResults[0].name).toBe('Sorrentinos Jamon Crudo Y Rucula - Coto');
+
+    mockFtsThrows = true;
+    const likeResults = await service.searchIngredients('rúcula');
+    expect(likeResults).toHaveLength(1);
+    expect(likeResults[0].name).toBe('Sorrentinos Jamon Crudo Y Rucula - Coto');
   });
 });

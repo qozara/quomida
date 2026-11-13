@@ -109,7 +109,7 @@ describe('Schema Version & Evolution Guard (Prevents Un-bumped Schema Mutations 
 
   it('guards against un-bumped schema modifications that cause RxDB Error DB6', () => {
     for (const schema of schemas) {
-      const baseline = V0_BASELINE[schema.title];
+      const baseline = V0_BASELINE[schema.title || ''];
       expect(baseline).toBeDefined();
 
       if (schema.version === 0) {

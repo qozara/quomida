@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { MealService, type BaseIngredient, type Portion, type ICatalogProvider } from '@quomida/domain-core';
-import { LlmRecipeDecomposer } from '@quomida/ai-services';
+import { LlmRecipeDecomposer, AiMealError } from '@quomida/ai-services';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

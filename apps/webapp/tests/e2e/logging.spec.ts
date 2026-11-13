@@ -6,7 +6,7 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
   });
 
   test('renders initial dashboard and header elements', async ({ page }) => {
-    await expect(page.locator('header')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('dashboard-date-bar')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Calorías')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Proteínas')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Carbohidratos')).toBeVisible({ timeout: 15000 });
@@ -14,11 +14,13 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
   });
 
   test('searches for regional meat cut and opens Portion Bottom Sheet', async ({ page }) => {
+    await page.getByRole('button', { name: /Add food to/i }).first().click();
+
     const searchInput = page.locator('#input-food-search');
     await searchInput.fill('Aceite');
 
-    // Click search result item
-    const searchResult = page.getByRole('button', { name: /Aceite/i }).first();
+    // Click search result item (excluding #btn-find-more-ai footer action)
+    const searchResult = page.locator('button:not(#btn-find-more-ai)').filter({ hasText: /Aceite/i }).first();
     await expect(searchResult).toBeVisible({ timeout: 15000 });
     await searchResult.click();
 
@@ -30,19 +32,20 @@ test.describe('Quomida Offline Food Logger & Macro Calculation Flow', () => {
     const logButton = page.locator('#btn-log-item');
     await logButton.click();
 
-    // Bottom sheet closes and food logs into Lunch section
+    // Bottom sheet closes and food logs into meal section
     await expect(page.getByText('Porción y Cantidad')).not.toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Aceite')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Aceite/i).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('opens and closes settings modal', async ({ page }) => {
-    await page.locator('#btn-open-settings').click();
+    await page.locator('#btn-open-settings-avatar').click();
     await expect(page.getByText('Perfil y Configuración')).toBeVisible({ timeout: 15000 });
 
-    const langSelect = page.locator('select').first();
+    await page.locator('#accordion-header-app-settings').click();
+    const langSelect = page.locator('#select-language');
     await langSelect.selectOption('en');
 
-    await page.keyboard.press('Escape');
-    await expect(page.getByText('Perfil y Configuración')).not.toBeVisible({ timeout: 15000 });
+    await page.locator('#btn-close-settings').click();
+    await expect(page.getByText(/Perfil y Configuración|Profile & Settings/)).not.toBeVisible({ timeout: 15000 });
   });
 });

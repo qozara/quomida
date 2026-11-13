@@ -258,6 +258,8 @@ export class RemoteCatalogService implements ICatalogProvider {
     ]);
     const filteredTokens = rawTokens.filter(t => !STOP_WORDS.has(t.toLowerCase()));
     const tokens = filteredTokens.length > 0 ? filteredTokens : rawTokens;
+    const normTokens = tokens.map(t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+    const hasDiacritics = tokens.some((t, i) => t !== normTokens[i]);
 
     let worker: any;
     try {
@@ -289,26 +291,43 @@ export class RemoteCatalogService implements ICatalogProvider {
       return rows.length > 0 ? this.mapRowsToIngredients(rows) : [];
     };
 
-    // 1. Try strict FTS5 AND query first
+    // 1. Try strict FTS5 AND query first (with diacritic-stripped retry if 0 rows)
     try {
-      const andMatch = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
-      const andResults = await runFts(andMatch);
+      const buildAndExpr = (termList: string[]) =>
+        termList.map(term => `"${term.replace(/"/g, '""')}"*`).join(' ');
+
+      const andResults = await runFts(buildAndExpr(tokens));
       if (andResults.length > 0) return andResults;
 
-      // 2. Try flexible FTS5 OR query if multi-token
+      if (hasDiacritics) {
+        const normAndResults = await runFts(buildAndExpr(normTokens));
+        if (normAndResults.length > 0) return normAndResults;
+      }
+
+      // 2. Try flexible FTS5 OR query if multi-token (with diacritic-stripped retry)
       if (tokens.length > 1) {
-        const orMatch = tokens.map(term => `"${term.replace(/"/g, '""')}"*`).join(' OR ');
-        const orResults = await runFts(orMatch);
+        const buildOrExpr = (termList: string[]) =>
+          termList.map(term => `"${term.replace(/"/g, '""')}"*`).join(' OR ');
+
+        const orResults = await runFts(buildOrExpr(tokens));
         if (orResults.length > 0) return orResults;
+
+        if (hasDiacritics) {
+          const normOrResults = await runFts(buildOrExpr(normTokens));
+          if (normOrResults.length > 0) return normOrResults;
+        }
       }
     } catch (e) {
       console.warn('[RemoteCatalogService] FTS query error, falling back to LIKE:', e);
     }
 
-    // 3. Fallback to LIKE substring query on local database
+    // 3. Fallback to LIKE substring query on local database (including diacritic-stripped terms)
     try {
-      const likeClause = tokens.length > 1
-        ? tokens.map(t => `name LIKE '%${t.replace(/'/g, "''")}%'`).join(' OR ')
+      const likeTerms = hasDiacritics
+        ? Array.from(new Set([...tokens, ...normTokens]))
+        : tokens;
+      const likeClause = likeTerms.length > 1
+        ? likeTerms.map(t => `name LIKE '%${t.replace(/'/g, "''")}%'`).join(' OR ')
         : `name LIKE '%${sanitizedQuery.replace(/'/g, "''")}%'`;
 
       const likeSql = `

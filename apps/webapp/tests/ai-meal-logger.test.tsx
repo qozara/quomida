@@ -6,9 +6,11 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FoodLogger } from '../src/components/FoodLogger.js';
 import { BatchAiMealReviewModal } from '../src/components/BatchAiMealReviewModal.js';
+import { RemoteCatalogService } from '../src/services/RemoteCatalogService.js';
 import * as AppContext from '../src/context/AppContext.js';
 import { dictionaries } from '@quomida/i18n-locales';
 import { AiProviderFactory } from '@qozara/ai-client';
+import { LlmRecipeDecomposer } from '@quomida/ai-services';
 import type { BaseIngredient, Recipe } from '@quomida/domain-core';
 
 describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
@@ -64,6 +66,7 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockChat.mockReset();
+    LlmRecipeDecomposer.clearCache();
 
     vi.spyOn(AiProviderFactory, 'createProvider').mockResolvedValue({
       id: 'mock-provider',
@@ -1264,5 +1267,99 @@ describe('FoodLogger - AI Multi-Ingredient Natural Log & Batch Review', () => {
     expect(loggedItems[1].mealType).toBe('meal_lunch');
     expect(loggedItems[2].mealType).toBe('meal_snack');
     expect(loggedItems[3].mealType).toBe('meal_dinner');
+  });
+
+  it('shows unaccented catalog dish on initial "rúcula" search and infers single ingredient macros via AI on Find more click', async () => {
+    const sorrentinosRucula: BaseIngredient = {
+      id: 'ing-off-2513873000018',
+      name: 'Sorrentinos Jamon Crudo Y Rucula - Coto',
+      source: 'system',
+      lang: 'es-AR',
+      calories_100g: 243,
+      protein_100g: 14,
+      carbs_100g: 30,
+      fats_100g: 7.2
+    };
+
+    // Simulate diacritic-sensitive provider returning the dish only for unaccented "rucula"
+    vi.spyOn(RemoteCatalogService.prototype, 'searchIngredients').mockImplementation(async (query: string) => {
+      const q = query.toLowerCase();
+      if (!q.includes('ú') && (q.includes('rucula') || q.includes('rucul'))) {
+        return [sorrentinosRucula];
+      }
+      return [];
+    });
+    vi.spyOn(RemoteCatalogService.prototype, 'getPortionsForIngredient').mockResolvedValue([]);
+
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Rúcula',
+        kind: 'ingredient',
+        estimated_total_weight_g: 100,
+        ingredients: [
+          {
+            food_name: 'Rúcula',
+            search_alias: 'arugula',
+            quantity: 100,
+            unit: 'g',
+            calories_100g: 25,
+            protein_100g: 2.6,
+            carbs_100g: 3.7,
+            fats_100g: 0.7,
+            portions: [
+              { name: '1 taza', equivalent_weight_g: 20 }
+            ]
+          }
+        ]
+      }
+    });
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ingredients: [],
+      recipes: [],
+      recipeFoods: [],
+      t: dictionaries.es,
+      locale: 'es',
+      setIsSettingsOpen: vi.fn(),
+      userSettings: {
+        ai_settings: { enabled: true, provider: 'qozara-intelligence' }
+      },
+      logBatchFoodItems: logBatchFoodItemsMock,
+      addRecipe: addRecipeMock,
+      addCustomIngredient: vi.fn().mockResolvedValue('custom-rucula-1'),
+      logFoodItem: vi.fn().mockResolvedValue(undefined),
+      db: null
+    } as any);
+
+    render(<FoodLogger onSelectIngredient={onSelectMock} />);
+
+    // 1. Typing "rúcula" shows "Sorrentinos Jamon Crudo Y Rucula - Coto" in initial search list
+    const searchInput = screen.getByPlaceholderText(dictionaries.es.search.unifiedPlaceholder);
+    fireEvent.change(searchInput, { target: { value: 'rúcula' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Sorrentinos Jamon Crudo Y Rucula - Coto')).toBeDefined();
+    });
+
+    // 2. Clicking "Find more" triggers AI inference, rejects Sorrentinos, and opens IngredientBuilder with inferred "Rúcula" macros
+    const findMoreBtn = document.getElementById('btn-find-more-ai');
+    expect(findMoreBtn).not.toBeNull();
+    fireEvent.click(findMoreBtn!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(screen.getByDisplayValue('Rúcula')).toBeDefined();
+    expect(screen.queryByDisplayValue('Sorrentinos Jamon Crudo Y Rucula - Coto')).toBeNull();
+    expect(screen.getByDisplayValue('25')).toBeDefined();
+    expect(screen.getByDisplayValue('2.6')).toBeDefined();
+    expect(screen.getByDisplayValue('3.7')).toBeDefined();
+    expect(screen.getByDisplayValue('0.7')).toBeDefined();
+    expect(screen.getByText('1 taza')).toBeDefined();
+    expect(screen.getByTestId('btn-save-and-log-ingredient')).toBeDefined();
   });
 });

@@ -10,11 +10,14 @@ import type { ICatalogProvider } from '../catalog/CatalogSearchManager.js';
 import { CatalogSearchManager } from '../catalog/CatalogSearchManager.js';
 import {
   BatchMealResolver,
+  matchPortionUnit,
   type ResolvedBatchMeal,
   type ResolvedMealItem
 } from '../catalog/BatchMealResolver.js';
+import type { TaggedPortion } from '../catalog/PortionManager.js';
+import { calculateItemMacros, convertPortionToGrams, createMacroSnapshot } from '../calculations/index.js';
 import { StandardMealParser } from '../parser/StandardMealParser.js';
-import type { IRecipeDecomposer, ParsedNaturalLanguageMeal } from '../parser/types.js';
+import type { DecomposedDishIngredient, IRecipeDecomposer, ParsedNaturalLanguageMeal } from '../parser/types.js';
 
 export interface MealServiceConfig {
   standardParser?: StandardMealParser;
@@ -34,6 +37,7 @@ export interface ProcessMealOptions {
   existingRecipes?: Recipe[];
   locale?: string;
   aiEnabled?: boolean;
+  forceAiEscalation?: boolean;
 }
 
 /**
@@ -110,20 +114,103 @@ export class MealService {
       locale
     });
 
-    // JIT Escalation: If any items are unmatched, AI is enabled, and a decomposer is provided, attempt recipe decomposition
+    // JIT Escalation: Escalate unmatched items or explicit single-item AI inference requests
     const hasUnmatched = resolved.items.some(it => it.unmatched);
-    if (hasUnmatched && aiEnabled && this.decomposer) {
+    const shouldEscalate =
+      hasUnmatched || Boolean(options.forceAiEscalation && resolved.items.length === 1);
+    if (shouldEscalate && aiEnabled && this.decomposer) {
       resolved = await this.attemptDecompositionEscalation(resolved, options);
     }
 
     return resolved;
   }
 
+  private buildAiSynthesizedMealItem(
+    subItem: ResolvedMealItem,
+    ing: DecomposedDishIngredient,
+    displayName: string,
+    idx: number,
+    itemMealType: MealType,
+    locale?: string
+  ): ResolvedMealItem {
+    const foodId = `ai_inferred_${Date.now()}_${idx}`;
+    const lang = locale && locale.toLowerCase().startsWith('en') ? 'en' : 'es';
+    const customPortionsList = Array.isArray(ing.portions)
+      ? ing.portions.filter(p => p && typeof p.name === 'string' && p.name.trim() && p.equivalent_weight_g > 0)
+      : [];
+
+    const availablePortions: TaggedPortion[] = customPortionsList.map((p, pIdx) => ({
+      id: `port-ai-${foodId}-${pIdx}`,
+      base_food_id: foodId,
+      name: p.name.trim(),
+      equivalent_weight_g: p.equivalent_weight_g,
+      source: 'ai',
+      tag: 'Custom'
+    }));
+
+    const hasUnitPortion = availablePortions.some(p =>
+      /unit|unidad|pieza|medium|mediana|chica|grande|serving/i.test(p.name)
+    );
+    if (!hasUnitPortion) {
+      availablePortions.push({
+        id: `port-std-unit-${foodId}`,
+        base_food_id: foodId,
+        name: '1 unidad',
+        equivalent_weight_g: 100,
+        source: 'system',
+        tag: 'Generic'
+      });
+    }
+
+    const hasPortion = availablePortions.some(p => /portion|porci[oó]n|plato/i.test(p.name));
+    if (!hasPortion) {
+      availablePortions.push({
+        id: `port-std-portion-${foodId}`,
+        base_food_id: foodId,
+        name: '1 porción',
+        equivalent_weight_g: 150,
+        source: 'system',
+        tag: 'Generic'
+      });
+    }
+
+    const synthesizedFood = {
+      id: foodId,
+      kind: 'ingredient' as const,
+      name: displayName.trim() || ing.food_name.trim(),
+      source: 'ai' as const,
+      lang,
+      calories_100g: Math.max(0, Number(ing.calories_100g) || 0),
+      protein_100g: Math.max(0, Number(ing.protein_100g) || 0),
+      carbs_100g: Math.max(0, Number(ing.carbs_100g) || 0),
+      fats_100g: Math.max(0, Number(ing.fats_100g) || 0),
+      ...(customPortionsList.length > 0 ? { portions: customPortionsList } : {})
+    };
+
+    const quantity = ing.quantity > 0 ? ing.quantity : 100;
+    const selectedPortionName = matchPortionUnit(ing.unit || subItem.selectedPortionName, availablePortions);
+    const calculatedWeightGrams = convertPortionToGrams(quantity, selectedPortionName, availablePortions);
+    const macros = createMacroSnapshot(calculateItemMacros(synthesizedFood, calculatedWeightGrams));
+
+    return {
+      ...subItem,
+      food: synthesizedFood,
+      unmatched: false,
+      availablePortions,
+      selectedPortionName,
+      quantity,
+      calculatedWeightGrams,
+      macros,
+      mealType: itemMealType,
+      isAiDecomposed: true
+    };
+  }
+
   /**
-   * Attempts JIT culinary recipe decomposition for uncataloged dishes.
+   * Attempts JIT culinary recipe decomposition or single-ingredient inference for uncataloged foods.
    * If decomposition fails (offline, rate limit, provider error), catches gracefully
    * unless the error is a critical service error (e.g. rate limit / auth), or preserves
-   * unmatched items so the user is never blocked.
+   * unmatched/existing items so the user is never blocked.
    */
   private async attemptDecompositionEscalation(
     resolved: ResolvedBatchMeal,
@@ -138,8 +225,23 @@ export class MealService {
       catalogProvider,
       currentHour,
       existingRecipes,
-      locale
+      locale,
+      forceAiEscalation
     } = options;
+
+    const allExistingRecipes: Recipe[] =
+      existingRecipes && existingRecipes.length > 0
+        ? existingRecipes
+        : customRecipes.map(
+            r =>
+              r.recipe || {
+                id: r.id,
+                name: r.name,
+                ingredients: (r as any).ingredients || [],
+                yield_factor: r.yield_factor ?? 1.0,
+                updatedAt: r.updatedAt
+              }
+          );
 
     const updatedItems: ResolvedMealItem[] = [];
     let didDecomposeAny = false;
@@ -148,7 +250,8 @@ export class MealService {
     let newlySynthesizedRecipe = resolved.synthesizedRecipe;
 
     for (const item of resolved.items) {
-      if (!item.unmatched) {
+      const shouldEscalateItem = item.unmatched || (Boolean(forceAiEscalation) && resolved.items.length === 1);
+      if (!shouldEscalateItem) {
         updatedItems.push(item);
         continue;
       }
@@ -158,6 +261,10 @@ export class MealService {
         const decomposed = await this.decomposer.decomposeDish(item.rawQuery, portionContext, locale);
 
         if (decomposed && decomposed.ingredients.length > 0) {
+          const isSingleIngredientIntent =
+            decomposed.kind === 'ingredient' ||
+            (decomposed.ingredients.length === 1 && decomposed.kind !== 'recipe');
+
           const subResolved = await this.batchResolver.resolveBatch({
             rawInput: `${item.rawQuery} (${decomposed.dishName})`,
             rawItems: decomposed.ingredients.map(ing => ({
@@ -173,27 +280,66 @@ export class MealService {
             catalogProvider,
             currentHour,
             detectedMealType: item.mealType || resolved.detectedMealType,
-            compositeDishName: decomposed.dishName,
-            existingRecipes,
-            isCompositeDish: true,
+            compositeDishName: isSingleIngredientIntent ? undefined : decomposed.dishName,
+            existingRecipes: allExistingRecipes,
+            isCompositeDish: !isSingleIngredientIntent,
             locale
           });
 
-          const validDecomposed = subResolved.items.filter(it => !it.unmatched && it.food);
-          if (validDecomposed.length > 0) {
-            didDecomposeAny = true;
-            decomposedDishTitle = decomposed.dishName;
-            sourceDishName = item.rawQuery;
-            if (subResolved.synthesizedRecipe) {
-              newlySynthesizedRecipe = subResolved.synthesizedRecipe;
+          const itemMealType = item.mealType || resolved.detectedMealType;
+          const hydratedSubItems: ResolvedMealItem[] = subResolved.items.map((subItem, idx) => {
+            const ing = decomposed.ingredients[idx];
+            const hasMacros = ing && typeof ing.calories_100g === 'number';
+            const shouldSynthesizeAiIngredient =
+              hasMacros &&
+              (subItem.unmatched ||
+                !subItem.food ||
+                (Boolean(forceAiEscalation) && isSingleIngredientIntent));
+
+            if (shouldSynthesizeAiIngredient) {
+              const displayName =
+                decomposed.ingredients.length === 1 && decomposed.dishName
+                  ? decomposed.dishName
+                  : ing.food_name;
+              return this.buildAiSynthesizedMealItem(subItem, ing, displayName, idx, itemMealType, locale);
             }
 
-            for (const decItem of subResolved.items) {
-              updatedItems.push({
-                ...decItem,
-                isAiDecomposed: true,
-                mealType: item.mealType || resolved.detectedMealType
-              });
+            return {
+              ...subItem,
+              isAiDecomposed: true,
+              mealType: itemMealType
+            };
+          });
+
+          const validDecomposed = hydratedSubItems.filter(it => !it.unmatched && it.food);
+          if (validDecomposed.length > 0) {
+            didDecomposeAny = true;
+            const isSingleIngredientResult =
+              decomposed.kind === 'ingredient' ||
+              (validDecomposed.length === 1 && decomposed.kind !== 'recipe');
+
+            if (isSingleIngredientResult) {
+              decomposedDishTitle = undefined;
+              newlySynthesizedRecipe = undefined;
+              sourceDishName = item.rawQuery;
+            } else {
+              decomposedDishTitle = decomposed.dishName;
+              sourceDishName = item.rawQuery;
+              if (validDecomposed.length >= 2) {
+                newlySynthesizedRecipe =
+                  this.batchResolver.computeSynthesizedRecipe(
+                    hydratedSubItems,
+                    decomposed.dishName,
+                    allExistingRecipes,
+                    locale
+                  ) || subResolved.synthesizedRecipe;
+              } else {
+                newlySynthesizedRecipe = subResolved.synthesizedRecipe;
+              }
+            }
+
+            for (const decItem of hydratedSubItems) {
+              updatedItems.push(decItem);
             }
             continue;
           }
@@ -207,7 +353,7 @@ export class MealService {
         console.warn('[MealService] JIT Decomposition escalation failed gracefully:', err);
       }
 
-      // If decomposition failed or returned no valid items, keep original unmatched item
+      // If decomposition failed or returned no valid items, keep original item
       updatedItems.push(item);
     }
 
@@ -226,13 +372,21 @@ export class MealService {
       { calories: 0, protein: 0, carbs: 0, fats: 0 }
     );
 
+    const isSingleAtomicResult =
+      updatedItems.length === 1 &&
+      !decomposedDishTitle &&
+      !newlySynthesizedRecipe &&
+      !resolved.compositeDishName;
+
     return {
       ...resolved,
       items: updatedItems,
       totalMacros: newTotalMacros,
-      compositeDishName: decomposedDishTitle || resolved.compositeDishName,
-      synthesizedRecipe: newlySynthesizedRecipe,
-      defaultLoggingMode: 'recipe',
+      compositeDishName: isSingleAtomicResult
+        ? undefined
+        : decomposedDishTitle || resolved.compositeDishName,
+      synthesizedRecipe: isSingleAtomicResult ? undefined : newlySynthesizedRecipe,
+      defaultLoggingMode: isSingleAtomicResult ? 'batch' : 'recipe',
       isAiDecomposed: true,
       sourceDishName: sourceDishName
     };
