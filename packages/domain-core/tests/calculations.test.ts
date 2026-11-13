@@ -58,8 +58,8 @@ describe('Domain Calculations & Macro Utilities', () => {
       id: 'rec-1',
       name: 'Peceto al horno',
       ingredients: [
-        { ingredient_id: 'ing-1', raw_weight_g: 500 }, // Peceto
-        { ingredient_id: 'ing-2', raw_weight_g: 20 }   // Oil
+        { ingredient_id: 'ing-1', raw_weight_g: 500 } as any, // Peceto
+        { ingredient_id: 'ing-2', raw_weight_g: 20 } as any   // Oil
       ],
       yield_factor: 0.85 // 15% moisture loss during baking
     };

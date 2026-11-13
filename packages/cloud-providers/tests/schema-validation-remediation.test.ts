@@ -398,7 +398,7 @@ describe('Google ValidationService & Repair Strategy', () => {
 
         if (url.includes('/v4/spreadsheets/sheet_logs') && !url.includes('/values')) {
           if (init?.method === 'POST' && url.includes(':batchUpdate')) {
-            const body = JSON.parse(init.body);
+            const body = JSON.parse(String(init.body));
             for (const req of body.requests) {
               if (req.appendDimension) {
                 appendedColumnsCount += req.appendDimension.length;

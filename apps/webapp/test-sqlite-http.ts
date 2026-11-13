@@ -9,7 +9,7 @@ async function run() {
         maxPageSize: 4096,
         cacheSize: 4096,
         maxConnections: 1
-      }
+      } as any
     });
 
     console.log('Worker initialized. Running count...');
