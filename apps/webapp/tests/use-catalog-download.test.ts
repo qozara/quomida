@@ -130,6 +130,27 @@ describe('useCatalogDownload', () => {
     expect(result.current.progress).toBe(0);
   });
 
+  it('resets RemoteCatalogService before starting download and on decompressing_and_writing to release OPFS file locks', async () => {
+    const { RemoteCatalogService } = await import('../src/services/RemoteCatalogService.js');
+    const resetSpy = vi.spyOn(RemoteCatalogService.getInstance(), 'reset').mockResolvedValue(undefined as any);
+
+    const { result } = renderHook(() => useCatalogDownload());
+
+    act(() => {
+      result.current.downloadCatalog('http://example.com/catalog.sqlite.gz');
+    });
+
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    resetSpy.mockClear();
+
+    act(() => {
+      mockWorker.onmessage({ data: { type: 'STATUS', payload: 'decompressing_and_writing' } });
+    });
+
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    resetSpy.mockRestore();
+  });
+
   describe('checkAndTriggerAutoDownload', () => {
     it('triggers auto-download when online, size <= 10MB, and saveData is false', () => {
       const { result } = renderHook(() => useCatalogDownload());

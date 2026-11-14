@@ -131,6 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
     : '2';
 
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
+  const [hasPendingCatalogUpdate, setHasPendingCatalogUpdate] = useState(false);
   const [autoDownloadEnabled, setAutoDownloadEnabled] = useState<boolean>(
     () => (typeof window !== 'undefined' ? localStorage.getItem('catalog_auto_download_enabled') !== 'false' : true)
   );
@@ -312,16 +313,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       }
 
       if (autoTriggered) {
+        setHasPendingCatalogUpdate(false);
         setCatalogFeedback(
           (t.settings as any).catalogDownloadingUpdate || 'Downloading catalog update...'
         );
       } else if (currentStatus !== 'complete' || res.status === 'UPDATED') {
+        setHasPendingCatalogUpdate(res.status === 'UPDATED');
         const availableText = (t.settings as any).catalogUpdateAvailable
           ?.replace('{{version}}', shortVersion)
           ?.replace('{{count}}', count !== null && count !== undefined ? count.toLocaleString() : '') ||
           `Update available: v: ${shortVersion}${count ? ` (${count.toLocaleString()} items)` : ''}`;
         setCatalogFeedback(availableText);
       } else if (res.status === 'UP_TO_DATE') {
+        setHasPendingCatalogUpdate(false);
         const itemsLabel = (t.settings as any).catalogItems || 'items';
         setCatalogFeedback(
           (t.settings as any).catalogUpToDate
@@ -939,10 +943,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     </button>
                   ) : downloadStatus === 'complete' ? (
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1.5 min-h-[44px] text-xs font-bold bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-300 dark:border-emerald-900/50">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        {(t.settings as any).offlineDbInstalled || 'Installed'}
-                      </span>
+                      {hasPendingCatalogUpdate ? (
+                        <button
+                          type="button"
+                          disabled={!isOnline}
+                          title={!isOnline ? ((t.settings as any).offlineDbDownloadOfflineTooltip || 'Connect to the internet to download the offline database') : undefined}
+                          onClick={() => setShowConfirmDownload(true)}
+                          className={`px-3 py-1.5 min-h-[44px] text-xs font-bold rounded-lg shadow transition-all flex items-center gap-1.5 ${
+                            !isOnline
+                              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+                              : 'bg-emerald-600 text-white active:scale-95'
+                          }`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          {((t.settings as any).offlineDbDownloadBtn || 'Download (~{{size}}MB)').replace('{{size}}', approximateSizeMb)}
+                        </button>
+                      ) : (
+                        <span className="px-2.5 py-1.5 min-h-[44px] text-xs font-bold bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-inner flex items-center gap-1.5 border border-emerald-300 dark:border-emerald-900/50">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {(t.settings as any).offlineDbInstalled || 'Installed'}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowConfirmDelete(true)}
@@ -1219,6 +1240,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 type="button"
                 onClick={() => {
                   setShowConfirmDownload(false);
+                  setHasPendingCatalogUpdate(false);
                   const baseUrl = import.meta.env?.VITE_CATALOG_BASE_URL?.replace(/\/+$/, '') || '';
                   const targetUrl = baseUrl ? `${baseUrl}/catalog.sqlite.gz` : '/catalog.sqlite.gz';
                   console.log('[SettingsModal] User confirmed download. Starting download from:', targetUrl);
@@ -1268,6 +1290,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 type="button"
                 onClick={async () => {
                   setShowConfirmDelete(false);
+                  setHasPendingCatalogUpdate(false);
                   console.log('[SettingsModal] User confirmed delete. Removing downloaded catalog...');
                   setCatalogFeedback(null);
                   await deleteCatalog();

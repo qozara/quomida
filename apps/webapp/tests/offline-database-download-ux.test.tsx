@@ -394,4 +394,47 @@ describe('Offline Database Download UX & Lifecycle', () => {
       expect(mockResetCatalogState).toHaveBeenCalled();
     });
   });
+
+  it('shows download button when full catalog is installed (complete) but a newer catalog version is available and auto-download was not triggered', async () => {
+    const mockCheckAndTriggerAutoDownload = vi.fn().mockReturnValue(false);
+    const mockRefreshCatalog = vi.fn().mockResolvedValue({
+      status: 'UPDATED',
+      version: '0a766c76a9120d41196a5ebd41f14aa0',
+      itemCount: 19994,
+      itemsUpserted: 19994,
+      fileSizeBytes: 15 * 1024 * 1024
+    });
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue({
+      ...baseAppContext,
+      refreshCatalog: mockRefreshCatalog,
+      catalogVersion: '11111111111111111111111111111111',
+      catalogItemCount: 15000,
+      catalogFileSizeBytes: 15 * 1024 * 1024
+    } as any);
+
+    vi.spyOn(CatalogDownloadHook, 'useCatalogDownload').mockReturnValue({
+      status: 'complete',
+      progress: 100,
+      error: null,
+      isDeleting: false,
+      downloadCatalog: mockDownloadCatalog,
+      deleteCatalog: mockDeleteCatalog,
+      checkAndTriggerAutoDownload: mockCheckAndTriggerAutoDownload,
+      refreshStatus: vi.fn().mockResolvedValue('complete')
+    } as any);
+
+    render(<SettingsModal />);
+
+    const checkUpdatesBtn = screen.getByRole('button', { name: /check for catalog updates/i });
+    fireEvent.click(checkUpdatesBtn);
+
+    await waitFor(() => {
+      expect(mockRefreshCatalog).toHaveBeenCalledWith({ force: true });
+      expect(screen.getByText(/update available: v: 0a766c76/i)).toBeDefined();
+      const downloadBtn = screen.getByRole('button', { name: /download/i });
+      expect(downloadBtn).toBeDefined();
+      expect((downloadBtn as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
 });
