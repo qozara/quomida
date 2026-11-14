@@ -1,16 +1,7 @@
-export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-export const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
-
-export const GOOGLE_DRIVE_SCOPES = [
+export {
   DRIVE_FILE_SCOPE,
-  DRIVE_APPDATA_SCOPE
-] as const;
-
-export interface GoogleHttpClient {
-  fetch(url: string, init?: RequestInit): Promise<Response>;
-}
-
-export interface GoogleDriverOptions {
-  getAccessToken: () => string | null;
-  httpClient?: GoogleHttpClient;
-}
+  DRIVE_APPDATA_SCOPE,
+  GOOGLE_DRIVE_SCOPES,
+  type GoogleHttpClient,
+  type GoogleDriverOptions,
+} from '@qozara/cloud-sync-google';

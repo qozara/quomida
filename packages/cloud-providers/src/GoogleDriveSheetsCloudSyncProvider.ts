@@ -1,9 +1,10 @@
-import type { SyncDeltaPayload, SyncStatus } from './types.js';
-import { CompositeCloudSyncProvider } from './strategy/CompositeCloudSyncProvider.js';
-import type { CollectionRoute } from './strategy/types.js';
-import { GoogleDriveBlobDriver } from './google/GoogleDriveBlobDriver.js';
-import { GoogleSheetsTabularDriver } from './google/GoogleSheetsTabularDriver.js';
-import type { GoogleHttpClient } from './google/types.js';
+import type { CollectionRoute } from '@qozara/cloud-sync';
+import {
+  GoogleDriveSheetsCloudSyncProvider as BaseGoogleDriveSheetsCloudSyncProvider,
+  type GoogleHttpClient,
+} from '@qozara/cloud-sync-google';
+import { createQuomidaTabularDriverOptions } from './google/GoogleSheetsTabularDriver.js';
+import { collectionSerializers } from './strategy/serializers.js';
 
 export interface GoogleDriveSheetsCloudSyncProviderOptions {
   httpClient?: GoogleHttpClient;
@@ -11,184 +12,63 @@ export interface GoogleDriveSheetsCloudSyncProviderOptions {
   onTokenRefresh?: () => Promise<string>;
 }
 
-export class GoogleDriveSheetsCloudSyncProvider extends CompositeCloudSyncProvider {
-  private accessToken: string | null = null;
-  private userEmail: string | null = null;
-  private userName: string | null = null;
-  private userPicture: string | null = null;
-  private httpClient?: GoogleHttpClient;
-  private onTokenRefresh?: () => Promise<string>;
+const DEFAULT_QUOMIDA_GOOGLE_ROUTES: Record<string, CollectionRoute> = {
+  daily_logs: {
+    target: 'tabular',
+    documentKey: 'quomida_daily_logs',
+    documentTitle: 'Quomida Daily Logs',
+    tabName: 'daily_logs',
+  },
+  weight_logs: {
+    target: 'tabular',
+    documentKey: 'quomida_daily_logs',
+    documentTitle: 'Quomida Daily Logs',
+    tabName: 'weight_logs',
+  },
+  base_ingredients: {
+    target: 'tabular',
+    documentKey: 'quomida_food_catalog',
+    documentTitle: 'Quomida Food Catalog',
+    tabName: 'base_ingredients',
+  },
+  recipes: {
+    target: 'tabular',
+    documentKey: 'quomida_food_catalog',
+    documentTitle: 'Quomida Food Catalog',
+    tabName: 'recipes',
+  },
+  portions: {
+    target: 'tabular',
+    documentKey: 'quomida_food_catalog',
+    documentTitle: 'Quomida Food Catalog',
+    tabName: 'portions',
+  },
+  user_settings: { target: 'blob', filename: 'settings.json' },
+};
 
+export class GoogleDriveSheetsCloudSyncProvider extends BaseGoogleDriveSheetsCloudSyncProvider {
   constructor(options?: GoogleDriveSheetsCloudSyncProviderOptions) {
-    const httpClient = options?.httpClient;
-
-    let getAccessToken = () => null as string | null;
-
-    const blobDriver = new GoogleDriveBlobDriver({
-      getAccessToken: () => getAccessToken(),
-      httpClient
+    const { getAccessToken: _ignored, ...tabularDefaults } = createQuomidaTabularDriverOptions({
+      getAccessToken: () => null,
+      httpClient: options?.httpClient,
     });
-
-    const tabularDriver = new GoogleSheetsTabularDriver({
-      getAccessToken: () => getAccessToken(),
-      httpClient
-    });
-
-    const defaultRoutes: Record<string, CollectionRoute> = {
-      daily_logs: { 
-        target: 'tabular', 
-        documentKey: 'quomida_daily_logs', 
-        documentTitle: 'Quomida Daily Logs', 
-        tabName: 'daily_logs' 
-      },
-      weight_logs: {
-        target: 'tabular',
-        documentKey: 'quomida_daily_logs',
-        documentTitle: 'Quomida Daily Logs',
-        tabName: 'weight_logs'
-      },
-      base_ingredients: { 
-        target: 'tabular', 
-        documentKey: 'quomida_food_catalog', 
-        documentTitle: 'Quomida Food Catalog', 
-        tabName: 'base_ingredients' 
-      },
-      recipes: { 
-        target: 'tabular', 
-        documentKey: 'quomida_food_catalog', 
-        documentTitle: 'Quomida Food Catalog', 
-        tabName: 'recipes' 
-      },
-      portions: { 
-        target: 'tabular', 
-        documentKey: 'quomida_food_catalog', 
-        documentTitle: 'Quomida Food Catalog', 
-        tabName: 'portions' 
-      },
-      user_settings: { target: 'blob', filename: 'settings.json' }
-    };
 
     super({
       id: 'google-drive-sheets',
       name: 'Google Drive / Sheets BYOS Adapter',
       description: 'Direct synchronization to personal Google Drive spreadsheets',
-      blobDriver,
-      tabularDriver,
-      routes: options?.routes || defaultRoutes
+      httpClient: options?.httpClient,
+      routes: options?.routes || { ...DEFAULT_QUOMIDA_GOOGLE_ROUTES },
+      serializers: collectionSerializers,
+      shouldSkipTabularPushDoc: (collection, doc) =>
+        (collection === 'base_ingredients' || collection === 'portions') &&
+        doc.source === 'system',
+      blobDriverOptions: {
+        enableLegacyRootMigration: false,
+        multipartBoundary: '-------quomida_blob_boundary',
+      },
+      tabularDriverOptions: tabularDefaults,
+      onTokenRefresh: options?.onTokenRefresh,
     });
-
-    this.httpClient = httpClient;
-    this.onTokenRefresh = options?.onTokenRefresh;
-    getAccessToken = () => this.accessToken;
-  }
-
-  override isInitialized(): boolean {
-    return this.initialized && !!this.accessToken;
-  }
-
-  override getConnectedAccount(): string | null {
-    if (!this.isInitialized()) return null;
-    if (this.userName && this.userEmail) {
-      return `${this.userName} (${this.userEmail})`;
-    }
-    if (this.userEmail) {
-      return this.userEmail;
-    }
-    if (this.userName) {
-      return this.userName;
-    }
-    return 'google-user@drive.google.com';
-  }
-
-  override getUserPicture(): string | null {
-    return this.userPicture;
-  }
-
-  override async initialize(credentials?: string | Record<string, any>): Promise<void> {
-    if (typeof credentials === 'string') {
-      this.accessToken = credentials;
-      this.userEmail = null;
-      this.userName = null;
-      this.userPicture = null;
-    } else if (credentials && typeof credentials === 'object') {
-      if (credentials.accessToken) {
-        this.accessToken = credentials.accessToken;
-      }
-      this.userEmail = credentials.userEmail || null;
-      this.userName = credentials.userName || null;
-      this.userPicture = credentials.userPicture || null;
-      if (credentials.httpClient) {
-        this.httpClient = credentials.httpClient;
-      }
-    }
-
-    if (this.accessToken) {
-      this.initialized = true;
-      this.lastSyncedTime = new Date().toISOString();
-      this.setStatus('idle');
-    } else if (this.onTokenRefresh) {
-      try {
-        this.accessToken = await this.onTokenRefresh();
-        this.initialized = true;
-        this.lastSyncedTime = new Date().toISOString();
-        this.setStatus('idle');
-      } catch (err) {
-        this.initialized = false;
-        this.setStatus('auth_failed');
-      }
-    } else {
-      this.initialized = false;
-      this.setStatus('disconnected');
-    }
-  }
-
-  override async disconnect(): Promise<void> {
-    this.accessToken = null;
-    this.userEmail = null;
-    this.userName = null;
-    this.userPicture = null;
-    await super.disconnect();
-  }
-
-  override async reauthenticate(): Promise<void> {
-    if (this.onTokenRefresh) {
-      try {
-        const newToken = await this.onTokenRefresh();
-        this.accessToken = newToken;
-        this.setStatus('idle');
-        this.lastSyncedTime = new Date().toISOString();
-        this.notifyCredentialsChange({
-          accessToken: newToken,
-          userEmail: this.userEmail,
-          userName: this.userName,
-          expiresAt: Date.now() + 3500000
-        });
-        return;
-      } catch (e) {
-        this.setStatus('auth_failed');
-        return;
-      }
-    }
-
-    if (this.accessToken) {
-      this.setStatus('idle');
-      this.lastSyncedTime = new Date().toISOString();
-    } else {
-      this.setStatus('auth_failed');
-    }
-  }
-
-  override async push(payload: SyncDeltaPayload): Promise<void> {
-    if (!this.isInitialized()) {
-      return;
-    }
-    await super.push(payload);
-  }
-
-  override async pull(): Promise<SyncDeltaPayload[]> {
-    if (!this.isInitialized()) {
-      return [];
-    }
-    return await super.pull();
   }
 }

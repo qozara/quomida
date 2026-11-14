@@ -1,62 +1,20 @@
-import type { TabularRow } from './types.js';
+import {
+  createFieldGetter,
+  parseBool,
+  parseNumber,
+  escapeFormulaInjection,
+  sanitizeString,
+  type CollectionSerializer,
+  type TabularRow,
+} from '@qozara/cloud-sync';
 
-export interface CollectionSerializer {
-  headers: string[];
-  docToRow(doc: Record<string, any>): TabularRow;
-  rowToDoc(row: TabularRow): Record<string, any>;
-}
-
-export function createFieldGetter(row: TabularRow) {
-  const headers = row.headers;
-  const v = row.values;
-
-  if (headers && headers.length > 0) {
-    const map = new Map<string, number>();
-    for (let i = 0; i < headers.length; i++) {
-      const h = String(headers[i] ?? '').trim().toLowerCase();
-      if (h && !map.has(h)) {
-        map.set(h, i);
-      }
-    }
-    return (colName: string, _fallbackIndex: number) => {
-      const target = colName.trim().toLowerCase();
-      const idx = map.get(target);
-      return idx !== undefined ? v[idx] : undefined;
-    };
-  }
-
-  return (_colName: string, fallbackIndex: number) => {
-    return v[fallbackIndex];
-  };
-}
-
-export const parseBool = (val: any) => {
-  if (typeof val === 'string') return val.toLowerCase() === 'true';
-  return Boolean(val);
-};
-
-export const parseNumber = (val: any, fallback: number = 0): number => {
-  if (val === null || val === undefined || val === '') return fallback;
-  const n = typeof val === 'number' ? val : Number(val);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-};
-
-export const escapeFormulaInjection = (val: any): any => {
-  if (typeof val !== 'string') return val;
-  if (/^[=+\-@\t\r]/.test(val)) {
-    return `'${val}`;
-  }
-  return val;
-};
-
-export const sanitizeString = (val: any, fallback: string = ''): string => {
-  if (val === null || val === undefined) return fallback;
-  let str = String(val);
-  if (str.startsWith("'") && /^[=+\-@\t\r]/.test(str.slice(1))) {
-    str = str.slice(1);
-  }
-  // Strip raw HTML / script tags
-  return str.replace(/<[^>]*>/g, '').trim();
+export {
+  createFieldGetter,
+  parseBool,
+  parseNumber,
+  escapeFormulaInjection,
+  sanitizeString,
+  type CollectionSerializer,
 };
 
 export const dailyLogsSerializer: CollectionSerializer = {

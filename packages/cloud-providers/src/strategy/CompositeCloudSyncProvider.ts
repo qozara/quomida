@@ -1,591 +1,69 @@
-import type { CloudSyncProvider, SyncDeltaPayload, SyncStatus } from '../types.js';
-import type {
-  BlobStorageDriver,
-  TabularStorageDriver,
-  TabularRow,
-  CollectionRoute,
-  CompositeCloudSyncProviderOptions
-} from './types.js';
+import {
+  CompositeCloudSyncProvider as BaseCompositeCloudSyncProvider,
+  isNetworkError,
+  isEntityNotFoundError,
+  shouldAcceptIncomingDoc,
+  sanitizeRemoteDocument,
+  type CollectionRoute,
+  type CompositeCloudSyncProviderOptions,
+} from '@qozara/cloud-sync';
 import { collectionSerializers } from './serializers.js';
 
-export function isNetworkError(err: any): boolean {
-  if (!err) return false;
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    return true;
-  }
-  const msg = err?.message || String(err);
-  return (
-    (err?.name === 'TypeError' && (msg.includes('fetch') || msg.includes('Failed to fetch'))) ||
-    msg.includes('net::ERR_INTERNET_DISCONNECTED') ||
-    msg.includes('NetworkError') ||
-    msg.includes('network error') ||
-    msg.includes('ERR_CONNECTION_') ||
-    msg.includes('ERR_NETWORK_CHANGED') ||
-    msg.includes('ECONNRESET') ||
-    msg.includes('ENOTFOUND') ||
-    msg.includes('ETIMEDOUT')
-  );
-}
-
-export function isEntityNotFoundError(err: any): boolean {
-  if (!err) return false;
-  if (err.status === 404 || err.code === 404 || err.statusCode === 404) {
-    return true;
-  }
-  const msg = err?.message || String(err);
-  return (
-    msg.includes('404') ||
-    msg.includes('NOT_FOUND') ||
-    msg.includes('Requested entity was not found') ||
-    msg.includes('File not found')
-  );
-}
-
-export function shouldAcceptIncomingDoc(
-  existing: Record<string, any> | undefined,
-  incoming: Record<string, any>
-): boolean {
-  if (!existing) return true;
-  const existingTime = typeof existing.updatedAt === 'number' ? existing.updatedAt : 0;
-  const incomingTime = typeof incoming.updatedAt === 'number' ? incoming.updatedAt : 0;
-  if (incomingTime > existingTime) return true;
-  if (incomingTime < existingTime) return false;
-  if (existing._deleted && !incoming._deleted) return false;
-  return true;
-}
-
-export function sanitizeRemoteDocument(
-  collection: string,
-  doc: Record<string, any>
-): Record<string, any> {
-  if (collection === 'user_settings' && doc && typeof doc === 'object' && 'active_cloud_provider' in doc) {
-    const copy = { ...doc };
-    delete copy.active_cloud_provider;
-    return copy;
-  }
-  return doc;
-}
+export {
+  isNetworkError,
+  isEntityNotFoundError,
+  shouldAcceptIncomingDoc,
+  sanitizeRemoteDocument,
+};
 
 export const DEFAULT_COLLECTION_ROUTES: Record<string, CollectionRoute> = {
   user_settings: {
     target: 'blob',
-    filename: 'settings.json'
+    filename: 'settings.json',
   },
   daily_logs: {
     target: 'tabular',
     documentKey: 'logs',
     documentTitle: 'Quomida Daily Logs',
-    tabName: 'daily_logs'
+    tabName: 'daily_logs',
   },
   weight_logs: {
     target: 'tabular',
     documentKey: 'logs',
     documentTitle: 'Quomida Daily Logs',
-    tabName: 'weight_logs'
+    tabName: 'weight_logs',
   },
   base_ingredients: {
     target: 'tabular',
     documentKey: 'catalog',
     documentTitle: 'Quomida Food Catalog',
-    tabName: 'base_ingredients'
+    tabName: 'base_ingredients',
   },
   recipes: {
     target: 'tabular',
     documentKey: 'catalog',
     documentTitle: 'Quomida Food Catalog',
-    tabName: 'recipes'
+    tabName: 'recipes',
   },
   portions: {
     target: 'tabular',
     documentKey: 'catalog',
     documentTitle: 'Quomida Food Catalog',
-    tabName: 'portions'
-  }
+    tabName: 'portions',
+  },
 };
 
-export class CompositeCloudSyncProvider implements CloudSyncProvider {
-  id: string;
-  name: string;
-  description?: string;
-
-  protected initialized = false;
-  protected status: SyncStatus = 'disconnected';
-  protected lastSyncedTime: string | null = null;
-  protected statusListeners: Set<(status: SyncStatus) => void> = new Set();
-  protected credentialsListeners: Set<(credentials: any) => void> = new Set();
-  protected blobDriver?: BlobStorageDriver;
-  protected tabularDriver?: TabularStorageDriver;
-  protected routes: Record<string, CollectionRoute>;
-  protected documentIdCache: Map<string, string> = new Map();
-  protected tabularCache: Map<string, Record<string, any>[]> = new Map();
-
+export class CompositeCloudSyncProvider extends BaseCompositeCloudSyncProvider {
   constructor(options: CompositeCloudSyncProviderOptions) {
-    this.id = options.id;
-    this.name = options.name;
-    this.description = options.description;
-    this.blobDriver = options.blobDriver;
-    this.tabularDriver = options.tabularDriver;
-    this.routes = options.routes || { ...DEFAULT_COLLECTION_ROUTES };
-  }
-
-  isInitialized(): boolean {
-    return this.initialized;
-  }
-
-  getStatus(): SyncStatus {
-    return this.status;
-  }
-
-  getLastSyncedTime(): string | null {
-    return this.lastSyncedTime;
-  }
-
-  getConnectedAccount(): string | null {
-    return this.initialized ? 'connected-account' : null;
-  }
-
-  getUserPicture(): string | null {
-    return null;
-  }
-
-  onStatusChange(listener: (status: SyncStatus) => void): () => void {
-    this.statusListeners.add(listener);
-    return () => {
-      this.statusListeners.delete(listener);
-    };
-  }
-
-  onCredentialsChange(listener: (credentials: any) => void): () => void {
-    this.credentialsListeners.add(listener);
-    return () => {
-      this.credentialsListeners.delete(listener);
-    };
-  }
-
-  protected setStatus(newStatus: SyncStatus): void {
-    this.status = newStatus;
-    for (const listener of this.statusListeners) {
-      try {
-        listener(newStatus);
-      } catch (err) {
-        console.error('Error in status change listener', err);
-      }
-    }
-  }
-
-  protected notifyCredentialsChange(credentials: any): void {
-    for (const listener of this.credentialsListeners) {
-      try {
-        listener(credentials);
-      } catch (err) {
-        console.error('Error in credentials change listener', err);
-      }
-    }
-  }
-
-  setCorruptedStatus(): void {
-    this.setStatus('corrupted');
-  }
-
-  setUpgradeRequiredStatus(): void {
-    this.setStatus('upgrade_required');
-  }
-
-  async getRemoteLinks(): Promise<string[]> {
-    const links: string[] = [];
-    if (this.blobDriver?.getRemoteLinks) {
-      links.push(...(await this.blobDriver.getRemoteLinks()));
-    }
-    if (this.tabularDriver?.getRemoteLinks) {
-      links.push(...(await this.tabularDriver.getRemoteLinks()));
-    }
-    return links;
-  }
-
-  async initialize(credentials?: string | Record<string, any>): Promise<void> {
-    this.initialized = true;
-    this.lastSyncedTime = new Date().toISOString();
-    this.setStatus('idle');
-  }
-
-  async disconnect(): Promise<void> {
-    this.initialized = false;
-    this.documentIdCache.clear();
-    this.tabularCache.clear();
-    this.setStatus('disconnected');
-  }
-
-  async reauthenticate(): Promise<void> {
-    if (this.initialized) {
-      this.setStatus('idle');
-      this.lastSyncedTime = new Date().toISOString();
-    } else {
-      this.setStatus('auth_failed');
-    }
-  }
-
-  async forceSync(): Promise<void> {
-    if (!this.initialized) return;
-    this.setStatus('syncing');
-    await this.pull();
-    this.lastSyncedTime = new Date().toISOString();
-    this.setStatus('idle');
-  }
-
-  async repair(): Promise<void> {
-    if (!this.tabularDriver || !this.tabularDriver.repairTable) {
-      throw new Error('Repair is not supported by this sync adapter driver');
-    }
-
-    this.setStatus('syncing');
-    try {
-      const docIds = new Set<string>();
-      for (const route of Object.values(this.routes)) {
-        if (route.target === 'tabular') {
-          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-          docIds.add(docId);
-        }
-      }
-
-      for (const docId of docIds) {
-        await this.tabularDriver.repairTable(docId);
-      }
-
-      this.setStatus('idle');
-    } catch (err) {
-      this.setStatus('corrupted');
-      throw err;
-    }
-  }
-
-  async migrate(): Promise<void> {
-    if (!this.tabularDriver || !this.tabularDriver.migrateTable) {
-      throw new Error('Migration is not supported by this sync adapter driver');
-    }
-
-    this.setStatus('syncing');
-    try {
-      const docIds = new Set<string>();
-      for (const route of Object.values(this.routes)) {
-        if (route.target === 'tabular') {
-          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-          docIds.add(docId);
-        }
-      }
-
-      for (const docId of docIds) {
-        await this.tabularDriver.migrateTable(docId);
-      }
-
-      this.setStatus('idle');
-    } catch (err) {
-      this.setStatus('upgrade_required');
-      throw err;
-    }
-  }
-
-  async getSchemaDiagnostic(): Promise<{
-    status: SyncStatus;
-    missingColumns?: Record<string, string[]>;
-    missingTabs?: string[];
-  } | null> {
-    if (this.status !== 'corrupted' && this.status !== 'upgrade_required') {
-      return null;
-    }
-    if (!this.tabularDriver || !this.tabularDriver.checkHealth) {
-      return { status: this.status };
-    }
-
-    try {
-      const allMissingCols: Record<string, string[]> = {};
-      const allMissingTabs: string[] = [];
-
-      for (const route of Object.values(this.routes)) {
-        if (route.target === 'tabular') {
-          const docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-          const health = await this.tabularDriver.checkHealth(docId);
-          if (health?.missingColumns) {
-            Object.assign(allMissingCols, health.missingColumns);
-          }
-          if (health?.missingTabs) {
-            allMissingTabs.push(...health.missingTabs);
-          }
-        }
-      }
-
-      return {
-        status: this.status,
-        missingColumns: allMissingCols,
-        missingTabs: allMissingTabs
-      };
-    } catch {
-      return { status: this.status };
-    }
-  }
-
-  async push(payload: SyncDeltaPayload): Promise<void> {
-    if (!this.initialized) return;
-    if (this.status === 'corrupted') {
-      throw new Error(
-        'Sync suspended: remote spreadsheet schema is corrupted. Please repair the spreadsheet before syncing.'
-      );
-    }
-    if (this.status === 'upgrade_required') {
-      throw new Error(
-        'Sync suspended: remote spreadsheet schema requires upgrade. Please migrate the spreadsheet before syncing.'
-      );
-    }
-
-    this.setStatus('syncing');
-
-    try {
-      const route = this.routes[payload.collection];
-      if (!route) {
-        console.warn(`[CompositeCloudSyncProvider] Skipping unrouted collection "${payload.collection}"`);
-        return;
-      }
-
-      if (route.target === 'blob') {
-        if (!this.blobDriver) {
-          throw new Error(`BlobStorageDriver is required for collection "${payload.collection}"`);
-        }
-        // Read existing blob to merge or upsert with LWW timestamp validation
-        const existingDocs = (await this.blobDriver.readBlob<Record<string, any>[]>(route.filename)) || [];
-        const docMap = new Map(existingDocs.map(d => [d.id, sanitizeRemoteDocument(payload.collection, d)]));
-        for (const doc of payload.documents) {
-          if (doc.id) {
-            const sanitized = sanitizeRemoteDocument(payload.collection, doc);
-            const current = docMap.get(doc.id);
-            if (shouldAcceptIncomingDoc(current, sanitized)) {
-              docMap.set(doc.id, sanitized);
-            }
-          }
-        }
-        await this.blobDriver.writeBlob(route.filename, Array.from(docMap.values()));
-      } else if (route.target === 'tabular') {
-        if (!this.tabularDriver) {
-          throw new Error(`TabularStorageDriver is required for collection "${payload.collection}"`);
-        }
-
-        const serializer = collectionSerializers[payload.collection];
-        if (!serializer) {
-          throw new Error(`No tabular serializer registered for collection "${payload.collection}"`);
-        }
-
-        let docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-        let cacheKey = `${docId}_${route.tabName}`;
-
-        let existingDocs: Record<string, any>[] = [];
-        if (this.tabularCache.has(cacheKey)) {
-          existingDocs = this.tabularCache.get(cacheKey)!;
-        } else {
-          try {
-            const existingRows = await this.tabularDriver.readTable(docId, route.tabName);
-            existingDocs = existingRows.map(r => serializer.rowToDoc(r));
-          } catch (err: any) {
-            if (
-              err?.message?.includes('corruption') ||
-              err?.message?.includes('missing required column')
-            ) {
-              throw err;
-            }
-            if (isEntityNotFoundError(err)) {
-              this.invalidateDocument(route.documentKey, docId);
-              docId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
-              cacheKey = `${docId}_${route.tabName}`;
-              existingDocs = [];
-            }
-            // If table doesn't exist or is empty, we start with empty existingDocs
-          }
-        }
-
-        const docMap = new Map(existingDocs.map(d => [d.id, d]));
-        for (const doc of payload.documents) {
-          if (doc.id) {
-            // JIT Cache Sync Isolation: explicitly ignore remote VFS items
-            if ((payload.collection === 'base_ingredients' || payload.collection === 'portions') && doc.source === 'system') {
-              continue;
-            }
-            const current = docMap.get(doc.id);
-            if (shouldAcceptIncomingDoc(current, doc)) {
-              docMap.set(doc.id, doc);
-            }
-          }
-        }
-
-        const mergedDocs = Array.from(docMap.values());
-        this.tabularCache.set(cacheKey, mergedDocs);
-
-        const rows = mergedDocs.map(doc => serializer.docToRow(doc));
-        try {
-          await this.tabularDriver.writeTable(docId, route.tabName, serializer.headers, rows);
-        } catch (writeErr: any) {
-          if (isEntityNotFoundError(writeErr)) {
-            this.invalidateDocument(route.documentKey, docId);
-            const freshDocId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
-            const freshCacheKey = `${freshDocId}_${route.tabName}`;
-            this.tabularCache.set(freshCacheKey, mergedDocs);
-            await this.tabularDriver.writeTable(freshDocId, route.tabName, serializer.headers, rows);
-          } else {
-            throw writeErr;
-          }
-        }
-      }
-
-      this.lastSyncedTime = new Date().toISOString();
-      this.setStatus('idle');
-    } catch (err: any) {
-      if (
-        err?.message?.includes('corruption') ||
-        err?.message?.includes('missing required column')
-      ) {
-        this.setStatus('corrupted');
-      } else if (
-        err?.message?.includes('upgrade') ||
-        err?.message?.includes('SchemaUpgradeRequired')
-      ) {
-        this.setStatus('upgrade_required');
-      } else if (
-        err?.message?.includes('Google Auth Failed') ||
-        err?.message?.includes('401') ||
-        err?.message?.includes('unauthorized')
-      ) {
-        this.setStatus('auth_failed');
-      } else if (
-        err?.message?.includes('Rate Limit') ||
-        err?.message?.includes('429')
-      ) {
-        this.setStatus('throttled');
-      } else if (isNetworkError(err) || isEntityNotFoundError(err)) {
-        // Transient network disconnection or self-healing entity 404: keep status intact (idle)
-        this.setStatus('idle');
-      } else {
-        this.setStatus('error');
-      }
-      throw err;
-    }
-  }
-
-  async pull(): Promise<SyncDeltaPayload[]> {
-    if (!this.initialized) return [];
-    if (this.status === 'corrupted') {
-      throw new Error(
-        'Sync suspended: remote spreadsheet schema is corrupted. Please repair the spreadsheet before syncing.'
-      );
-    }
-    if (this.status === 'upgrade_required') {
-      throw new Error(
-        'Sync suspended: remote spreadsheet schema requires upgrade. Please migrate the spreadsheet before syncing.'
-      );
-    }
-
-    this.setStatus('syncing');
-
-    try {
-      const results: SyncDeltaPayload[] = [];
-
-      for (const [collection, route] of Object.entries(this.routes)) {
-        if (route.target === 'blob' && this.blobDriver) {
-          const docs = await this.blobDriver.readBlob<Record<string, any>[]>(route.filename);
-          if (docs && Array.isArray(docs)) {
-            results.push({ collection, documents: docs });
-          }
-        } else if (route.target === 'tabular' && this.tabularDriver) {
-          const serializer = collectionSerializers[collection];
-          if (serializer) {
-            try {
-              let docId = await this.resolveDocumentId(route.documentKey, route.documentTitle);
-              let rows: TabularRow[];
-              try {
-                rows = await this.tabularDriver.readTable(docId, route.tabName);
-              } catch (readErr: any) {
-                if (isEntityNotFoundError(readErr)) {
-                  this.invalidateDocument(route.documentKey, docId);
-                  docId = await this.resolveDocumentId(route.documentKey, route.documentTitle, true);
-                  rows = await this.tabularDriver.readTable(docId, route.tabName);
-                } else {
-                  throw readErr;
-                }
-              }
-              const documents = rows.map(r => serializer.rowToDoc(r));
-              const cacheKey = `${docId}_${route.tabName}`;
-              this.tabularCache.set(cacheKey, documents);
-              results.push({ collection, documents });
-            } catch (tabErr: any) {
-              if (
-                tabErr?.message?.includes('corruption') ||
-                tabErr?.message?.includes('missing required column')
-              ) {
-                throw tabErr;
-              }
-              // Document or sheet tab might not exist yet; gracefully return empty
-              results.push({ collection, documents: [] });
-            }
-          }
-        }
-      }
-
-      this.lastSyncedTime = new Date().toISOString();
-      this.setStatus('idle');
-      return results;
-    } catch (err: any) {
-      if (
-        err?.message?.includes('corruption') ||
-        err?.message?.includes('missing required column')
-      ) {
-        this.setStatus('corrupted');
-      } else if (
-        err?.message?.includes('upgrade') ||
-        err?.message?.includes('SchemaUpgradeRequired')
-      ) {
-        this.setStatus('upgrade_required');
-      } else if (
-        err?.message?.includes('Google Auth Failed') ||
-        err?.message?.includes('401') ||
-        err?.message?.includes('unauthorized')
-      ) {
-        this.setStatus('auth_failed');
-      } else if (
-        err?.message?.includes('Rate Limit') ||
-        err?.message?.includes('429')
-      ) {
-        this.setStatus('throttled');
-      } else if (isNetworkError(err) || isEntityNotFoundError(err)) {
-        // Transient network disconnection or self-healing entity 404: keep status intact (idle)
-        this.setStatus('idle');
-      } else {
-        this.setStatus('error');
-      }
-      throw err;
-    }
-  }
-
-  invalidateDocument(documentKey: string, staleDocId?: string): void {
-    this.documentIdCache.delete(documentKey);
-    if (staleDocId) {
-      for (const key of Array.from(this.tabularCache.keys())) {
-        if (key.startsWith(`${staleDocId}_`)) {
-          this.tabularCache.delete(key);
-        }
-      }
-    }
-  }
-
-  protected async resolveDocumentId(documentKey: string, documentTitle: string, bypassCache = false): Promise<string> {
-    if (!bypassCache && this.documentIdCache.has(documentKey)) {
-      return this.documentIdCache.get(documentKey)!;
-    }
-    if (!this.tabularDriver) {
-      throw new Error('TabularStorageDriver not configured');
-    }
-
-    // Determine all tabs for this documentKey
-    const relevantTabs = Object.values(this.routes)
-      .filter(r => r.target === 'tabular' && r.documentKey === documentKey)
-      .map(r => (r as Extract<CollectionRoute, { target: 'tabular' }>).tabName);
-
-    const docId = await this.tabularDriver.ensureDocument(documentTitle, relevantTabs);
-    this.documentIdCache.set(documentKey, docId);
-    return docId;
+    super({
+      ...options,
+      routes: options.routes || { ...DEFAULT_COLLECTION_ROUTES },
+      serializers: options.serializers || collectionSerializers,
+      shouldSkipTabularPushDoc:
+        options.shouldSkipTabularPushDoc ??
+        ((collection, doc) =>
+          (collection === 'base_ingredients' || collection === 'portions') &&
+          doc.source === 'system'),
+    });
   }
 }
