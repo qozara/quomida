@@ -1,4 +1,4 @@
-import type { SchemaDefinition, TabDefinition, ColumnDefinition } from '@qozara/gdocs-schema';
+import type { SchemaDefinition, TabDefinition, ColumnDefinition } from '@qozara/cloud-sync-google';
 export type { SchemaDefinition, TabDefinition, ColumnDefinition };
 
 export const QuomidaDailyLogsSpreadsheetSchema: SchemaDefinition = {

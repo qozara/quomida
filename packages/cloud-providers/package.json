@@ -19,7 +19,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@qozara/gdocs-schema": "^1.0.4",
+    "@qozara/cloud-sync": "^1.0.0",
+    "@qozara/cloud-sync-google": "^1.0.0",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {
