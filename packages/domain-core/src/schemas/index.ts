@@ -116,7 +116,7 @@ export const dailyLogsSchema: RxJsonSchema<DailyLog> = {
 
 export const userSettingsSchema: RxJsonSchema<UserSettings> = {
   title: 'user_settings',
-  version: 0,
+  version: 1,
   description: 'Global application preferences and nutritional targets',
   primaryKey: 'id',
   type: 'object',

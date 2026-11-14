@@ -95,4 +95,72 @@ describe('exportRawDexieBackup', () => {
     const backupJson = await exportRawDexieBackup('test_empty_db');
     expect(backupJson).toBe('{}');
   });
+
+  it('exports per-collection rxdb-dexie IndexedDB databases when main db has no object stores', async () => {
+    const emptyMainDb = {
+      objectStoreNames: [],
+      close: vi.fn()
+    };
+
+    const collectionStores: Record<string, any[]> = {
+      'rxdb-dexie-quomidadb_v1--0--daily_logs': [
+        { id: 'log-1', food_name: 'Eggs', _deleted: false },
+        { id: 'log-deleted', food_name: 'Old', _deleted: true }
+      ],
+      'rxdb-dexie-quomidadb_v1--0--base_ingredients': [
+        { id: 'custom-1', name: 'My Bread', source: 'custom', _deleted: false },
+        { id: 'sys-1', name: 'Apple', source: 'system', _deleted: false }
+      ],
+      'rxdb-dexie-quomidadb_v1--0--_rxdb_internal': [
+        { id: 'internal-1' }
+      ]
+    };
+
+    const makeCollectionDb = (dbName: string) => ({
+      objectStoreNames: ['docs', 'changes'],
+      transaction: vi.fn().mockReturnValue({
+        objectStore: (storeName: string) => ({
+          getAll: () => {
+            const req: any = {
+              onsuccess: null,
+              onerror: null,
+              result: storeName === 'docs' ? (collectionStores[dbName] || []) : []
+            };
+            setTimeout(() => {
+              if (req.onsuccess) req.onsuccess();
+            }, 0);
+            return req;
+          }
+        })
+      }),
+      close: vi.fn()
+    });
+
+    vi.stubGlobal('indexedDB', {
+      databases: vi.fn().mockResolvedValue([
+        { name: 'rxdb-dexie-quomidadb_v1--0--daily_logs' },
+        { name: 'rxdb-dexie-quomidadb_v1--0--base_ingredients' },
+        { name: 'rxdb-dexie-quomidadb_v1--0--_rxdb_internal' },
+        { name: 'other-unrelated-db' }
+      ]),
+      open: vi.fn().mockImplementation((name: string) => {
+        const req: any = {
+          onsuccess: null,
+          onerror: null,
+          result: name === 'quomidadb_v1' ? emptyMainDb : makeCollectionDb(name)
+        };
+        setTimeout(() => {
+          if (req.onsuccess) req.onsuccess();
+        }, 0);
+        return req;
+      })
+    });
+
+    const backupJson = await exportRawDexieBackup('quomidadb_v1');
+    const parsed = JSON.parse(backupJson);
+
+    expect(parsed.daily_logs).toEqual([{ id: 'log-1', food_name: 'Eggs', _deleted: false }]);
+    expect(parsed.base_ingredients).toEqual([{ id: 'custom-1', name: 'My Bread', source: 'custom', _deleted: false }]);
+    expect(parsed._rxdb_internal).toBeUndefined();
+  });
 });

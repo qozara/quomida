@@ -38,62 +38,135 @@ export interface QuomidaDBError extends Error {
   backupData?: string;
 }
 
+function readObjectStoresFromIdb(
+  idb: IDBFactory,
+  dbName: string
+): Promise<{ storeCount: number; backup: Record<string, any[]> }> {
+  return new Promise((resolve, reject) => {
+    const request = idb.open(dbName);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const backup: Record<string, any[]> = {};
+      const objectStoreNames = Array.from(db.objectStoreNames);
+      if (objectStoreNames.length === 0) {
+        db.close();
+        resolve({ storeCount: 0, backup });
+        return;
+      }
+
+      // Target stores, excluding internal catalog system dumps
+      const targetStores = objectStoreNames.filter(name => {
+        const lower = name.toLowerCase();
+        return !lower.includes('catalog_system');
+      });
+
+      const storesToExport = targetStores.length > 0 ? targetStores : objectStoreNames;
+      let completed = 0;
+      const transaction = db.transaction(storesToExport, 'readonly');
+
+      storesToExport.forEach(storeName => {
+        const store = transaction.objectStore(storeName);
+        const getAllRequest = store.getAll();
+        getAllRequest.onsuccess = () => {
+          let records = getAllRequest.result || [];
+          // Filter out system catalog items to prevent memory explosion
+          if (storeName.includes('base_ingredients') || storeName.includes('portions')) {
+            records = records.filter((r: any) => r?.source !== 'system');
+          }
+          backup[storeName] = records;
+          completed++;
+          if (completed === storesToExport.length) {
+            db.close();
+            resolve({ storeCount: objectStoreNames.length, backup });
+          }
+        };
+        getAllRequest.onerror = () => {
+          completed++;
+          if (completed === storesToExport.length) {
+            db.close();
+            resolve({ storeCount: objectStoreNames.length, backup });
+          }
+        };
+      });
+    };
+  });
+}
+
+async function readRxdbDexieCollectionDocs(idb: IDBFactory, dexieDbName: string): Promise<any[]> {
+  return new Promise((resolve) => {
+    const request = idb.open(dexieDbName);
+    request.onerror = () => resolve([]);
+    request.onsuccess = () => {
+      const db = request.result;
+      const objectStoreNames = Array.from(db.objectStoreNames);
+      if (!objectStoreNames.includes('docs')) {
+        db.close();
+        resolve([]);
+        return;
+      }
+      try {
+        const tx = db.transaction(['docs'], 'readonly');
+        const store = tx.objectStore('docs');
+        const getAllReq = store.getAll();
+        getAllReq.onsuccess = () => {
+          const records = Array.isArray(getAllReq.result) ? getAllReq.result : [];
+          db.close();
+          resolve(records);
+        };
+        getAllReq.onerror = () => {
+          db.close();
+          resolve([]);
+        };
+      } catch {
+        db.close();
+        resolve([]);
+      }
+    };
+  });
+}
+
 export async function exportRawDexieBackup(dbName: string): Promise<string> {
   const idb = typeof window !== 'undefined' && 'indexedDB' in window
     ? window.indexedDB
     : (typeof indexedDB !== 'undefined' ? indexedDB : null);
   if (!idb) return '';
   try {
-    return await new Promise((resolve, reject) => {
-      const request = idb.open(dbName);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const backup: any = {};
-        const objectStoreNames = Array.from(db.objectStoreNames);
-        if (objectStoreNames.length === 0) {
-           db.close();
-           resolve('{}');
-           return;
+    const { storeCount, backup } = await readObjectStoresFromIdb(idb, dbName);
+    if (storeCount > 0) {
+      // Compact JSON stringify to avoid OOM memory expansion
+      return JSON.stringify(backup);
+    }
+
+    if (typeof (idb as any).databases === 'function') {
+      const dbs: Array<{ name?: string }> = await (idb as any).databases();
+      const prefix = `rxdb-dexie-${dbName}--`;
+      const dexieBackup: Record<string, any[]> = {};
+
+      for (const dbInfo of dbs || []) {
+        const name = dbInfo?.name;
+        if (!name || !name.startsWith(prefix)) continue;
+        const lower = name.toLowerCase();
+        if (lower.includes('_rxdb_internal') || lower.includes('catalog_system')) continue;
+
+        const rest = name.slice(prefix.length);
+        const parts = rest.split('--');
+        const collectionName = parts.length >= 2 ? parts.slice(1).join('--') : name;
+
+        let records = await readRxdbDexieCollectionDocs(idb, name);
+        records = records.filter((r: any) => r?._deleted !== true);
+        if (collectionName.includes('base_ingredients') || collectionName.includes('portions')) {
+          records = records.filter((r: any) => r?.source !== 'system');
         }
+        if (records.length > 0) {
+          dexieBackup[collectionName] = [...(dexieBackup[collectionName] || []), ...records];
+        }
+      }
 
-        // Target stores, excluding internal catalog system dumps
-        const targetStores = objectStoreNames.filter(name => {
-          const lower = name.toLowerCase();
-          return !lower.includes('catalog_system');
-        });
+      return JSON.stringify(dexieBackup);
+    }
 
-        const storesToExport = targetStores.length > 0 ? targetStores : objectStoreNames;
-        let completed = 0;
-        const transaction = db.transaction(storesToExport, 'readonly');
-        
-        storesToExport.forEach(storeName => {
-          const store = transaction.objectStore(storeName);
-          const getAllRequest = store.getAll();
-          getAllRequest.onsuccess = () => {
-            let records = getAllRequest.result || [];
-            // Filter out system catalog items to prevent memory explosion
-            if (storeName.includes('base_ingredients') || storeName.includes('portions')) {
-              records = records.filter((r: any) => r?.source !== 'system');
-            }
-            backup[storeName] = records;
-            completed++;
-            if (completed === storesToExport.length) {
-              db.close();
-              // Compact JSON stringify to avoid OOM memory expansion
-              resolve(JSON.stringify(backup));
-            }
-          };
-          getAllRequest.onerror = () => {
-            completed++;
-            if (completed === storesToExport.length) {
-              db.close();
-              resolve(JSON.stringify(backup));
-            }
-          };
-        });
-      };
-    });
+    return '{}';
   } catch (err) {
     console.error('Failed to export raw backup:', err);
     return '';
@@ -230,7 +303,16 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
         }
       },
       daily_logs: { schema: dailyLogsSchema },
-      user_settings: { schema: userSettingsSchema },
+      user_settings: {
+        schema: userSettingsSchema,
+        migrationStrategies: {
+          1: (oldDoc: any) => ({
+            ...oldDoc,
+            target_mode: oldDoc.target_mode || 'manual',
+            updatedAt: typeof oldDoc.updatedAt === 'number' ? oldDoc.updatedAt : 0
+          })
+        }
+      },
       system_metadata: { schema: systemMetadataSchema },
       weight_logs: { schema: weightLogsSchema }
     });

@@ -19,20 +19,20 @@ import {
  * 2. You MUST increment the schema's `version` (e.g. from 0 to 1).
  * 3. You MUST provide a corresponding `migrationStrategies` entry in `apps/webapp/src/db/rxdb.ts`.
  */
-const V0_BASELINE: Record<string, { version: number; properties: string[]; required: string[] }> = {
+const SCHEMA_BASELINES: Record<string, { version: number; properties: string[]; required: string[] }> = {
   base_ingredients: {
     version: 0,
     properties: ['id', 'name', 'source', 'lang', 'calories_100g', 'protein_100g', 'carbs_100g', 'fats_100g', 'updatedAt'],
     required: ['id', 'name', 'source', 'lang', 'calories_100g', 'protein_100g', 'carbs_100g', 'fats_100g']
   },
   recipes: {
-    version: 0,
+    version: 1,
     properties: ['id', 'name', 'ingredients', 'yield_factor', 'updatedAt'],
     required: ['id', 'name', 'ingredients', 'yield_factor']
   },
   portions: {
-    version: 0,
-    properties: ['id', 'base_food_id', 'name', 'equivalent_weight_g', 'updatedAt'],
+    version: 1,
+    properties: ['id', 'base_food_id', 'name', 'equivalent_weight_g', 'source', 'is_generic', 'updatedAt'],
     required: ['id', 'base_food_id', 'name', 'equivalent_weight_g']
   },
   daily_logs: {
@@ -52,7 +52,7 @@ const V0_BASELINE: Record<string, { version: number; properties: string[]; requi
     required: ['id', 'timestamp', 'date', 'meal_type', 'food_reference_id', 'quantity', 'portion_name', 'macros']
   },
   user_settings: {
-    version: 0,
+    version: 1,
     properties: [
       'id',
       'locale',
@@ -107,12 +107,13 @@ describe('Schema Version & Evolution Guard (Prevents Un-bumped Schema Mutations 
     }
   });
 
-  it('guards against un-bumped schema modifications that cause RxDB Error DB6', () => {
+  it('guards against un-bumped schema modifications and version downgrades that cause RxDB Error DB6', () => {
     for (const schema of schemas) {
-      const baseline = V0_BASELINE[schema.title || ''];
+      const baseline = SCHEMA_BASELINES[schema.title || ''];
       expect(baseline).toBeDefined();
+      expect(schema.version).toBeGreaterThanOrEqual(baseline.version);
 
-      if (schema.version === 0) {
+      if (schema.version === baseline.version) {
         const currentProperties = Object.keys(schema.properties).sort();
         const baselineProperties = [...baseline.properties].sort();
 

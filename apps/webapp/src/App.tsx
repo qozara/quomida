@@ -57,21 +57,6 @@ export const DashboardContent: React.FC = () => {
     }
   }, [activeProvider, uxSyncState, userSettings?.active_cloud_provider]);
 
-  if (dbInitError) {
-    return <DatabaseRecoveryScreen error={dbInitError} dbVersion={dbVersion} />;
-  }
-
-  const handleDismissBanner = () => {
-    setIsBannerDismissed(true);
-    localStorage.setItem('quomida_onboarding_dismissed', 'true');
-  };
-
-  const handleConnectFromBanner = () => {
-    setIsBannerDismissed(true);
-    localStorage.setItem('quomida_onboarding_dismissed', 'true');
-    setIsStorageSettingsOpen(true);
-  };
-
   const [portionOrigin, setPortionOrigin] = useState<'add_food' | 'catalog' | 'diary'>('diary');
   const [previousScreenBeforeSettings, setPreviousScreenBeforeSettings] = useState<'diary' | 'catalog' | 'analytics' | 'profile' | 'add_food'>('diary');
 
@@ -91,6 +76,21 @@ export const DashboardContent: React.FC = () => {
       }
     }
   }, [isSettingsOpen, isAddFoodModalOpen, isProfileOpen, isCatalogOpen, isAnalyticsOpen]);
+
+  if (dbInitError) {
+    return <DatabaseRecoveryScreen error={dbInitError} dbVersion={dbVersion} />;
+  }
+
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true);
+    localStorage.setItem('quomida_onboarding_dismissed', 'true');
+  };
+
+  const handleConnectFromBanner = () => {
+    setIsBannerDismissed(true);
+    localStorage.setItem('quomida_onboarding_dismissed', 'true');
+    setIsStorageSettingsOpen(true);
+  };
 
   const handleOpenPortionModal = (
     ingredient: FoodItem | BaseIngredient,
