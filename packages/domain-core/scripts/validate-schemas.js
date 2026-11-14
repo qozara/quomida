@@ -8,18 +8,18 @@ const __dirname = path.dirname(__filename);
 // We import from the built dist output
 import * as schemas from '../dist/index.js';
 
-const V0_BASELINE = {
+const SCHEMA_BASELINES = {
   base_ingredients: {
     version: 0,
     properties: ['id', 'name', 'source', 'lang', 'calories_100g', 'protein_100g', 'carbs_100g', 'fats_100g', 'updatedAt']
   },
   recipes: {
-    version: 0,
+    version: 1,
     properties: ['id', 'name', 'ingredients', 'yield_factor', 'updatedAt']
   },
   portions: {
-    version: 0,
-    properties: ['id', 'base_food_id', 'name', 'equivalent_weight_g', 'updatedAt']
+    version: 1,
+    properties: ['id', 'base_food_id', 'name', 'equivalent_weight_g', 'source', 'is_generic', 'updatedAt']
   },
   daily_logs: {
     version: 0,
@@ -28,11 +28,15 @@ const V0_BASELINE = {
     ]
   },
   user_settings: {
-    version: 0,
+    version: 1,
     properties: [
       'id', 'locale', 'theme', 'daily_calorie_target', 'custom_macros', 'active_cloud_provider', 'ai_settings',
       'target_mode', 'biometrics', 'goal_config', 'adaptive_state', 'updatedAt'
     ]
+  },
+  system_metadata: {
+    version: 0,
+    properties: ['key', 'value', 'updatedAt']
   },
   weight_logs: {
     version: 0,
@@ -48,6 +52,7 @@ const allSchemas = [
   schemas.portionsSchema,
   schemas.dailyLogsSchema,
   schemas.userSettingsSchema,
+  schemas.systemMetadataSchema,
   schemas.weightLogsSchema
 ];
 
@@ -55,19 +60,28 @@ console.log('[Schema Validation] Starting build-time schema checks...');
 
 let hasError = false;
 
-// 1. Check un-bumped mutations against V0 baseline
+// 1. Check un-bumped mutations and disallowed version downgrades against baselines
 for (const schema of allSchemas) {
   if (!schema) {
     console.error('[Schema Validation] FATAL: Schema export missing or dist/ not built properly.');
     process.exit(1);
   }
-  const baseline = V0_BASELINE[schema.title];
+  const baseline = SCHEMA_BASELINES[schema.title];
   if (!baseline) {
     console.error(`[Schema Validation] FATAL: No baseline found for schema ${schema.title}.`);
     process.exit(1);
   }
 
-  if (schema.version === 0) {
+  if (schema.version < baseline.version) {
+    console.error(
+      `\n[SCHEMA EVOLUTION ERROR] Schema "${schema.title}" version ${schema.version} is lower than baseline version ${baseline.version}!\n` +
+      `Downgrading a schema version breaks existing client databases.\n`
+    );
+    hasError = true;
+    continue;
+  }
+
+  if (schema.version === baseline.version) {
     const currentProperties = Object.keys(schema.properties).sort();
     const baselineProperties = [...baseline.properties].sort();
 
@@ -89,19 +103,38 @@ for (const schema of allSchemas) {
   }
 }
 
-// 2. Check apps/webapp/src/db/rxdb.ts for migrationStrategies if version > 0
+// 2. Check apps/webapp/src/db/rxdb.ts for per-collection migrationStrategies if version > 0
 const rxdbFilePath = path.resolve(__dirname, '../../../apps/webapp/src/db/rxdb.ts');
 if (fs.existsSync(rxdbFilePath)) {
   const rxdbContent = fs.readFileSync(rxdbFilePath, 'utf-8');
+  const addCollectionsStart = rxdbContent.indexOf('await db.addCollections(');
+  const addCollectionsSection = addCollectionsStart !== -1 ? rxdbContent.slice(addCollectionsStart) : rxdbContent;
+  const allTitlesPattern = Object.keys(SCHEMA_BASELINES).join('|');
+
   for (const schema of allSchemas) {
     if (schema.version > 0) {
-      // Very basic static check to ensure developer didn't forget `migrationStrategies` in the addCollections call
-      if (!rxdbContent.includes('migrationStrategies')) {
+      const collectionBlockRegex = new RegExp(
+        `\\b${schema.title}\\s*:\\s*\\{[\\s\\S]*?(?=\\n\\s*(?:${allTitlesPattern})\\s*:|\\n\\s*\\}\\);)`
+      );
+      const collectionMatch = addCollectionsSection.match(collectionBlockRegex);
+
+      if (!collectionMatch || !collectionMatch[0].includes('migrationStrategies')) {
         console.error(
-          `\n[MIGRATION ERROR] Schema "${schema.title}" is at version ${schema.version}, but no 'migrationStrategies' found in rxdb.ts.\n` +
+          `\n[MIGRATION ERROR] Schema "${schema.title}" is at version ${schema.version}, but no 'migrationStrategies' found for it in rxdb.ts.\n` +
           `You must provide migration strategies when version > 0.\n`
         );
         hasError = true;
+        continue;
+      }
+
+      for (let v = 1; v <= schema.version; v++) {
+        const versionEntryRegex = new RegExp(`\\b${v}\\s*:`);
+        if (!versionEntryRegex.test(collectionMatch[0])) {
+          console.error(
+            `\n[MIGRATION ERROR] Schema "${schema.title}" is at version ${schema.version}, but migrationStrategies[${v}] is missing in rxdb.ts.\n`
+          );
+          hasError = true;
+        }
       }
     }
   }
