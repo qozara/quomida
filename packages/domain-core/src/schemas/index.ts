@@ -116,7 +116,7 @@ export const dailyLogsSchema: RxJsonSchema<DailyLog> = {
 
 export const userSettingsSchema: RxJsonSchema<UserSettings> = {
   title: 'user_settings',
-  version: 1,
+  version: 2,
   description: 'Global application preferences and nutritional targets',
   primaryKey: 'id',
   type: 'object',
@@ -146,10 +146,24 @@ export const userSettingsSchema: RxJsonSchema<UserSettings> = {
       type: 'object',
       properties: {
         enabled: { type: 'boolean' },
-        provider: { type: 'string', enum: ['qozara-intelligence', 'byok', 'ollama', 'window.ai'] },
+        provider: {
+          type: 'string',
+          enum: [
+            'auto',
+            'cloud',
+            'byok',
+            'local',
+            'local-browser',
+            'disabled',
+            'qozara-intelligence',
+            'ollama',
+            'window.ai'
+          ]
+        },
         ciphertext: { type: 'string' },
         ollama_base_url: { type: 'string' },
-        ollama_model: { type: 'string' }
+        ollama_model: { type: 'string' },
+        enable_local_ai: { type: 'boolean' }
       },
       required: ['provider']
     },

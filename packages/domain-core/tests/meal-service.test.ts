@@ -313,4 +313,26 @@ describe('MealService (domain-core)', () => {
     expect(fallback.items[0].unmatched).toBe(false);
     expect(fallback.items[0].food?.id).toBe('cust-egg');
   });
+
+  it('skips decomposer escalation when genAiEnabled is false while preserving deterministic parsing', async () => {
+    const mockDecomposer: IRecipeDecomposer = {
+      decomposeDish: vi.fn()
+    };
+
+    const service = new MealService({ decomposer: mockDecomposer });
+    const result = await service.processMeal({
+      input: 'desayuné 2 huevos revueltos y locro',
+      customIngredients: [mockEgg],
+      locale: 'es',
+      genAiEnabled: false
+    });
+
+    expect(mockDecomposer.decomposeDish).not.toHaveBeenCalled();
+    expect(result.detectedMealType).toBe('meal_breakfast');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].unmatched).toBe(false);
+    expect(result.items[0].food?.id).toBe('cust-egg');
+    expect(result.items[1].unmatched).toBe(true);
+    expect(result.isAiDecomposed).toBeFalsy();
+  });
 });

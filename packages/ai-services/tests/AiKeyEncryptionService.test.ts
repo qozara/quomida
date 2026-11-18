@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AiKeyEncryptionService } from '../src/AiKeyEncryptionService.js';
+import { AiKeyEncryptionService } from '../src/index.js';
 import { AgentClient } from '@qozara/ai-client';
 
 describe('AiKeyEncryptionService', () => {

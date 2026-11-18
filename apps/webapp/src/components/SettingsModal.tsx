@@ -31,7 +31,7 @@ import {
 import { useCatalogDownload } from '../hooks/useCatalogDownload.js';
 import { usePwaUpdate } from '../hooks/usePwaUpdate.js';
 import { SYSTEM_CATALOG_META } from '../services/RemoteCatalogService.js';
-import { AiKeyEncryptionService } from '@quomida/ai-services';
+import { AiKeyEncryptionService, isGenAiEnabled, normalizeProviderPreference } from '@quomida/ai-services';
 import { AI_CONFIG } from '../config/ai.js';
 import { type AiProviderType } from '@quomida/domain-core';
 
@@ -140,10 +140,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
   // AI & Qozara Intelligence State
   const [aiEnabled, setAiEnabled] = useState<boolean>(
-    userSettings?.ai_settings?.enabled !== false
+    isGenAiEnabled(userSettings?.ai_settings)
   );
   const [aiProvider, setAiProvider] = useState<AiProviderType>(
     userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider
+  );
+  const [enableLocalAi, setEnableLocalAi] = useState<boolean>(
+    Boolean(userSettings?.ai_settings?.enable_local_ai)
   );
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [ollamaUrl, setOllamaUrl] = useState(
@@ -155,6 +158,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
   const [isEncryptingKey, setIsEncryptingKey] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
+  const normalizedAiProvider = useMemo(
+    () => normalizeProviderPreference(aiProvider),
+    [aiProvider]
+  );
+
   const settingsSignature = useMemo(() => {
     if (!userSettings) return '';
     const { active_cloud_provider: _creds, ...domainSettings } = userSettings;
@@ -164,10 +172,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
   useEffect(() => {
     if (!userSettings) return;
     if (userSettings.ai_settings) {
-      setAiEnabled(userSettings.ai_settings.enabled !== false);
+      setAiEnabled(isGenAiEnabled(userSettings.ai_settings));
       if (userSettings.ai_settings.provider) {
         setAiProvider(userSettings.ai_settings.provider);
       }
+      setEnableLocalAi(Boolean(userSettings.ai_settings.enable_local_ai));
       if (userSettings.ai_settings.ollama_base_url) {
         setOllamaUrl(userSettings.ai_settings.ollama_base_url);
       }
@@ -209,6 +218,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       ai_settings: {
         provider: aiProvider,
         enabled,
+        enable_local_ai: enableLocalAi,
+        ciphertext: userSettings?.ai_settings?.ciphertext,
+        ollama_base_url: ollamaUrl,
+        ollama_model: ollamaModel,
+      },
+    });
+  };
+
+  const handleToggleLocalAi = async (nextLocalAi: boolean) => {
+    setEnableLocalAi(nextLocalAi);
+    await updateUserSettings({
+      ai_settings: {
+        provider: aiProvider,
+        enabled: aiEnabled,
+        enable_local_ai: nextLocalAi,
         ciphertext: userSettings?.ai_settings?.ciphertext,
         ollama_base_url: ollamaUrl,
         ollama_model: ollamaModel,
@@ -217,11 +241,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
   };
 
   const handleSaveAiProvider = async (newProvider: AiProviderType) => {
+    const nextLocalAi =
+      newProvider === 'local' || newProvider === 'ollama' ? true : enableLocalAi;
     setAiProvider(newProvider);
+    if (nextLocalAi !== enableLocalAi) {
+      setEnableLocalAi(nextLocalAi);
+    }
     await updateUserSettings({
       ai_settings: {
         provider: newProvider,
         enabled: aiEnabled,
+        enable_local_ai: nextLocalAi,
         ciphertext: userSettings?.ai_settings?.ciphertext,
         ollama_base_url: ollamaUrl,
         ollama_model: ollamaModel,
@@ -240,6 +270,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
         ai_settings: {
           provider: 'byok',
           enabled: aiEnabled,
+          enable_local_ai: enableLocalAi,
           ciphertext,
           ollama_base_url: ollamaUrl,
           ollama_model: ollamaModel,
@@ -260,6 +291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
       ai_settings: {
         provider: AI_CONFIG.defaultProvider,
         enabled: aiEnabled,
+        enable_local_ai: enableLocalAi,
         ciphertext: undefined,
         ollama_base_url: ollamaUrl,
         ollama_model: ollamaModel,
@@ -271,16 +303,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
 
   const handleSaveOllamaSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextProvider: AiProviderType = normalizedAiProvider === 'auto' ? 'auto' : 'local';
+    setEnableLocalAi(true);
     await updateUserSettings({
       ai_settings: {
-        provider: 'ollama',
+        provider: nextProvider,
         enabled: aiEnabled,
+        enable_local_ai: true,
         ciphertext: userSettings?.ai_settings?.ciphertext,
         ollama_base_url: ollamaUrl.trim(),
         ollama_model: ollamaModel.trim(),
       },
     });
-    setAiProvider('ollama');
+    setAiProvider(nextProvider);
     setAiFeedback(t.ai?.ollamaSavedSuccess);
   };
 
@@ -611,27 +646,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     {/* Provider Selection */}
                     <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
-                    {t.ai?.providerLabel || 'Active AI Provider'}
+                    {t.ai?.providerLabel || 'Generative AI Mode'}
                   </label>
                   <div className="grid grid-cols-1 gap-2">
                     {[
                       {
-                        id: 'qozara-intelligence' as const,
-                        title: t.ai?.providers?.qozaraIntelligence || 'Qozara Intelligence (Default)',
+                        id: 'auto' as const,
+                        pref: 'auto' as const,
+                        title: t.ai?.providers?.auto || 'Auto (Recommended)',
+                        desc: t.ai?.providers?.autoDesc || 'Automatically selects the best available GenAI backend (personal key → local browser AI → Qozara Cloud AI).'
+                      },
+                      {
+                        id: 'cloud' as const,
+                        pref: 'cloud' as const,
+                        title: t.ai?.providers?.qozaraIntelligence || 'Qozara Cloud AI (Managed)',
                         desc: t.ai?.providers?.qozaraIntelligenceDesc || 'Managed Gemini 2.0 Flash edge AI'
                       },
                       {
                         id: 'byok' as const,
+                        pref: 'byok' as const,
                         title: t.ai?.providers?.byok || 'Bring Your Own Key (BYOK)',
                         desc: t.ai?.providers?.byokDesc || 'Personal key envelope-encrypted at edge (AES-256-GCM)'
                       },
                       {
-                        id: 'ollama' as const,
+                        id: 'local' as const,
+                        pref: 'local' as const,
                         title: t.ai?.providers?.ollama || 'Local Ollama (Offline)',
                         desc: t.ai?.providers?.ollamaDesc || 'Private local offline inference'
                       },
                       {
-                        id: 'window.ai' as const,
+                        id: 'local-browser' as const,
+                        pref: 'local-browser' as const,
                         title: t.ai?.providers?.windowAi || 'Browser Built-in AI',
                         desc: t.ai?.providers?.windowAiDesc || 'Experimental browser Gemini Nano'
                       }
@@ -639,15 +684,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                       <button
                         key={p.id}
                         type="button"
+                        data-testid={`ai-provider-${p.id}`}
                         onClick={() => handleSaveAiProvider(p.id)}
                         className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-0.5 ${
-                          aiProvider === p.id
+                          normalizedAiProvider === p.pref
                             ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/80 text-emerald-950 dark:text-white'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400'
                         }`}
                       >
                         <span className="font-bold flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${aiProvider === p.id ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} />
+                          <span className={`w-2 h-2 rounded-full ${normalizedAiProvider === p.pref ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} />
                           {p.title}
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 pl-3.5 leading-tight">{p.desc}</span>
@@ -656,8 +702,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                   </div>
                 </div>
 
+                {/* Explicit Opt-in for Local Network AI (Ollama) */}
+                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl">
+                  <div className="space-y-0.5 pr-3">
+                    <label htmlFor="toggle-local-ai-enabled" className="text-xs font-semibold text-slate-800 dark:text-slate-200 block cursor-pointer">
+                      {t.ai?.enableLocalAi || 'Allow Local Network AI (Ollama)'}
+                    </label>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                      {t.ai?.enableLocalAiDesc || 'Opt in to allow Auto mode to connect to your private Ollama server on localhost or your local network.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="toggle-local-ai-enabled"
+                    data-testid="toggle-local-ai-enabled"
+                    role="switch"
+                    aria-checked={enableLocalAi}
+                    onClick={() => handleToggleLocalAi(!enableLocalAi)}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1 rounded-xl transition-colors"
+                  >
+                    <div className={`w-11 h-6 rounded-full transition-colors relative p-0.5 pointer-events-none ${enableLocalAi ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                      <div className={`w-5 h-5 rounded-full bg-white transition-transform ${enableLocalAi ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                </div>
+
                 {/* BYOK Section */}
-                {aiProvider === 'byok' && (
+                {normalizedAiProvider === 'byok' && (
                   <form onSubmit={handleEncryptAndSaveKey} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-900">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
@@ -705,7 +776,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                 )}
 
                 {/* Ollama Section */}
-                {aiProvider === 'ollama' && (
+                {(normalizedAiProvider === 'local' || (normalizedAiProvider === 'auto' && enableLocalAi)) && (
                   <form onSubmit={handleSaveOllamaSettings} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-900">
                     <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
                       <Cpu className="w-3.5 h-3.5 text-emerald-500" />

@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext.js';
 import {
   CatalogSearchManager,
   BatchMealResolver,
-  MealService,
   addDaysToDate,
   type BaseIngredient,
   type FoodItem,
@@ -31,8 +30,7 @@ import { RecipeComponentList } from './recipes/RecipeComponentList.js';
 import { CustomDialog } from './common/CustomDialog.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
 import { RemoteCatalogService } from '../services/RemoteCatalogService.js';
-import { LlmRecipeDecomposer } from '@quomida/ai-services';
-import { AI_CONFIG } from '../config/ai.js';
+import { useMealAiService } from '../hooks/useMealAiService.js';
 import { useRecentFoods } from '../hooks/useRecentFoods.js';
 
 const EMPTY_ARRAY: any[] = [];
@@ -70,6 +68,11 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
   const [searchManager] = useState(() => new CatalogSearchManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
+  const { isGenAiEnabled, createMealService } = useMealAiService({
+    userSettings,
+    searchManager,
+    batchResolver
+  });
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,14 +214,6 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
 
     setIsParsing(true);
     try {
-      const getAuthToken = async (): Promise<string | null> => {
-        const creds = userSettings?.active_cloud_provider?.credentials;
-        if (typeof creds === 'string' && creds.trim()) return creds.trim();
-        const token = creds?.accessToken || creds?.access_token || creds?.token;
-        if (typeof token === 'string' && token.trim()) return token.trim();
-        return null;
-      };
-
       let customPortions: Portion[] = [];
       if (db?.portions?.find) {
         try {
@@ -229,24 +224,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
         }
       }
 
-      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
-
-      const decomposer = isAiEnabled
-        ? new LlmRecipeDecomposer({
-            proxyUrl: AI_CONFIG.proxyUrl,
-            provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
-            ciphertext: userSettings?.ai_settings?.ciphertext,
-            ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
-            ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
-            getAuthToken
-          })
-        : undefined;
-
-      const mealService = new MealService({
-        decomposer,
-        searchManager,
-        batchResolver
-      });
+      const mealService = createMealService();
 
       const resolved = await mealService.processMeal({
         input: query,
@@ -256,7 +234,7 @@ export const CatalogManager: React.FC<CatalogManagerProps> = ({ onSelectFood }) 
         customPortions,
         catalogProvider: remoteService,
         locale,
-        aiEnabled: isAiEnabled,
+        genAiEnabled: isGenAiEnabled,
         forceAiEscalation: true
       });
 

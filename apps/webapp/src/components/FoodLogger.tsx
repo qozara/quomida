@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType, Portion, RecipeComponent } from '@quomida/domain-core';
-import { CatalogSearchManager, BatchMealResolver, MealService, RecipeManager, type Recipe } from '@quomida/domain-core';
-import { LlmRecipeDecomposer, AiMealError, classifyAiError } from '@quomida/ai-services';
+import { CatalogSearchManager, BatchMealResolver, RecipeManager, type Recipe } from '@quomida/domain-core';
+import { AiMealError, classifyAiError } from '@quomida/ai-services';
 import { Search, Sparkles, PlusCircle, Download } from 'lucide-react';
-import { AI_CONFIG } from '../config/ai.js';
+import { useMealAiService } from '../hooks/useMealAiService.js';
 import { RecipeBuilder } from './recipes/RecipeBuilder.js';
 import { IngredientBuilder } from './IngredientBuilder.js';
 
@@ -46,6 +46,11 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
   const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
+  const { isGenAiEnabled, createMealService } = useMealAiService({
+    userSettings,
+    searchManager,
+    batchResolver
+  });
 
   const [isBuildingRecipe, setIsBuildingRecipe] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
@@ -114,20 +119,6 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
     setParseError(null);
 
     try {
-      const getAuthToken = async (): Promise<string | null> => {
-        // Read Google OAuth token if authenticated in webapp user settings
-        const creds = userSettings?.active_cloud_provider?.credentials;
-        if (typeof creds === 'string' && creds.trim()) {
-          return creds.trim();
-        }
-        const token = creds?.accessToken || creds?.access_token || creds?.token;
-        if (typeof token === 'string' && token.trim()) {
-          return token.trim();
-        }
-
-        return null;
-      };
-
       let customPortions: Portion[] = [];
       if (db) {
         try {
@@ -138,24 +129,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         }
       }
 
-      const isAiEnabled = userSettings?.ai_settings?.enabled !== false;
-
-      const decomposer = isAiEnabled
-        ? new LlmRecipeDecomposer({
-            proxyUrl: AI_CONFIG.proxyUrl,
-            provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
-            ciphertext: userSettings?.ai_settings?.ciphertext,
-            ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
-            ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
-            getAuthToken
-          })
-        : undefined;
-
-      const mealService = new MealService({
-        decomposer,
-        searchManager,
-        batchResolver
-      });
+      const mealService = createMealService();
 
       const resolved = await mealService.processMeal({
         input: query,
@@ -165,9 +139,13 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         customPortions,
         catalogProvider: remoteService,
         locale,
-        aiEnabled: isAiEnabled,
+        genAiEnabled: isGenAiEnabled,
         forceAiEscalation: true
       });
+
+      if (!isGenAiEnabled && resolved.items.some((it) => it.unmatched)) {
+        throw new AiMealError('AI_DISABLED', 'Generative AI is disabled in settings.');
+      }
 
       setIsParsing(false);
       setDetectedMealType(resolved.detectedMealType || null);

@@ -15,7 +15,7 @@ All architectural decisions, product specifications, component blueprints, and p
 - ☁️ **[Google Drive & Sheets Connector](./docs/connectors/google-drive-sheets.md)** — Google OAuth configuration, dual spreadsheet model, dynamic mapping, and live E2E testing.
 - 🛠️ **[Developer CLI Harness](./apps/cli/README.md)** — Terminal CLI for OAuth login/logout, domain calculations, and live E2E testing.
 - 📋 **[Product Specification](./docs/PRODUCT_SPEC.md)** — Functional requirements, wireframe specs, regional datasets, and WCAG 2.2 accessibility.
-- 📜 **[Architectural Decision Records (ADRs)](./docs/adr/README.md)** — MADR-standard records (0000 through 0015: RxDB, BYOS, Immutability, Yield Factors, ETL, LLM Fallback, Recovery UX, Dynamic Mapping, Dual Migrations, Hook Registry, Catalog Hydration).
+- 📜 **[Architectural Decision Records (ADRs)](./docs/adr/README.md)** — MADR-standard records (0000 through 0035: RxDB, BYOS, Immutability, Yield Factors, ETL, Hybrid Symbolic + GenAI Escalation, Recovery UX, Dynamic Mapping, Dual Migrations, Hook Registry, Catalog Hydration).
 - 🥗 **[ETL & Catalog Hydration Pipeline](./apps/etl-pipeline/README.md)** — Decoupled static dataset compiler, two-file delta synchronization, shift-left data sanitization, and infrastructure-agnostic CDN deployment.
 - 👩‍💻 **[Contributing & TDD Guide](./docs/CONTRIBUTING.md)** — Developer workflow, running unit/E2E tests, and schema migrations.
 - 🤖 **[AI Coding Agent Invariants](./AGENTS.md)** — Critical invariants, zero-vulnerability policy, and strict isolation rules.
@@ -49,7 +49,7 @@ quomida/
 ├── packages/
 │   ├── domain-core/      # Isomorphic TypeScript SDK: RxDB schemas, yield formulas, MealService & offline meal parser
 │   ├── cloud-providers/  # Unified SyncAdapter, Composite strategy, @qozara/gdocs-schema validation, Mock & Google Drive/Sheets
-│   ├── ai-services/      # Optional external AI adapters: JIT culinary recipe decomposition & KMS key encryption
+│   ├── ai-services/      # Optional GenAI escalation adapter (LlmRecipeDecomposer) built on @qozara/ai-client
 │   └── i18n-locales/     # Centralized English & Spanish translation dictionaries
 ├── apps/
 │   ├── webapp/           # React 19 + Vite + RxDB PWA with modern glassmorphic mobile UI

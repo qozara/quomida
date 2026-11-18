@@ -98,13 +98,19 @@ async function runCliAiLog() {
 
   // If AI_PROXY_URL is set in environment, use LlmRecipeDecomposer for uncataloged cultural dishes; otherwise runs 100% offline
   const proxyUrl = process.env.AI_PROXY_URL || process.env.VITE_AI_PROXY_URL;
+  const provider = (process.env.AI_PROVIDER as any) || 'auto';
   const decomposer = proxyUrl
     ? new LlmRecipeDecomposer({
         proxyUrl,
-        provider: (process.env.AI_PROVIDER as any) || 'qozara-intelligence',
+        provider,
         ciphertext: process.env.AI_CIPHERTEXT,
         ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
-        ollamaModel: process.env.OLLAMA_MODEL
+        ollamaModel: process.env.OLLAMA_MODEL,
+        enableLocalAi: Boolean(
+          process.env.OLLAMA_BASE_URL ||
+          provider === 'ollama' ||
+          provider === 'local'
+        )
       })
     : undefined;
 

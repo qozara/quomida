@@ -109,7 +109,16 @@ export interface DailyLog {
   updatedAt?: number;
 }
 
-export type AiProviderType = 'qozara-intelligence' | 'byok' | 'ollama' | 'window.ai';
+export type AiProviderType =
+  | 'auto'
+  | 'cloud'
+  | 'byok'
+  | 'local'
+  | 'local-browser'
+  | 'disabled'
+  | 'qozara-intelligence'
+  | 'ollama'
+  | 'window.ai';
 
 export interface UserAiSettings {
   enabled?: boolean;
@@ -117,6 +126,7 @@ export interface UserAiSettings {
   ciphertext?: string;
   ollama_base_url?: string;
   ollama_model?: string;
+  enable_local_ai?: boolean;
 }
 
 export type TargetMode = 'manual' | 'deterministic_seed' | 'adaptive';

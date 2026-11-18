@@ -310,6 +310,9 @@ async function initDatabase(options?: InitDBOptions): Promise<QuomidaDatabase> {
             ...oldDoc,
             target_mode: oldDoc.target_mode || 'manual',
             updatedAt: typeof oldDoc.updatedAt === 'number' ? oldDoc.updatedAt : 0
+          }),
+          2: (oldDoc: any) => ({
+            ...oldDoc
           })
         }
       },
