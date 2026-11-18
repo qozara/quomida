@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@qozara/pwa-update": "^1.0.2",
     "@quomida/cloud-providers": "*",
     "@quomida/domain-core": "*",
     "@quomida/i18n-locales": "*",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
+    "@qozara/pwa-vite": "^1.0.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

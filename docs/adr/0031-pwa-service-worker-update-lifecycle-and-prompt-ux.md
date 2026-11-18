@@ -37,3 +37,12 @@ We adopt a **Three-Trigger Event-Driven PWA Update Lifecycle** using `vite-plugi
 - **Data Integrity & UX Safety**: Switching to `registerType: 'prompt'` prevents mid-session reloads or cache invalidation while RxDB transactions or Google Sheets syncs are active.
 - **Deterministic Post-Deployment Verification**: Users on mobile Home Screen PWAs can immediately pull and apply hotfixes via Settings without clearing browser storage or reinstalling the PWA.
 - **WCAG 2.2 & Bilingual Compliance**: All update prompts and buttons enforce `44x44px` minimum touch targets, `aria-live="polite"` status announcements, and 100% EN/ES dictionary parity in `@quomida/i18n-locales`.
+
+## Addendum (2026-11-18) — Shared `@qozara/pwa-kit` Dual-Layer Detection & iOS Recovery
+
+To eliminate duplicated PWA update boilerplate across Qozara apps and fix an iOS Safari standalone Home Screen quirk where `navigator.serviceWorker.getRegistration()` / `registration.update()` can hang indefinitely during suspended sessions:
+
+1. **Shared Vite Plugin (`@qozara/pwa-vite`)**: `apps/webapp/vite.config.ts` now uses `qozaraPwaVersionPlugin({ defineKey: '__APP_VERSION__' })` to inject the 7-char Git commit hash, emit uncached `/version.json`, and exclude `version.json` from Workbox precaching via `PWA_VERSION_GLOB_IGNORES`. Both Vercel configs (`vercel.json`, `apps/webapp/vercel.json`) enforce `Cache-Control: no-cache, no-store, must-revalidate` on `/sw.js`, `/version.json`, and `/index.html`.
+2. **Shared Update State Machine & UI (`@qozara/pwa-update`)**: `apps/webapp/src/hooks/usePwaUpdate.ts`, `PwaUpdatePrompt.tsx`, and `SettingsModal.tsx` now wrap `@qozara/pwa-update` (`PwaUpdateBanner`, `VersionCheckControl`, and singleton helpers configured with `VISIBILITY_UPDATE_COOLDOWN_MS = 1h`).
+3. **Dual-Layer Verification & Self-Healing Reload**: Manual checks and foreground resumes inspect `/version.json?_t=<ts>` (`cache: 'no-store'`) in parallel with Service Worker `reg.update()`. Network timeouts/errors return explicit failure states rather than falsely claiming *"Quomida is up to date"*, and when a newer build exists without a staged `waiting` worker (e.g., hung iOS WebKit daemon), `applyPwaAppUpdate()` unregisters stalled Service Workers and deletes only Workbox/shell precaches (preserving IndexedDB/RxDB and `localStorage`) before reloading.
+
