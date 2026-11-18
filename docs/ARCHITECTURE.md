@@ -51,7 +51,7 @@ quomida/
 ### Dependency Rules & Constraints
 1. **`packages/domain-core`**: MUST remain strictly isomorphic. ZERO DOM dependencies, zero UI framework dependencies, zero network calls, and zero external AI SDK imports. Houses the pure domain `MealService` and `StandardMealParser`.
 2. **`packages/cloud-providers`**: Communicates strictly via `SyncDeltaPayload` objects.
-3. **`packages/ai-services`**: Houses external AI adapters (`LlmRecipeDecomposer`, `AiKeyEncryptionService`), consuming `@qozara/ai-client` and implementing the `IRecipeDecomposer` domain port.
+3. **`packages/ai-services`**: Thin domain-specific adapter layer (`LlmRecipeDecomposer`) built on `@qozara/ai-client`, re-exporting shared cache, error normalization, KMS encryption, and settings normalization primitives.
 4. **`apps/webapp`**: Consumes `@quomida/domain-core` for pure domain orchestration and optionally injects adapters from `@quomida/cloud-providers` and `@quomida/ai-services`.
 
 ---
@@ -174,21 +174,20 @@ Quomida uses a hybrid natural language meal ingestion pipeline that cleanly sepa
 2. **Deterministic Offline Recipe Decomposition (No AI Required)**:
    - When users log composite meals or multiple foods (e.g., *"milanesa con puré de papas"*, *"2 huevos revueltos con tostadas"*), the parser splits the clause into distinct items.
    - `BatchMealResolver` resolves each component against the local catalog and automatically synthesizes a composite Virtual Recipe proposal 100% offline.
-3. **Master AI Toggle & Offline Graceful Degradation**:
-   - `userSettingsSchema` includes `ai_settings.enabled`. When toggled off, Quomida operates in 100% private, local-first mode with zero external network requests.
+3. **Transparent Generative AI (GenAI) Toggle & Offline Graceful Degradation**:
+   - `userSettingsSchema` (v2) stores `ai_settings.enabled`, unified `provider` preferences (`'auto'`, `'cloud'`, `'byok'`, `'local'`, `'local-browser'`, `'disabled'`, plus legacy aliases), and `enable_local_ai` opt-in for local Ollama inference. When GenAI is disabled, deterministic parsing (`StandardMealParser`) and catalog matching continue running 100% locally with zero external requests and zero UI changes.
    - If the device is offline or provider quotas are exhausted, meal parsing and multi-item recipe synthesis continue to work without interruption.
 4. **Just-In-Time (JIT) Culinary LLM Decomposer (`LlmRecipeDecomposer`)**:
-   - Triggers only when a single food query yields no catalog match (e.g., regional/cultural dishes like *"locro"*).
-   - Prompts the LLM to decompose the dish into base agricultural staples (e.g. white corn, beans, beef, squash) with realistic gram weights in the user's language.
-   - Resolves those base ingredients against the catalog to synthesize an editable Virtual Recipe with real calculated macronutrients, eliminating the dead-end *"Alimento no encontrado"* error state.
+   - Triggers behind the scenes only when deterministic search yields no catalog match (e.g., regional dishes like *"locro"* or missing base ingredients like *"rúcula"*).
+   - Powered by `createGenAiToolResolver` from `@qozara/ai-client` with `'auto'` backend cascading and explicit local-network opt-in.
 
 ---
 
 ## 8. Hexagonal Dependency Inversion for AI Meal Services
 
 Following Clean Hexagonal Architecture (Ports & Adapters):
-- **Core Domain (`packages/domain-core`)**: Owns `MealService` and the `IRecipeDecomposer` interface (port). `MealService` runs 100% offline out-of-the-box with `StandardMealParser` and `BatchMealResolver`. It has zero knowledge of HTTP or AI SDKs.
-- **AI Infrastructure Adapter (`packages/ai-services`)**: Owns `LlmRecipeDecomposer`, implementing `IRecipeDecomposer` using `@qozara/ai-client`.
-- **In-Memory LRU Decomposition Cache**: `LlmRecipeDecomposer` maintains an in-memory LRU cache (`LruMemoryCache`, capacity 50). Repeat queries for the same uncataloged dish (e.g. accidental double-submits, portion edits, or page navigations) resolve in 0ms without hitting the remote AI proxy, while transient errors (500/503/429) bypass the cache to allow retries.
-- **Composition Root (`apps/webapp`)**: Dynamically passes `new LlmRecipeDecomposer(...)` into `new MealService({ decomposer })` only when AI features are enabled by the user. If disabled or offline, `MealService` operates cleanly without any AI adapter.
+- **Core Domain (`packages/domain-core`)**: Owns `MealService` (`ProcessMealOptions.genAiEnabled`) and the `IRecipeDecomposer` interface (port). `MealService` runs 100% offline out-of-the-box with `StandardMealParser` and `BatchMealResolver`. It has zero knowledge of HTTP or AI SDKs.
+- **AI Infrastructure Adapter (`packages/ai-services`)**: Owns `LlmRecipeDecomposer` (backed by `@qozara/ai-client`'s `createGenAiToolResolver`) and re-exports `LruMemoryCache`, `AiKeyEncryptionService`, `AiError`/`AiMealError`, `normalizeProviderPreference`, and `isGenAiEnabled`.
+- **In-Memory LRU Decomposition Cache**: Shared `LruMemoryCache` (capacity 50) caches valid decompositions in memory while letting transient errors bypass cache for clean retries.
+- **Composition Hook (`apps/webapp/src/hooks/useMealAiService.ts`)**: Centralizes `UserSettings.ai_settings` checks (`isGenAiEnabled`), Google OAuth token resolution, and `LlmRecipeDecomposer` injection for `FoodLogger`, `CatalogManager`, and `BatchAiMealReviewModal`.
 

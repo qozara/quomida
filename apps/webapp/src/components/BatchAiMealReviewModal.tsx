@@ -21,9 +21,8 @@ import {
   BatchMealResolver,
   RecipeManager
 } from '@quomida/domain-core';
-import { LlmRecipeDecomposer } from '@quomida/ai-services';
 import { dictionaries } from '@quomida/i18n-locales';
-import { AI_CONFIG } from '../config/ai.js';
+import { useMealAiService } from '../hooks/useMealAiService.js';
 import {
   Sparkles,
   X,
@@ -94,7 +93,11 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
     };
   }, []);
 
-  const isAiConfigured = userSettings?.ai_settings?.enabled !== false;
+  const { isGenAiEnabled, decomposer: hookDecomposer } = useMealAiService({
+    userSettings,
+    decomposerOverride: propsDecomposer
+  });
+  const isAiConfigured = Boolean(propsDecomposer) || isGenAiEnabled;
   const isAiAvailable = isAiConfigured && isOnline;
 
   const [mealType, setMealType] = useState<MealType>(() => batchMeal?.detectedMealType || 'meal_lunch');
@@ -164,26 +167,9 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
   }, [items, batchMeal?.compositeDishName, existingRecipes, batchResolver, locale, isMultiMeal]);
 
   const activeDecomposer = useMemo<IRecipeDecomposer | null>(() => {
-    if (propsDecomposer) return propsDecomposer;
     if (!isAiAvailable) return null;
-
-    const getAuthToken = async () => {
-      const creds = userSettings?.active_cloud_provider?.credentials;
-      if (typeof creds === 'string' && creds.trim()) return creds.trim();
-      const token = creds?.accessToken || creds?.access_token || creds?.token;
-      if (typeof token === 'string' && token.trim()) return token.trim();
-      return null;
-    };
-
-    return new LlmRecipeDecomposer({
-      proxyUrl: AI_CONFIG.proxyUrl,
-      provider: userSettings?.ai_settings?.provider || AI_CONFIG.defaultProvider,
-      ciphertext: userSettings?.ai_settings?.ciphertext,
-      ollamaBaseUrl: userSettings?.ai_settings?.ollama_base_url || AI_CONFIG.defaultOllamaBaseUrl,
-      ollamaModel: userSettings?.ai_settings?.ollama_model || AI_CONFIG.defaultOllamaModel,
-      getAuthToken
-    });
-  }, [propsDecomposer, isAiAvailable, userSettings]);
+    return propsDecomposer || hookDecomposer || null;
+  }, [propsDecomposer, hookDecomposer, isAiAvailable]);
 
   // Re-sync state whenever batchMeal changes
   useEffect(() => {

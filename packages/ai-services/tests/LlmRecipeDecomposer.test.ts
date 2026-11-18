@@ -83,13 +83,16 @@ describe('LlmRecipeDecomposer', () => {
     expect(result!.ingredients[0].quantity).toBe(150);
   });
 
-  it('throws when AI provider returns an error', async () => {
+  it('throws classified AiError when AI provider returns an error', async () => {
     mockChat.mockResolvedValueOnce({
       error: 'Rate limit exceeded (429)'
     });
 
     const decomposer = new LlmRecipeDecomposer({ proxyUrl: 'https://test.local' });
-    await expect(decomposer.decomposeDish('locro')).rejects.toThrow('AI Provider returned error');
+    await expect(decomposer.decomposeDish('locro')).rejects.toMatchObject({
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Rate limit exceeded (429)'
+    });
   });
 
   it('returns null when AI response contains no valid ingredients', async () => {
@@ -268,5 +271,63 @@ describe('LlmRecipeDecomposer', () => {
     expect(result!.ingredients).toHaveLength(2);
     expect(result!.ingredients[0].calories_100g).toBe(25);
     expect(result!.ingredients[1].protein_100g).toBe(38);
+  });
+
+  it('forwards auto preference and explicit enableLocalAi flag to AiProviderFactory', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Empanada Salteña',
+        kind: 'recipe',
+        ingredients: [{ food_name: 'Carne', quantity: 50, unit: 'g' }]
+      }
+    });
+
+    const decomposer = new LlmRecipeDecomposer({
+      proxyUrl: 'https://test.local',
+      provider: 'auto',
+      enableLocalAi: false
+    });
+
+    const result = await decomposer.decomposeDish('empanada salteña', '1 unit', 'es');
+    expect(result).not.toBeNull();
+    expect(AiProviderFactory.createProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerPreference: 'auto',
+        enableLocalAi: false
+      }),
+      undefined
+    );
+  });
+
+  it('enables local AI implicitly when provider is ollama or local', async () => {
+    mockChat.mockResolvedValueOnce({
+      type: 'tool_call',
+      tool: 'decompose_dish',
+      arguments: {
+        dish_name: 'Chipá',
+        kind: 'recipe',
+        ingredients: [{ food_name: 'Fécula de mandioca', quantity: 60, unit: 'g' }]
+      }
+    });
+
+    const decomposer = new LlmRecipeDecomposer({
+      proxyUrl: 'https://test.local',
+      provider: 'ollama',
+      ollamaBaseUrl: 'http://localhost:11434/api',
+      ollamaModel: 'llama3.2'
+    });
+
+    await decomposer.decomposeDish('chipá');
+    expect(AiProviderFactory.createProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerPreference: 'local',
+        enableLocalAi: true,
+        baseUrl: 'http://localhost:11434/api',
+        ollamaModel: 'llama3.2'
+      }),
+      undefined
+    );
   });
 });

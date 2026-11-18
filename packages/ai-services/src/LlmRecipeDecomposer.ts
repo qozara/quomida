@@ -1,21 +1,35 @@
-import { AiProviderFactory, type AuthTokenGetter, type AiFactoryConfig } from '@qozara/ai-client';
+import {
+  createGenAiToolResolver,
+  normalizeProviderPreference,
+  LruMemoryCache,
+  type AuthTokenGetter,
+  type GenAiProviderPreference,
+  type LegacyAiProviderPreference,
+  type GenAiToolResolver
+} from '@qozara/ai-client';
 import type {
   IRecipeDecomposer,
   DecomposedDishResult,
   DecomposedDishIngredient,
   InferredPortion
 } from '@quomida/domain-core';
-import { LruMemoryCache } from './cache/LruMemoryCache.js';
 
 export interface LlmRecipeDecomposerConfig {
   proxyUrl: string;
-  provider?: 'qozara-intelligence' | 'byok' | 'ollama' | 'window.ai';
+  provider?: GenAiProviderPreference | LegacyAiProviderPreference;
   ciphertext?: string;
   ollamaBaseUrl?: string;
   ollamaModel?: string;
+  enableLocalAi?: boolean;
   getAuthToken?: AuthTokenGetter;
   systemPrompt?: string;
   cache?: LruMemoryCache<string, DecomposedDishResult> | null;
+}
+
+interface DecomposeDishInput {
+  dishName: string;
+  portionContext: string;
+  locale: string;
 }
 
 const defaultGlobalDecompositionCache = new LruMemoryCache<string, DecomposedDishResult>(50);
@@ -130,11 +144,144 @@ export const DEFAULT_DECOMPOSE_SYSTEM_PROMPT =
   '5. Use the user\'s requested language for `dish_name`, `food_name`, and portion names (e.g., Spanish for Spanish queries). If `food_name` is in Spanish, provide a canonical English alias in `search_alias` when helpful.\n' +
   '6. ALWAYS call the `decompose_dish` tool. Never return plain text.';
 
+function parseMacro(val: unknown): number | undefined {
+  if (typeof val === 'number' && Number.isFinite(val) && val >= 0) return val;
+  if (typeof val === 'string' && val.trim() !== '') {
+    const parsed = parseFloat(val);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return undefined;
+}
+
+function parseDecomposedDishPayload(
+  parsedData: any,
+  trimmedDish: string
+): DecomposedDishResult | null {
+  if (!parsedData || typeof parsedData !== 'object') {
+    return null;
+  }
+
+  const rawIngredients = Array.isArray(parsedData.ingredients)
+    ? parsedData.ingredients
+    : Array.isArray(parsedData.food_items)
+    ? parsedData.food_items
+    : Array.isArray(parsedData.items)
+    ? parsedData.items
+    : [];
+
+  if (rawIngredients.length === 0) {
+    return null;
+  }
+
+  const ingredients: DecomposedDishIngredient[] = [];
+  for (const raw of rawIngredients) {
+    const name = raw.food_name || raw.name || raw.food || raw.ingredient || raw.foodQuery;
+    if (!name || typeof name !== 'string') continue;
+
+    const qty = typeof raw.quantity === 'number' ? raw.quantity : parseFloat(raw.quantity) || 50;
+    const unit = typeof raw.unit === 'string' && raw.unit.trim() ? raw.unit.trim() : 'g';
+    const alias = typeof raw.search_alias === 'string' && raw.search_alias.trim() ? raw.search_alias.trim() : undefined;
+    const notes = typeof raw.notes === 'string' && raw.notes.trim() ? raw.notes.trim() : undefined;
+
+    const calories100g = parseMacro(raw.calories_100g);
+    const protein100g = parseMacro(raw.protein_100g);
+    const carbs100g = parseMacro(raw.carbs_100g);
+    const fats100g = parseMacro(raw.fats_100g);
+
+    const portions: InferredPortion[] | undefined = Array.isArray(raw.portions)
+      ? raw.portions
+          .filter(
+            (p: any) =>
+              p &&
+              typeof p.name === 'string' &&
+              p.name.trim() &&
+              typeof p.equivalent_weight_g === 'number' &&
+              Number.isFinite(p.equivalent_weight_g) &&
+              p.equivalent_weight_g > 0
+          )
+          .map((p: any) => ({
+            name: p.name.trim(),
+            equivalent_weight_g: p.equivalent_weight_g
+          }))
+      : undefined;
+
+    ingredients.push({
+      food_name: name.trim(),
+      quantity: qty > 0 ? qty : 50,
+      unit,
+      ...(alias ? { search_alias: alias } : {}),
+      ...(notes ? { notes } : {}),
+      ...(calories100g !== undefined ? { calories_100g: calories100g } : {}),
+      ...(protein100g !== undefined ? { protein_100g: protein100g } : {}),
+      ...(carbs100g !== undefined ? { carbs_100g: carbs100g } : {}),
+      ...(fats100g !== undefined ? { fats_100g: fats100g } : {}),
+      ...(portions && portions.length > 0 ? { portions } : {})
+    });
+  }
+
+  if (ingredients.length === 0) {
+    return null;
+  }
+
+  const dish = parsedData.dish_name || parsedData.dishName || trimmedDish;
+  const totalWeight =
+    typeof parsedData.estimated_total_weight_g === 'number'
+      ? parsedData.estimated_total_weight_g
+      : ingredients.reduce((sum, ing) => sum + (ing.unit === 'g' || ing.unit === 'ml' ? ing.quantity : 100), 0);
+
+  const kind =
+    parsedData.kind === 'ingredient' || parsedData.kind === 'recipe'
+      ? (parsedData.kind as 'ingredient' | 'recipe')
+      : undefined;
+
+  return {
+    dishName: dish,
+    ...(kind ? { kind } : {}),
+    rationale: parsedData.rationale || `AI culinary decomposition for ${dish}`,
+    estimatedTotalWeightGrams: totalWeight,
+    ingredients
+  };
+}
+
 export class LlmRecipeDecomposer implements IRecipeDecomposer {
   private readonly cache: LruMemoryCache<string, DecomposedDishResult> | null;
+  private readonly resolver: GenAiToolResolver<DecomposeDishInput, DecomposedDishResult>;
 
   constructor(private readonly config: LlmRecipeDecomposerConfig) {
     this.cache = config.cache === null ? null : (config.cache ?? defaultGlobalDecompositionCache);
+    const providerPreference = normalizeProviderPreference(this.config.provider);
+    const enableLocalAi = Boolean(
+      this.config.enableLocalAi ||
+      this.config.provider === 'ollama' ||
+      this.config.provider === 'local'
+    );
+
+    this.resolver = createGenAiToolResolver<DecomposeDishInput, DecomposedDishResult>({
+      factoryConfig: {
+        providerPreference,
+        proxyUrl: this.config.proxyUrl,
+        encryptedApiKey: this.config.ciphertext,
+        baseUrl: this.config.ollamaBaseUrl,
+        ollamaModel: this.config.ollamaModel,
+        enableLocalAi
+      },
+      getAuthToken: this.config.getAuthToken,
+      cache: this.cache,
+      getCacheKey: ({ dishName, portionContext, locale }) =>
+        normalizeDecompositionKey(dishName, portionContext, locale),
+      buildRequest: ({ dishName, portionContext, locale }) => ({
+        messages: [
+          {
+            role: 'user',
+            content: `Decompose standard single portion of this dish into base ingredients:\nDish: "${dishName}"\nPortion Context: "${portionContext}"\nPreferred Language: ${locale}`
+          }
+        ],
+        tools: [DECOMPOSE_DISH_TOOL],
+        systemPrompt: this.config.systemPrompt || DEFAULT_DECOMPOSE_SYSTEM_PROMPT
+      }),
+      parseResponse: (extracted, _rawResponse, { dishName }) =>
+        parseDecomposedDishPayload(extracted?.args, dishName)
+    });
   }
 
   /**
@@ -151,20 +298,6 @@ export class LlmRecipeDecomposer implements IRecipeDecomposer {
     this.cache?.clear();
   }
 
-  private mapPreference(provider?: string): AiFactoryConfig['providerPreference'] {
-    switch (provider) {
-      case 'byok':
-        return 'byok';
-      case 'ollama':
-        return 'local';
-      case 'window.ai':
-        return 'local-browser';
-      case 'qozara-intelligence':
-      default:
-        return 'cloud';
-    }
-  }
-
   async decomposeDish(
     dishName: string,
     portionContext = '1 portion',
@@ -172,186 +305,10 @@ export class LlmRecipeDecomposer implements IRecipeDecomposer {
   ): Promise<DecomposedDishResult | null> {
     if (!dishName || !dishName.trim()) return null;
 
-    const trimmedDish = dishName.trim();
-    const cacheKey = normalizeDecompositionKey(trimmedDish, portionContext, locale);
-
-    // 1. Transparent in-memory cache check (Last decision step in pipeline)
-    if (this.cache) {
-      const cached = this.cache.get(cacheKey);
-      if (cached && cached.ingredients && cached.ingredients.length > 0) {
-        return cached;
-      }
-    }
-
-    const prompt = `Decompose standard single portion of this dish into base ingredients:\nDish: "${trimmedDish}"\nPortion Context: "${portionContext}"\nPreferred Language: ${locale}`;
-
-    const factoryConfig: AiFactoryConfig = {
-      providerPreference: this.mapPreference(this.config.provider),
-      proxyUrl: this.config.proxyUrl,
-      encryptedApiKey: this.config.ciphertext,
-      baseUrl: this.config.ollamaBaseUrl,
-      ollamaModel: this.config.ollamaModel
-    };
-
-    const provider = await AiProviderFactory.createProvider(factoryConfig, this.config.getAuthToken);
-
-    const response = await provider.chat({
-      messages: [{ role: 'user', content: prompt }],
-      tools: [DECOMPOSE_DISH_TOOL],
-      systemPrompt: this.config.systemPrompt || DEFAULT_DECOMPOSE_SYSTEM_PROMPT
+    return this.resolver.resolve({
+      dishName: dishName.trim(),
+      portionContext,
+      locale
     });
-
-    if (!response) {
-      return null;
-    }
-
-    if (response.error) {
-      throw new Error(`AI Provider returned error: ${response.error}`);
-    }
-
-    let parsedData: any = null;
-
-    if (response.type === 'tool_call' && response.arguments) {
-      parsedData = this.extractData(response.arguments);
-    } else if (response.arguments) {
-      parsedData = this.extractData(response.arguments);
-    } else if (Array.isArray((response as any).tool_calls) && (response as any).tool_calls.length > 0) {
-      const call = (response as any).tool_calls[0];
-      const callArgs = call.function?.arguments || call.arguments || call;
-      parsedData = this.extractData(callArgs);
-    } else if ((response as any).choices?.[0]?.message) {
-      const msg = (response as any).choices[0].message;
-      if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
-        const callArgs = msg.tool_calls[0].function?.arguments || msg.tool_calls[0].arguments;
-        parsedData = this.extractData(callArgs);
-      } else if (msg.content) {
-        parsedData = this.extractData(msg.content);
-      }
-    } else if (response.content) {
-      parsedData = this.extractData(response.content);
-    }
-
-    if (!parsedData || typeof parsedData !== 'object') {
-      return null;
-    }
-
-    const rawIngredients = Array.isArray(parsedData.ingredients)
-      ? parsedData.ingredients
-      : Array.isArray(parsedData.food_items)
-      ? parsedData.food_items
-      : Array.isArray(parsedData.items)
-      ? parsedData.items
-      : [];
-
-    if (rawIngredients.length === 0) {
-      return null;
-    }
-
-    const ingredients: DecomposedDishIngredient[] = [];
-    for (const raw of rawIngredients) {
-      const name = raw.food_name || raw.name || raw.food || raw.ingredient || raw.foodQuery;
-      if (!name || typeof name !== 'string') continue;
-
-      const qty = typeof raw.quantity === 'number' ? raw.quantity : parseFloat(raw.quantity) || 50;
-      const unit = typeof raw.unit === 'string' && raw.unit.trim() ? raw.unit.trim() : 'g';
-      const alias = typeof raw.search_alias === 'string' && raw.search_alias.trim() ? raw.search_alias.trim() : undefined;
-      const notes = typeof raw.notes === 'string' && raw.notes.trim() ? raw.notes.trim() : undefined;
-
-      const parseMacro = (val: unknown): number | undefined => {
-        if (typeof val === 'number' && Number.isFinite(val) && val >= 0) return val;
-        if (typeof val === 'string' && val.trim() !== '') {
-          const parsed = parseFloat(val);
-          if (Number.isFinite(parsed) && parsed >= 0) return parsed;
-        }
-        return undefined;
-      };
-
-      const calories100g = parseMacro(raw.calories_100g);
-      const protein100g = parseMacro(raw.protein_100g);
-      const carbs100g = parseMacro(raw.carbs_100g);
-      const fats100g = parseMacro(raw.fats_100g);
-
-      const portions: InferredPortion[] | undefined = Array.isArray(raw.portions)
-        ? raw.portions
-            .filter(
-              (p: any) =>
-                p &&
-                typeof p.name === 'string' &&
-                p.name.trim() &&
-                typeof p.equivalent_weight_g === 'number' &&
-                Number.isFinite(p.equivalent_weight_g) &&
-                p.equivalent_weight_g > 0
-            )
-            .map((p: any) => ({
-              name: p.name.trim(),
-              equivalent_weight_g: p.equivalent_weight_g
-            }))
-        : undefined;
-
-      ingredients.push({
-        food_name: name.trim(),
-        quantity: qty > 0 ? qty : 50,
-        unit,
-        ...(alias ? { search_alias: alias } : {}),
-        ...(notes ? { notes } : {}),
-        ...(calories100g !== undefined ? { calories_100g: calories100g } : {}),
-        ...(protein100g !== undefined ? { protein_100g: protein100g } : {}),
-        ...(carbs100g !== undefined ? { carbs_100g: carbs100g } : {}),
-        ...(fats100g !== undefined ? { fats_100g: fats100g } : {}),
-        ...(portions && portions.length > 0 ? { portions } : {})
-      });
-    }
-
-    if (ingredients.length === 0) {
-      return null;
-    }
-
-    const dish = parsedData.dish_name || parsedData.dishName || trimmedDish;
-    const totalWeight =
-      typeof parsedData.estimated_total_weight_g === 'number'
-        ? parsedData.estimated_total_weight_g
-        : ingredients.reduce((sum, ing) => sum + (ing.unit === 'g' || ing.unit === 'ml' ? ing.quantity : 100), 0);
-
-    const kind =
-      parsedData.kind === 'ingredient' || parsedData.kind === 'recipe'
-        ? (parsedData.kind as 'ingredient' | 'recipe')
-        : undefined;
-
-    const result: DecomposedDishResult = {
-      dishName: dish,
-      ...(kind ? { kind } : {}),
-      rationale: parsedData.rationale || `AI culinary decomposition for ${dish}`,
-      estimatedTotalWeightGrams: totalWeight,
-      ingredients
-    };
-
-    // Cache valid result in-memory
-    if (this.cache && result.ingredients.length > 0) {
-      this.cache.set(cacheKey, result);
-    }
-
-    return result;
-  }
-
-  private extractData(raw: any): any {
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw;
-    if (typeof raw === 'string') {
-      const trimmed = raw.trim();
-      try {
-        return JSON.parse(trimmed);
-      } catch {
-        const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || trimmed.match(/(\{[\s\S]*\})/);
-        if (jsonMatch) {
-          try {
-            return JSON.parse(jsonMatch[1]);
-          } catch {
-            return null;
-          }
-        }
-        return null;
-      }
-    }
-    return null;
   }
 }

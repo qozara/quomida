@@ -138,6 +138,7 @@ npm run build
 
 | Meal Logging Service | `packages/domain-core/src/services/MealService.ts` |
 | AI Recipe Decomposer | `packages/ai-services/src/LlmRecipeDecomposer.ts` |
+| Webapp AI Composition Hook | `apps/webapp/src/hooks/useMealAiService.ts` |
 | Batch Meal Resolver | `packages/domain-core/src/catalog/BatchMealResolver.ts` |
 | React App Context & DB Provider | `apps/webapp/src/context/AppContext.tsx` |
 | RxDB Database Hydration & DB6 Guard | `apps/webapp/src/db/rxdb.ts` |

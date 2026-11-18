@@ -1,21 +1,17 @@
 # @quomida/ai-services
 
-Optional external AI adapters for Quomida, encapsulating edge KMS API key encryption and Just-In-Time (JIT) culinary recipe decomposition.
+Optional Generative AI (GenAI) infrastructure adapters for Quomida, built on `@qozara/ai-client` (`>=1.1.0`). Built-in deterministic natural language parsing (`StandardMealParser`, `BatchMealResolver`, OPFS SQLite search) runs 100% offline in `@quomida/domain-core` and always stays enabled even when GenAI is disabled.
 
 ## Architectural Boundary
 
-`@quomida/ai-services` contains strictly external AI infrastructure adapters that depend on `@qozara/ai-client`:
-- **`LlmRecipeDecomposer`**: Implements the `IRecipeDecomposer` domain port declared in `@quomida/domain-core`. Decomposes unknown cultural dishes into base agricultural staples when queries yield no catalog match. Includes an in-memory LRU cache (`LruMemoryCache`, capacity 50) that transparently caches valid responses for 0ms repeat lookups.
-- **`LruMemoryCache`**: Generic, zero-dependency in-memory LRU cache backed by native JavaScript `Map` insertion order.
-- **`AiKeyEncryptionService`**: Encrypts user Gemini API keys using Quomida's edge KMS proxy for safe storage in RxDB and cloud spreadsheets.
-- **`AiMealError` & `classifyAiError`**: Error normalization classifying provider status codes (`RATE_LIMIT_EXCEEDED`, `AI_DISABLED`, `AUTHENTICATION_REQUIRED`).
+`@quomida/ai-services` adapts Quomida's domain ports to `@qozara/ai-client`:
+- **`LlmRecipeDecomposer`**: Implements `IRecipeDecomposer` from `@quomida/domain-core` using `createGenAiToolResolver` from `@qozara/ai-client`. Supports `'auto'` cascading (`byok` -> `local-browser` -> opt-in `local` -> `cloud`), single-ingredient macro inference (`kind: 'ingredient'`), and composite recipe decomposition (`kind: 'recipe'`).
+- **Shared Primitives Re-exported from `@qozara/ai-client`**: `LruMemoryCache`, `AiKeyEncryptionService`, `AiError` (aliased as `AiMealError`), `classifyAiError`, `normalizeProviderPreference`, `isGenAiEnabled`, `AiProviderFactory`, `createGenAiToolResolver`, and `createCompositeAiResolver`.
+- **Webapp Composition Root**: `apps/webapp/src/hooks/useMealAiService.ts` reads `userSettings.ai_settings` (via `isGenAiEnabled`) and OAuth tokens to wire `LlmRecipeDecomposer` into `MealService` cleanly across components.
 
 ## In-Memory LLM Response Cache
 
-`LlmRecipeDecomposer` transparently caches successful decompositions in memory:
-- **Capacity**: 50 entries (LRU eviction).
+`LlmRecipeDecomposer` passes a shared `LruMemoryCache<string, DecomposedDishResult>` (capacity 50) to `createGenAiToolResolver`:
 - **Key Normalization**: Case-insensitive and whitespace-normalized (`normalizeDecompositionKey`).
-- **Error Bypass**: Transient errors (500, 503, 429 quota, timeouts) are never cached, allowing subsequent retries to succeed.
+- **Error Bypass**: Transient errors (500, 503, 429 quota, timeouts) throw normalized `AiError` (`AiMealError`) instances without caching so subsequent retries can succeed.
 - **Testing**: Cache can be cleared via `LlmRecipeDecomposer.clearCache()` or disabled via `{ cache: null }`.
-
-Deterministic natural language meal parsing and core meal logging workflow orchestration live 100% offline in `@quomida/domain-core` (`MealService`, `StandardMealParser`, `BatchMealResolver`).

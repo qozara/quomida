@@ -192,6 +192,64 @@ describe('AI Recipe Decomposition & Master Toggle UI', () => {
     );
   });
 
+  it('renders Auto GenAI option and explicit Local Network AI opt-in toggle in SettingsModal', () => {
+    const updateUserSettingsMock = vi.fn().mockResolvedValue(true);
+    const mockUseApp = {
+      isSettingsOpen: true,
+      setIsSettingsOpen: vi.fn(),
+      t: dictionaries.en,
+      locale: 'en',
+      userSettings: {
+        id: 'global_settings',
+        locale: 'en',
+        theme: 'dark',
+        daily_calorie_target: 2000,
+        custom_macros: { protein: 150, carbs: 200, fats: 65 },
+        ai_settings: { enabled: true, provider: 'auto', enable_local_ai: false },
+      },
+      updateUserSettings: updateUserSettingsMock,
+      activeProvider: null,
+      syncState: {},
+    };
+
+    vi.spyOn(AppContext, 'useApp').mockReturnValue(mockUseApp as any);
+
+    render(<SettingsModal />);
+
+    fireEvent.click(screen.getByTestId('accordion-header-ai'));
+
+    // Auto provider button should be present
+    const autoBtn = screen.getByTestId('ai-provider-auto');
+    expect(autoBtn).toBeDefined();
+
+    // Explicit Local Network AI opt-in toggle starts unchecked
+    const localToggle = screen.getByTestId('toggle-local-ai-enabled');
+    expect(localToggle).toBeDefined();
+    expect(localToggle.getAttribute('aria-checked')).toBe('false');
+
+    // Toggling it persists enable_local_ai: true
+    fireEvent.click(localToggle);
+    expect(updateUserSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ai_settings: expect.objectContaining({
+          provider: 'auto',
+          enabled: true,
+          enable_local_ai: true,
+        }),
+      })
+    );
+
+    // Selecting cloud provider calls updateUserSettings with provider: 'cloud'
+    fireEvent.click(screen.getByTestId('ai-provider-cloud'));
+    expect(updateUserSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ai_settings: expect.objectContaining({
+          provider: 'cloud',
+        }),
+      })
+    );
+  });
+
   describe('Force AI Decomposition Action in BatchAiMealReviewModal', () => {
     const singleMatchedBatchMeal: ResolvedBatchMeal = {
       rawInput: 'canelones de verdura',

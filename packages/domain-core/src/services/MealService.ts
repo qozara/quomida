@@ -37,6 +37,7 @@ export interface ProcessMealOptions {
   existingRecipes?: Recipe[];
   locale?: string;
   aiEnabled?: boolean;
+  genAiEnabled?: boolean;
   forceAiEscalation?: boolean;
 }
 
@@ -118,7 +119,8 @@ export class MealService {
     const hasUnmatched = resolved.items.some(it => it.unmatched);
     const shouldEscalate =
       hasUnmatched || Boolean(options.forceAiEscalation && resolved.items.length === 1);
-    if (shouldEscalate && aiEnabled && this.decomposer) {
+    const effectiveGenAiEnabled = options.genAiEnabled ?? options.aiEnabled ?? true;
+    if (shouldEscalate && effectiveGenAiEnabled && this.decomposer) {
       resolved = await this.attemptDecompositionEscalation(resolved, options);
     }
 

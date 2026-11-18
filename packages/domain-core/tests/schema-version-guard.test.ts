@@ -52,7 +52,7 @@ const SCHEMA_BASELINES: Record<string, { version: number; properties: string[]; 
     required: ['id', 'timestamp', 'date', 'meal_type', 'food_reference_id', 'quantity', 'portion_name', 'macros']
   },
   user_settings: {
-    version: 1,
+    version: 2,
     properties: [
       'id',
       'locale',
