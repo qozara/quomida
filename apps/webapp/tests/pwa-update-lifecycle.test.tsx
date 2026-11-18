@@ -18,7 +18,13 @@ import { SettingsModal } from '../src/components/SettingsModal.js';
 import * as AppContext from '../src/context/AppContext.js';
 
 describe('PWA Service Worker Update Lifecycle (Prompt, Visibility Resume & Settings Check)', () => {
+  let originalFetch: typeof globalThis.fetch;
+
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ version: 'dev' }), { status: 200 })
+    ) as unknown as typeof fetch;
     resetSharedPwaUpdateState();
     vi.spyOn(AppContext, 'useApp').mockReturnValue({
       locale: 'en',
@@ -50,6 +56,7 @@ describe('PWA Service Worker Update Lifecycle (Prompt, Visibility Resume & Setti
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     cleanup();
     resetSharedPwaUpdateState();
     vi.restoreAllMocks();
@@ -434,6 +441,122 @@ describe('PWA Service Worker Update Lifecycle (Prompt, Visibility Resume & Setti
       expect(es.settings.appUpdateAvailable).toBeDefined();
       expect(en.settings.appUpdateInstallNow).toBeDefined();
       expect(es.settings.appUpdateInstallNow).toBeDefined();
+    });
+  });
+
+  describe('iOS Standalone Dual-Layer Detection & Self-Healing Recovery', () => {
+    it('detects update via /version.json when reg.update() hangs on iOS and applies self-healing cache purge', async () => {
+      vi.useFakeTimers();
+
+      const mockRegistration: any = {
+        waiting: null,
+        installing: null,
+        active: { state: 'activated' },
+        update: vi.fn().mockImplementation(() => new Promise(() => {})),
+        unregister: vi.fn().mockResolvedValue(true),
+      };
+
+      const originalServiceWorker = navigator.serviceWorker;
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: {
+          controller: {},
+          getRegistration: vi.fn().mockResolvedValue(mockRegistration),
+          getRegistrations: vi.fn().mockResolvedValue([mockRegistration]),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+      });
+
+      const deletedCaches: string[] = [];
+      const originalCaches = window.caches;
+      Object.defineProperty(window, 'caches', {
+        configurable: true,
+        value: {
+          keys: vi.fn().mockResolvedValue(['workbox-precache-v2-quomida', 'google-fonts-cache']),
+          delete: vi.fn(async (key: string) => {
+            deletedCaches.push(key);
+            return true;
+          }),
+        },
+      });
+
+      const originalLocation = window.location;
+      const reloadMock = vi.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, reload: reloadMock },
+      });
+
+      globalThis.fetch = vi.fn(async () =>
+        new Response(JSON.stringify({ version: '156003f' }), { status: 200 })
+      ) as unknown as typeof fetch;
+
+      localStorage.setItem('quomida_keep_test', 'preserved');
+
+      const cleanupListeners = registerPwaServiceWorker((options?: any) => {
+        options?.onRegisteredSW?.('/sw.js', mockRegistration);
+        return vi.fn().mockResolvedValue(undefined);
+      });
+
+      render(<SettingsModal />);
+      fireEvent.click(screen.getByTestId('accordion-header-about-legal'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('btn-check-app-update'));
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(screen.getByText(new RegExp(en.settings.appUpdateAvailable, 'i'))).toBeDefined();
+      const installBtn = screen.getByTestId('btn-install-app-update');
+
+      await act(async () => {
+        fireEvent.click(installBtn);
+      });
+
+      expect(mockRegistration.unregister).toHaveBeenCalledTimes(1);
+      expect(deletedCaches).toEqual(['workbox-precache-v2-quomida']);
+      expect(deletedCaches).not.toContain('google-fonts-cache');
+      expect(localStorage.getItem('quomida_keep_test')).toBe('preserved');
+      expect(reloadMock).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+      cleanupListeners();
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: originalServiceWorker,
+      });
+      Object.defineProperty(window, 'caches', { configurable: true, value: originalCaches });
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    });
+
+    it('displays appUpdateCheckError and never appUpToDate when /version.json fails or times out', async () => {
+      const mockRegistration: any = {
+        waiting: null,
+        installing: null,
+        update: vi.fn().mockResolvedValue(undefined),
+      };
+
+      globalThis.fetch = vi.fn(async () =>
+        new Response('Server Error', { status: 500 })
+      ) as unknown as typeof fetch;
+
+      const cleanupListeners = registerPwaServiceWorker((options?: any) => {
+        options?.onRegisteredSW?.('/sw.js', mockRegistration);
+        return vi.fn().mockResolvedValue(undefined);
+      });
+
+      render(<SettingsModal />);
+      fireEvent.click(screen.getByTestId('accordion-header-about-legal'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('btn-check-app-update'));
+      });
+
+      expect(screen.getByText(new RegExp(en.settings.appUpdateCheckError, 'i'))).toBeDefined();
+      expect(screen.queryByText(new RegExp(en.settings.appUpToDate, 'i'))).toBeNull();
+
+      cleanupListeners();
     });
   });
 });

@@ -2,24 +2,10 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { qozaraPwaVersionPlugin, PWA_VERSION_GLOB_IGNORES } from '@qozara/pwa-vite';
 import sri from 'vite-plugin-sri';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
-
-function getGitCommitHash(): string {
-  if (process.env.VERCEL_GIT_COMMIT_SHA) {
-    return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7);
-  }
-  if (process.env.GITHUB_SHA) {
-    return process.env.GITHUB_SHA.slice(0, 7);
-  }
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
-  } catch {
-    return 'dev';
-  }
-}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -124,10 +110,10 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       sri(),
+      qozaraPwaVersionPlugin({ defineKey: '__APP_VERSION__' }),
     VitePWA({
       registerType: 'prompt',
       useCredentials: true,
-      includeAssets: ['favicon.ico', 'favicon.svg', 'favicon-48x48.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Quomida',
         short_name: 'Quomida',
@@ -163,8 +149,10 @@ export default defineConfig(({ mode }) => {
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB limit
         globPatterns: ['**/*.{js,css,html,ico,png,svg,sqlite}'],
+        globIgnores: [...PWA_VERSION_GLOB_IGNORES],
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
@@ -188,9 +176,6 @@ export default defineConfig(({ mode }) => {
       }
     })
   ],
-  define: {
-    __APP_VERSION__: JSON.stringify(getGitCommitHash())
-  },
   resolve: {
     alias: {
       '@quomida/domain-core': path.resolve(__dirname, '../../packages/domain-core/src/index.ts'),
