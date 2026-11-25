@@ -5,7 +5,12 @@ export default defineConfig({
   test: {
     include: ['packages/**/*.test.{ts,tsx}', 'apps/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', 'apps/webapp/tests/e2e/**/*'],
-    setupFiles: ['apps/webapp/tests/setup.ts']
+    setupFiles: ['apps/webapp/tests/setup.ts'],
+    server: {
+      deps: {
+        inline: ['@qozara/google-auth']
+      }
+    }
   },
   resolve: {
     alias: {

@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react';
+import { GOOGLE_IDENTITY_SCOPES } from '@qozara/google-auth';
+import { useOptionalGoogleAuthSession } from '@qozara/google-auth/react';
 import {
   BatchMealResolver,
   CatalogSearchManager,
@@ -13,6 +15,15 @@ export function extractGoogleOAuthToken(userSettings?: Partial<UserSettings> | n
   const creds = (userSettings as any)?.active_cloud_provider?.credentials;
   if (typeof creds === 'string' && creds.trim()) {
     return creds.trim();
+  }
+  if (
+    creds &&
+    typeof creds === 'object' &&
+    typeof creds.expiresAt === 'number' &&
+    Number.isFinite(creds.expiresAt) &&
+    creds.expiresAt <= Date.now()
+  ) {
+    return null;
   }
   const token = creds?.accessToken || creds?.access_token || creds?.token;
   if (typeof token === 'string' && token.trim()) {
@@ -31,19 +42,27 @@ export interface UseMealAiServiceOptions {
 /**
  * Reusable hook composing Quomida's deterministic MealService with optional
  * GenAI recipe/ingredient escalation wired from @quomida/ai-services.
+ *
+ * Authentication is resolved from the decoupled device-local GoogleSessionStore
+ * (`@qozara/google-auth`) so Qozara Cloud AI works independently of Cloud Storage Sync,
+ * falling back to legacy `userSettings.active_cloud_provider.credentials` only in
+ * standalone unit tests rendered outside `GoogleAuthSessionProvider`.
  */
 export function useMealAiService(options: UseMealAiServiceOptions = {}) {
   const { userSettings, searchManager, batchResolver, decomposerOverride } = options;
+  const googleAuth = useOptionalGoogleAuthSession();
 
   const genAiEnabled = useMemo(
     () => isGenAiEnabled(userSettings?.ai_settings),
     [userSettings?.ai_settings]
   );
 
-  const getAuthToken = useCallback(
-    async (): Promise<string | null> => extractGoogleOAuthToken(userSettings),
-    [userSettings]
-  );
+  const getAuthToken = useCallback(async (): Promise<string | null> => {
+    if (googleAuth) {
+      return googleAuth.getValidAccessToken(GOOGLE_IDENTITY_SCOPES);
+    }
+    return extractGoogleOAuthToken(userSettings);
+  }, [googleAuth, userSettings]);
 
   const decomposer = useMemo<IRecipeDecomposer | undefined>(() => {
     if (decomposerOverride) {

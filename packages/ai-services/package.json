@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@qozara/ai-client": "^1.1.0",
+    "@qozara/ai-client": "^1.2.1",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {

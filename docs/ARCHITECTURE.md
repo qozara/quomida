@@ -52,7 +52,7 @@ quomida/
 1. **`packages/domain-core`**: MUST remain strictly isomorphic. ZERO DOM dependencies, zero UI framework dependencies, zero network calls, and zero external AI SDK imports. Houses the pure domain `MealService` and `StandardMealParser`.
 2. **`packages/cloud-providers`**: Communicates strictly via `SyncDeltaPayload` objects.
 3. **`packages/ai-services`**: Thin domain-specific adapter layer (`LlmRecipeDecomposer`) built on `@qozara/ai-client`, re-exporting shared cache, error normalization, KMS encryption, and settings normalization primitives.
-4. **`apps/webapp`**: Consumes `@quomida/domain-core` for pure domain orchestration and optionally injects adapters from `@quomida/cloud-providers` and `@quomida/ai-services`.
+4. **`apps/webapp`**: Consumes `@quomida/domain-core` for pure domain orchestration, manages device-local Google OAuth identity & incremental scopes via `@qozara/google-auth` (decoupling Qozara Cloud AI authentication from optional BYOS cloud storage sync), and optionally injects adapters from `@quomida/cloud-providers` and `@quomida/ai-services`.
 
 ---
 

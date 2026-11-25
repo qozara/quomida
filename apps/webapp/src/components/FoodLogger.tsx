@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useOptionalGoogleAuthSession } from '@qozara/google-auth/react';
 import { useApp } from '../context/AppContext.js';
 import type { BaseIngredient, FoodItem, MealType, Portion, RecipeComponent } from '@quomida/domain-core';
 import { CatalogSearchManager, BatchMealResolver, RecipeManager, type Recipe } from '@quomida/domain-core';
@@ -46,6 +47,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
   const [recipeManager] = useState(() => new RecipeManager());
   const [remoteService] = useState(() => RemoteCatalogService.getInstance());
   const [batchResolver] = useState(() => new BatchMealResolver(searchManager));
+  const googleAuth = useOptionalGoogleAuthSession();
   const { isGenAiEnabled, createMealService } = useMealAiService({
     userSettings,
     searchManager,
@@ -214,7 +216,18 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
       const aiError = err instanceof AiMealError ? err : classifyAiError(err);
       switch (aiError.code) {
         case 'AUTHENTICATION_REQUIRED':
-          setParseError(t.ai?.tokenExpiredNotice || 'Your Google session has expired or is invalid. Please reconnect in Settings.');
+          setParseError(
+            googleAuth && !googleAuth.user
+              ? (t.ai as any)?.signInRequiredNotice || t.ai?.tokenExpiredNotice
+              : t.ai?.tokenExpiredNotice ||
+                  'Your Google session has expired or is invalid. Please reconnect in Settings.'
+          );
+          break;
+        case 'FORBIDDEN_NOT_REGISTERED':
+          setParseError(
+            (t.ai as any)?.accountNotRegisteredNotice ||
+              'Your Google account is not registered for Qozara Cloud AI free quota. Configure a personal Gemini API key in Settings.'
+          );
           break;
         case 'RATE_LIMIT_EXCEEDED':
           setParseError(t.ai?.quotaNotice || 'Daily AI quota exceeded. Please sign in or provide a Gemini API key in Settings.');
@@ -276,17 +289,42 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSelectIngredient, onCl
         {parseError && (
           <div className="mt-2 space-y-1.5 px-1" aria-live="polite">
             <p className="text-xs text-rose-400 leading-relaxed">{parseError}</p>
-            {(parseError === t.ai?.quotaNotice ||
-              parseError === t.ai?.aiDisabled ||
-              parseError === t.ai?.tokenExpiredNotice) && (
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                className="text-xs text-emerald-400 underline hover:text-emerald-300 font-semibold block transition-colors"
-              >
-                {t.ai?.openSettingsBtn || t.sync.actions.storageSettings}
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {googleAuth &&
+                (parseError === t.ai?.tokenExpiredNotice ||
+                  parseError === (t.ai as any)?.signInRequiredNotice) && (
+                  <button
+                    type="button"
+                    data-testid="btn-inline-ai-google-auth"
+                    onClick={() => {
+                      const action = googleAuth.user
+                        ? googleAuth.refreshSession()
+                        : googleAuth.signInForIdentity();
+                      action
+                        .then(() => setParseError(null))
+                        .catch(() => {});
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
+                  >
+                    {googleAuth.user
+                      ? (t.ai as any)?.reconnectGoogleBtn || 'Reconnect Google'
+                      : (t.ai as any)?.signInGoogleBtn || 'Sign in with Google'}
+                  </button>
+                )}
+              {(parseError === t.ai?.quotaNotice ||
+                parseError === t.ai?.aiDisabled ||
+                parseError === t.ai?.tokenExpiredNotice ||
+                parseError === (t.ai as any)?.signInRequiredNotice ||
+                parseError === (t.ai as any)?.accountNotRegisteredNotice) && (
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-xs text-emerald-400 underline hover:text-emerald-300 font-semibold block transition-colors"
+                >
+                  {t.ai?.openSettingsBtn || t.sync.actions.storageSettings}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

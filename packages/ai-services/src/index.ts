@@ -20,6 +20,7 @@ export {
   type LegacyAiProviderPreference,
   type AiFactoryConfig,
   type AuthTokenGetter,
+  type AuthTokenRefresher,
   type IAiResolver
 } from '@qozara/ai-client';
 export * from './LlmRecipeDecomposer.js';

@@ -9,7 +9,9 @@ import { collectionSerializers } from './strategy/serializers.js';
 export interface GoogleDriveSheetsCloudSyncProviderOptions {
   httpClient?: GoogleHttpClient;
   routes?: Record<string, CollectionRoute>;
+  getAccessToken?: () => string | null;
   onTokenRefresh?: () => Promise<string>;
+  now?: () => number;
 }
 
 const DEFAULT_QUOMIDA_GOOGLE_ROUTES: Record<string, CollectionRoute> = {
@@ -68,7 +70,9 @@ export class GoogleDriveSheetsCloudSyncProvider extends BaseGoogleDriveSheetsClo
         multipartBoundary: '-------quomida_blob_boundary',
       },
       tabularDriverOptions: tabularDefaults,
+      getAccessToken: options?.getAccessToken,
       onTokenRefresh: options?.onTokenRefresh,
+      now: options?.now,
     });
   }
 }

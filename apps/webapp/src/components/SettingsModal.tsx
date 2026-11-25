@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useOptionalGoogleAuthSession } from '@qozara/google-auth/react';
 import { useApp } from '../context/AppContext.js';
 import {
   X,
@@ -183,11 +184,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
     }
   }, [settingsSignature, isSettingsOpen]);
 
-  // Extract User Info
+  // Extract User Info (prefers decoupled GoogleSessionStore, falls back to cloud sync adapter metadata)
+  const googleAuth = useOptionalGoogleAuthSession();
   const connectedAccount = activeProvider?.getConnectedAccount?.();
-  let userName = userSettings?.active_cloud_provider?.credentials?.userName;
-  let userEmail = userSettings?.active_cloud_provider?.credentials?.userEmail;
+  let userName =
+    googleAuth?.user?.name ||
+    userSettings?.active_cloud_provider?.credentials?.userName;
+  let userEmail =
+    googleAuth?.user?.email ||
+    userSettings?.active_cloud_provider?.credentials?.userEmail;
   const userPicture =
+    googleAuth?.user?.picture ||
     userSettings?.active_cloud_provider?.credentials?.userPicture ||
     activeProvider?.getUserPicture?.() ||
     null;
@@ -698,6 +705,99 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack, onClose })
                     ))}
                   </div>
                 </div>
+
+                {/* Qozara Cloud AI Account Session Card (Decoupled from Cloud Storage Sync) */}
+                {googleAuth && (normalizedAiProvider === 'cloud' || normalizedAiProvider === 'auto') && (
+                  <div
+                    data-testid="qozara-ai-account-card"
+                    className="p-3.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        <User className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span>{(t.ai as any)?.aiAccountTitle || 'Qozara Cloud AI Account'}</span>
+                      </div>
+                      {googleAuth.isAuthenticated && !isCloudConnected && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                          {(t.ai as any)?.aiAccountIdentityOnlyBadge || 'Identity only (Local storage)'}
+                        </span>
+                      )}
+                    </div>
+
+                    {googleAuth.isAuthenticated && googleAuth.user ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                            {googleAuth.user.name || googleAuth.user.email}
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {googleAuth.user.email}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="btn-ai-google-signout"
+                          onClick={() => googleAuth.signOut()}
+                          className="px-3 py-1.5 min-h-[36px] rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors shrink-0"
+                        >
+                          {(t.ai as any)?.signOutGoogleBtn || 'Sign Out'}
+                        </button>
+                      </div>
+                    ) : googleAuth.isExpired && googleAuth.user ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-tight">
+                          {((t.ai as any)?.aiAccountExpired || 'Session expired — Reconnect to use Qozara Cloud AI')}{' '}
+                          ({googleAuth.user.email})
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            data-testid="btn-ai-google-reconnect"
+                            disabled={googleAuth.isLoading}
+                            onClick={() => {
+                              googleAuth
+                                .refreshSession()
+                                .then(() => setAiFeedback(null))
+                                .catch((err: Error) => setAiFeedback(err.message));
+                            }}
+                            className="flex-1 py-2 px-3 min-h-[40px] rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition-colors"
+                          >
+                            {(t.ai as any)?.reconnectGoogleBtn || 'Reconnect Google'}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="btn-ai-google-signout"
+                            onClick={() => googleAuth.signOut()}
+                            className="py-2 px-3 min-h-[40px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                          >
+                            {(t.ai as any)?.signOutGoogleBtn || 'Sign Out'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                          {(t.ai as any)?.aiAccountDisconnectedDesc ||
+                            'Sign in with Google (identity only — zero Google Drive permissions required) to use your 20 req/day Qozara Cloud AI quota, even in local-only storage mode.'}
+                        </p>
+                        <button
+                          type="button"
+                          data-testid="btn-ai-google-signin"
+                          disabled={googleAuth.isLoading}
+                          onClick={() => {
+                            googleAuth
+                              .signInForIdentity()
+                              .then(() => setAiFeedback(null))
+                              .catch((err: Error) => setAiFeedback(err.message));
+                          }}
+                          className="w-full py-2 px-3 min-h-[40px] rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+                        >
+                          {(t.ai as any)?.signInGoogleBtn || 'Sign in with Google'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Explicit Opt-in for Local Network AI (Ollama) */}
                 <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl">

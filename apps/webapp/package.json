@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@qozara/google-auth": "^1.0.1",
     "@qozara/pwa-update": "^1.0.2",
     "@quomida/cloud-providers": "*",
     "@quomida/domain-core": "*",
