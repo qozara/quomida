@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext.js';
 import { calculateBaselineSeed, type UserSex } from '@quomida/domain-core';
 import { User, Scale, Ruler, Calendar, Save, Check, Info, Flame } from 'lucide-react';
@@ -41,6 +41,15 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
 
   const [currentWeightKg, setCurrentWeightKg] = useState<number>(initialWeight);
   const [isSaved, setIsSaved] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!userSettings) return;
@@ -140,7 +149,11 @@ export const BiometricsEditModal: React.FC<BiometricsEditModalProps> = ({
     }
 
     setIsSaved(true);
-    setTimeout(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
       setIsSaved(false);
       onClose();
     }, 400);
