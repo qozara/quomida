@@ -16,6 +16,7 @@ export const VISIBILITY_UPDATE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown 
 export type { AppUpdateCheckResult, PwaUpdateState };
 
 let isConfigured = false;
+let activeGeneration = 0;
 
 function getCurrentAppVersion(): string {
   return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
@@ -23,15 +24,29 @@ function getCurrentAppVersion(): string {
 
 export function ensurePwaUpdateConfigured(): void {
   if (!isConfigured) {
+    const generationAtConfig = ++activeGeneration;
     configurePwaUpdate({
       currentVersion: getCurrentAppVersion(),
       visibilityCooldownMs: VISIBILITY_UPDATE_COOLDOWN_MS,
+      onReload: () => {
+        if (generationAtConfig !== activeGeneration) {
+          return;
+        }
+        if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+          try {
+            window.location.reload();
+          } catch {
+            // Ignore jsdom navigation not implemented errors when unmocked
+          }
+        }
+      },
     });
     isConfigured = true;
   }
 }
 
 export function resetSharedPwaUpdateState(): void {
+  activeGeneration += 1;
   resetPwaUpdateManager();
   isConfigured = false;
   ensurePwaUpdateConfigured();

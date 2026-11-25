@@ -40,4 +40,5 @@ This directory contains formal Architectural Decision Records (ADRs) for the Quo
 * [ADR 0033: Isolation of Mock Cloud Sync Provider to Test Packages and Removal from Production UI](./0033-quomida-mock-cloud-sync-isolation-to-test-packages.md)
 * [ADR 0034: Diacritic-Insensitive Catalog Search and Unified AI Ingredient & Recipe Inference](./0034-diacritic-catalog-search-and-ai-ingredient-recipe-inference.md)
 * [ADR 0035: Composite Symbolic + GenAI Resolver, Unified Settings Schema & Shared AI Client](./0035-composite-symbolic-genai-and-shared-ai-client.md)
+* [ADR 0036: Decoupled Google Identity Session (`@qozara/google-auth`) and Incremental OAuth Scopes](./0036-decoupled-google-identity-session-and-incremental-oauth-scopes.md)
 

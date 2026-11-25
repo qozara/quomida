@@ -22,6 +22,7 @@ import {
   RecipeManager
 } from '@quomida/domain-core';
 import { dictionaries } from '@quomida/i18n-locales';
+import { AiMealError, classifyAiError } from '@quomida/ai-services';
 import { useMealAiService } from '../hooks/useMealAiService.js';
 import {
   Sparkles,
@@ -280,7 +281,22 @@ export const BatchAiMealReviewModal: React.FC<BatchAiMealReviewModalProps> = ({
       }
     } catch (err: any) {
       console.warn('[BatchAiMealReviewModal] Force meal decomposition failed:', err);
-      setDecomposeError(err?.message || t.ai?.parseError || 'AI decomposition failed.');
+      const aiErr = err instanceof AiMealError ? err : classifyAiError(err);
+      if (aiErr.code === 'FORBIDDEN_NOT_REGISTERED') {
+        setDecomposeError(
+          (t.ai as any)?.accountNotRegisteredNotice || aiErr.message
+        );
+      } else if (aiErr.code === 'AUTHENTICATION_REQUIRED') {
+        setDecomposeError(
+          t.ai?.tokenExpiredNotice || aiErr.message
+        );
+      } else if (aiErr.code === 'RATE_LIMIT_EXCEEDED') {
+        setDecomposeError(
+          t.ai?.quotaNotice || aiErr.message
+        );
+      } else {
+        setDecomposeError(err?.message || t.ai?.parseError || 'AI decomposition failed.');
+      }
     } finally {
       setIsDecomposingMeal(false);
     }

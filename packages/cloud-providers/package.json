@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@qozara/cloud-sync": "^1.0.0",
-    "@qozara/cloud-sync-google": "^1.0.0",
+    "@qozara/cloud-sync-google": "^1.0.2",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {

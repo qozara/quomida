@@ -3,6 +3,7 @@ import {
   normalizeProviderPreference,
   LruMemoryCache,
   type AuthTokenGetter,
+  type AuthTokenRefresher,
   type GenAiProviderPreference,
   type LegacyAiProviderPreference,
   type GenAiToolResolver
@@ -22,6 +23,7 @@ export interface LlmRecipeDecomposerConfig {
   ollamaModel?: string;
   enableLocalAi?: boolean;
   getAuthToken?: AuthTokenGetter;
+  onAuthExpired?: AuthTokenRefresher;
   systemPrompt?: string;
   cache?: LruMemoryCache<string, DecomposedDishResult> | null;
 }
@@ -266,6 +268,7 @@ export class LlmRecipeDecomposer implements IRecipeDecomposer {
         enableLocalAi
       },
       getAuthToken: this.config.getAuthToken,
+      onAuthExpired: this.config.onAuthExpired,
       cache: this.cache,
       getCacheKey: ({ dishName, portionContext, locale }) =>
         normalizeDecompositionKey(dishName, portionContext, locale),
