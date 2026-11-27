@@ -2,7 +2,14 @@ import type { SchemaDefinition, TabDefinition, ColumnDefinition } from '@qozara/
 export type { SchemaDefinition, TabDefinition, ColumnDefinition };
 
 export const QuomidaDailyLogsSpreadsheetSchema: SchemaDefinition = {
-  version: 1,
+  version: 2,
+  identity: {
+    appId: 'quomida',
+    docType: 'daily_logs',
+    legacyMetaSheetNames: ['_quomida_meta'],
+    legacyPropertyMatchers: [{ key: 'quomida_doc_type', value: 'daily_logs' }],
+    legacyRequiredTabs: ['daily_logs'],
+  },
   tabs: [
     {
       name: 'daily_logs',
@@ -36,12 +43,27 @@ export const QuomidaDailyLogsSpreadsheetSchema: SchemaDefinition = {
         { name: 'updatedAt', type: 'number', required: true },
         { name: '_deleted', type: 'boolean' }
       ]
+    },
+    {
+      name: '_meta',
+      columns: [
+        { name: 'key', type: 'string', required: true },
+        { name: 'value', type: 'string', required: true },
+        { name: 'updatedAt', type: 'string', required: true }
+      ]
     }
   ]
 };
 
 export const QuomidaFoodCatalogSpreadsheetSchema: SchemaDefinition = {
-  version: 1,
+  version: 2,
+  identity: {
+    appId: 'quomida',
+    docType: 'food_catalog',
+    legacyMetaSheetNames: ['_quomida_meta'],
+    legacyPropertyMatchers: [{ key: 'quomida_doc_type', value: 'food_catalog' }],
+    legacyRequiredTabs: ['base_ingredients'],
+  },
   tabs: [
     {
       name: 'base_ingredients',
@@ -78,6 +100,14 @@ export const QuomidaFoodCatalogSpreadsheetSchema: SchemaDefinition = {
         { name: 'equivalent_weight_g', type: 'number' },
         { name: 'updatedAt', type: 'number' },
         { name: '_deleted', type: 'boolean' }
+      ]
+    },
+    {
+      name: '_meta',
+      columns: [
+        { name: 'key', type: 'string', required: true },
+        { name: 'value', type: 'string', required: true },
+        { name: 'updatedAt', type: 'string', required: true }
       ]
     }
   ]

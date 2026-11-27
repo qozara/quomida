@@ -58,11 +58,19 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
           return new Response(JSON.stringify(appDataBlob), { status: 200 });
         }
 
-        // Search Drive for spreadsheets by metadata
-        if (url.includes('/drive/v3/files?') && url.includes('appProperties')) {
-          const isLogs = url.includes('daily_logs');
-          const found = createdSpreadsheets.filter(s => s.tabs.includes(isLogs ? 'daily_logs' : 'base_ingredients'));
-          return new Response(JSON.stringify({ files: found.map(s => ({ id: s.id, name: s.title })) }), { status: 200 });
+        // Search Drive for spreadsheets by metadata (properties / appProperties)
+        if (url.includes('/drive/v3/files?') && !url.includes('spaces=appDataFolder')) {
+          if (url.includes('properties%20has') || url.includes('appProperties')) {
+            const isLogs = url.includes('daily_logs');
+            const found = createdSpreadsheets.filter(s => s.tabs.includes(isLogs ? 'daily_logs' : 'base_ingredients'));
+            return new Response(JSON.stringify({ files: found.map(s => ({ id: s.id, name: s.title })) }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+
+        // Get Drive file metadata
+        if (url.includes('/drive/v3/files/') && (!init?.method || init.method === 'GET') && !url.includes('alt=media')) {
+          return new Response(JSON.stringify({ properties: {}, appProperties: {} }), { status: 200 });
         }
 
         // :clear endpoint
@@ -84,6 +92,35 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
             sheets: body.sheets.map((s: any, idx: number) => ({ properties: { title: s.properties.title, sheetId: idx } })) 
           }), { status: 200 });
         }
+
+        // Get spreadsheet metadata (excluding /values)
+        if (url.includes('/v4/spreadsheets/') && (!init?.method || init.method === 'GET') && !url.includes('/values')) {
+          const match = url.match(/\/v4\/spreadsheets\/([^?]+)/);
+          const sheetId = match ? match[1] : '';
+          const sheet = createdSpreadsheets.find(s => s.id === sheetId);
+          if (sheet) {
+            return new Response(JSON.stringify({
+              spreadsheetId: sheet.id,
+              properties: { title: sheet.title },
+              sheets: sheet.tabs.map((title, idx) => ({ properties: { title, sheetId: idx } }))
+            }), { status: 200 });
+          }
+          return new Response('Not Found', { status: 404 });
+        }
+
+        // BatchGet spreadsheet values
+        if (url.includes('/values:batchGet') && (!init?.method || init.method === 'GET')) {
+          const match = url.match(/\/spreadsheets\/([^/]+)\/values:batchGet/);
+          const sheetId = match ? match[1] : '';
+          const urlObj = new URL(url);
+          const ranges = urlObj.searchParams.getAll('ranges');
+          return new Response(JSON.stringify({
+            valueRanges: ranges.map((range) => {
+              const tab = range.split('!')[0].replace(/^'|'$/g, '');
+              return { range, values: sheetsData.get(`${sheetId}:${tab}`) || [] };
+            })
+          }), { status: 200 });
+        }
         
         // Patch Drive metadata
         if (url.includes('/drive/v3/files/') && init?.method === 'PATCH') {
@@ -101,7 +138,27 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
           const sheetId = match ? match[1] : 'unknown';
           const body = JSON.parse(String(init?.body));
           for (const item of body.data) {
-            sheetsData.set(`${sheetId}:${item.range}`, item.values);
+            const [rawTab, a1Ref = 'A1'] = String(item.range).split('!');
+            const tab = rawTab.replace(/^'|'$/g, '');
+            const cellMatch = /^([A-Z]+)(\d+)/i.exec(a1Ref);
+            let startCol = 0;
+            let startRow = 0;
+            if (cellMatch) {
+              for (const ch of cellMatch[1].toUpperCase()) {
+                startCol = startCol * 26 + (ch.charCodeAt(0) - 64);
+              }
+              startCol -= 1;
+              startRow = parseInt(cellMatch[2], 10) - 1;
+            }
+            const grid: any[][] = sheetsData.get(`${sheetId}:${tab}`) || [];
+            (item.values || []).forEach((rowVals: any[], rOffset: number) => {
+              const r = startRow + rOffset;
+              while (grid.length <= r) grid.push([]);
+              (rowVals || []).forEach((val: any, cOffset: number) => {
+                grid[r][startCol + cOffset] = val;
+              });
+            });
+            sheetsData.set(`${sheetId}:${tab}`, grid);
           }
           return new Response(JSON.stringify({ totalUpdatedRows: 1 }), { status: 200 });
         }
@@ -110,9 +167,8 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
         if (url.includes('/values/') && init?.method === 'GET') {
           const match = url.match(/\/spreadsheets\/([^/]+)\/values\/([^!]+)!/);
           const sheetId = match ? match[1] : '';
-          const tab = match ? decodeURIComponent(match[2]) : '';
-          const key = `${sheetId}:${tab}!A1:Z`;
-          const values = sheetsData.get(key) || [];
+          const tab = match ? decodeURIComponent(match[2]).replace(/^'|'$/g, '') : '';
+          const values = sheetsData.get(`${sheetId}:${tab}`) || [];
           return new Response(JSON.stringify({ values }), { status: 200 });
         }
 
@@ -178,11 +234,10 @@ describe('GoogleDriveSheetsCloudSyncProvider (Integrated Strategy)', () => {
     expect(catalogSheet!.tabs).toContain('base_ingredients');
     expect(catalogSheet!.tabs).toContain('recipes');
     expect(catalogSheet!.tabs).toContain('portions');
-    expect(catalogSheet!.tabs).toContain('_quomida_meta');
+    expect(catalogSheet!.tabs).toContain('_meta');
 
     // Verify Logs tab has denormalized column
-    const logsKey = `${logsSheet!.id}:daily_logs!A1:Z`;
-    const logValues = sheetsData.get(logsKey);
+    const logValues = sheetsData.get(`${logsSheet!.id}:daily_logs`);
     expect(logValues).toBeDefined();
     expect(logValues!.length).toBe(2); // Header + 1 row
     const row = logValues![1];

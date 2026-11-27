@@ -57,11 +57,11 @@ function createMockGoogleCloudBackend() {
       if (url.includes('/drive/v3/files?') && init?.method !== 'POST' && !url.includes('alt=media')) {
         let matching = Array.from(files.values()).filter(f => !f.trashed);
 
-        if (url.includes('appProperties')) {
+        if (url.includes('properties') || url.includes('appProperties')) {
           const isLogs = url.includes('daily_logs');
           const isCatalog = url.includes('food_catalog');
           matching = matching.filter(f => {
-            const docType = f.appProperties?.quomida_doc_type;
+            const docType = f.appProperties?.qozara_doc_type || f.appProperties?.quomida_doc_type;
             if (isLogs) return docType === 'daily_logs';
             if (isCatalog) return docType === 'food_catalog';
             return !!docType;
@@ -115,6 +115,21 @@ function createMockGoogleCloudBackend() {
         return new Response(JSON.stringify(null), { status: 404 });
       }
 
+      // 4b. Drive File Metadata GET
+      if (url.includes('/drive/v3/files/') && init?.method !== 'PATCH' && init?.method !== 'DELETE' && !url.includes('alt=media')) {
+        const fileIdMatch = url.match(/\/drive\/v3\/files\/([^?]+)/);
+        const fileId = fileIdMatch ? fileIdMatch[1] : '';
+        const file = files.get(fileId);
+        if (file) {
+          return new Response(JSON.stringify({
+            properties: file.appProperties || {},
+            appProperties: file.appProperties || {},
+            modifiedTime: '2026-11-27T00:00:00Z'
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ properties: {}, appProperties: {} }), { status: 200 });
+      }
+
       // 5. Drive metadata PATCH
       if (url.includes('/drive/v3/files/') && init?.method === 'PATCH') {
         const fileIdMatch = url.match(/\/drive\/v3\/files\/([^?]+)/);
@@ -123,9 +138,11 @@ function createMockGoogleCloudBackend() {
         if (file && init?.body) {
           try {
             const body = JSON.parse(String(init.body));
-            if (body.appProperties) {
-              file.appProperties = { ...file.appProperties, ...body.appProperties };
-            }
+            file.appProperties = {
+              ...(file.appProperties || {}),
+              ...(body.properties || {}),
+              ...(body.appProperties || {}),
+            };
           } catch {}
           return new Response(JSON.stringify(file), { status: 200 });
         }
@@ -161,7 +178,7 @@ function createMockGoogleCloudBackend() {
       }
 
       // 8. Get Spreadsheet metadata (sheets & titles)
-      if (url.includes('/v4/spreadsheets/') && init?.method === 'GET' && !url.includes('/values/')) {
+      if (url.includes('/v4/spreadsheets/') && (!init?.method || init.method === 'GET') && !url.includes('/values')) {
         const match = url.match(/\/v4\/spreadsheets\/([^?]+)/);
         const id = match ? match[1] : '';
         const sheet = files.get(id);
@@ -169,10 +186,27 @@ function createMockGoogleCloudBackend() {
           const tabNames = Array.from(sheet.tabs.keys());
           return new Response(JSON.stringify({
             spreadsheetId: id,
+            properties: { title: sheet.name },
             sheets: tabNames.map((t, idx) => ({ properties: { title: t, sheetId: idx } }))
           }), { status: 200 });
         }
         return new Response('Not Found', { status: 404 });
+      }
+
+      // 8b. BatchGet spreadsheet values
+      if (url.includes('/values:batchGet') && (!init?.method || init.method === 'GET')) {
+        const match = url.match(/\/spreadsheets\/([^/]+)\/values:batchGet/);
+        const id = match ? match[1] : '';
+        const sheet = files.get(id);
+        const urlObj = new URL(url);
+        const ranges = urlObj.searchParams.getAll('ranges');
+        return new Response(JSON.stringify({
+          valueRanges: ranges.map((range) => {
+            const tab = range.split('!')[0].replace(/^'|'$/g, '');
+            const values = sheet?.tabs?.get(tab) || [];
+            return { range, values };
+          })
+        }), { status: 200 });
       }
 
       // 9. BatchUpdate spreadsheet (addSheet, addProtectedRange, etc.)
@@ -199,8 +233,27 @@ function createMockGoogleCloudBackend() {
         if (sheet && sheet.tabs && init?.body) {
           const body = JSON.parse(String(init.body));
           for (const item of (body.data || [])) {
-            const tabName = item.range.split('!')[0];
-            sheet.tabs.set(tabName, item.values);
+            const [rawTab, a1Ref = 'A1'] = String(item.range).split('!');
+            const tabName = rawTab.replace(/^'|'$/g, '');
+            const cellMatch = /^([A-Z]+)(\d+)/i.exec(a1Ref);
+            let startCol = 0;
+            let startRow = 0;
+            if (cellMatch) {
+              for (const ch of cellMatch[1].toUpperCase()) {
+                startCol = startCol * 26 + (ch.charCodeAt(0) - 64);
+              }
+              startCol -= 1;
+              startRow = parseInt(cellMatch[2], 10) - 1;
+            }
+            const grid = sheet.tabs.get(tabName) || [];
+            (item.values || []).forEach((rowVals: any[], rOffset: number) => {
+              const r = startRow + rOffset;
+              while (grid.length <= r) grid.push([]);
+              (rowVals || []).forEach((val: any, cOffset: number) => {
+                grid[r][startCol + cOffset] = val;
+              });
+            });
+            sheet.tabs.set(tabName, grid);
           }
           return new Response(JSON.stringify({ totalUpdatedRows: 1 }), { status: 200 });
         }
@@ -211,7 +264,7 @@ function createMockGoogleCloudBackend() {
       if (url.includes('/values/') && init?.method === 'GET') {
         const match = url.match(/\/spreadsheets\/([^/]+)\/values\/([^!]+)!/);
         const id = match ? match[1] : '';
-        const tab = match ? decodeURIComponent(match[2]) : '';
+        const tab = match ? decodeURIComponent(match[2]).replace(/^'|'$/g, '') : '';
         const sheet = files.get(id);
         const values = (sheet && sheet.tabs) ? (sheet.tabs.get(tab) || []) : [];
         return new Response(JSON.stringify({ values }), { status: 200 });

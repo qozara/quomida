@@ -17,6 +17,29 @@ export {
   type CollectionSerializer,
 };
 
+function mapFieldsToHeaders(
+  doc: Record<string, any>,
+  fields: Record<string, any>,
+  defaultHeaders: string[],
+  headers?: string[]
+): TabularRow {
+  const targetHeaders = headers && headers.length > 0 ? headers : defaultHeaders;
+  const normalized = new Map<string, any>();
+  for (const [key, value] of Object.entries(fields)) {
+    normalized.set(key.trim().toLowerCase(), value);
+  }
+  const values = targetHeaders.map((header) => {
+    const key = String(header ?? '').trim().toLowerCase();
+    return normalized.has(key) ? normalized.get(key) : undefined;
+  });
+  return {
+    id: doc.id,
+    updatedAt: doc.updatedAt,
+    _deleted: doc._deleted,
+    values,
+  };
+}
+
 export const dailyLogsSerializer: CollectionSerializer = {
   headers: [
     'id',
@@ -35,33 +58,33 @@ export const dailyLogsSerializer: CollectionSerializer = {
     'updatedAt',
     '_deleted'
   ],
-  docToRow(doc: Record<string, any>): TabularRow {
+  docToRow(doc: Record<string, any>, headers?: string[]): TabularRow {
     const macros = doc.macros || { calories: 0, protein: 0, carbs: 0, fats: 0 };
     const foodName = doc.food_name || 'Alimento';
     const denormalized = `${foodName} | ${macros.calories ?? 0}kcal | ${macros.protein ?? 0}g P, ${macros.carbs ?? 0}g C, ${macros.fats ?? 0}g F`;
 
-    return {
-      id: doc.id,
-      updatedAt: doc.updatedAt,
-      _deleted: doc._deleted,
-      values: [
-        escapeFormulaInjection(doc.id),
-        doc.timestamp,
-        doc.date,
-        doc.meal_type,
-        doc.food_reference_id,
-        escapeFormulaInjection(doc.food_name ?? ''),
-        parseNumber(doc.quantity, 0),
-        escapeFormulaInjection(doc.portion_name ?? ''),
-        parseNumber(macros.calories, 0),
-        parseNumber(macros.protein, 0),
-        parseNumber(macros.carbs, 0),
-        parseNumber(macros.fats, 0),
-        escapeFormulaInjection(denormalized),
-        doc.updatedAt ?? Date.now(),
-        Boolean(doc._deleted)
-      ]
-    };
+    return mapFieldsToHeaders(
+      doc,
+      {
+        id: escapeFormulaInjection(doc.id),
+        timestamp: doc.timestamp,
+        date: doc.date,
+        meal_type: doc.meal_type,
+        food_reference_id: doc.food_reference_id,
+        food_name: escapeFormulaInjection(doc.food_name ?? ''),
+        quantity: parseNumber(doc.quantity, 0),
+        portion_name: escapeFormulaInjection(doc.portion_name ?? ''),
+        calories: parseNumber(macros.calories, 0),
+        protein: parseNumber(macros.protein, 0),
+        carbs: parseNumber(macros.carbs, 0),
+        fats: parseNumber(macros.fats, 0),
+        food_details_readonly: escapeFormulaInjection(denormalized),
+        updatedAt: doc.updatedAt ?? Date.now(),
+        _deleted: Boolean(doc._deleted),
+      },
+      this.headers,
+      headers
+    );
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const getField = createFieldGetter(row);
@@ -123,24 +146,24 @@ export const baseIngredientsSerializer: CollectionSerializer = {
     'updatedAt',
     '_deleted'
   ],
-  docToRow(doc: Record<string, any>): TabularRow {
-    return {
-      id: doc.id,
-      updatedAt: doc.updatedAt,
-      _deleted: doc._deleted,
-      values: [
-        escapeFormulaInjection(doc.id),
-        escapeFormulaInjection(doc.name),
-        doc.source,
-        doc.lang,
-        parseNumber(doc.calories_100g, 0),
-        parseNumber(doc.protein_100g, 0),
-        parseNumber(doc.carbs_100g, 0),
-        parseNumber(doc.fats_100g, 0),
-        doc.updatedAt ?? Date.now(),
-        Boolean(doc._deleted)
-      ]
-    };
+  docToRow(doc: Record<string, any>, headers?: string[]): TabularRow {
+    return mapFieldsToHeaders(
+      doc,
+      {
+        id: escapeFormulaInjection(doc.id),
+        name: escapeFormulaInjection(doc.name),
+        source: doc.source,
+        lang: doc.lang,
+        calories_100g: parseNumber(doc.calories_100g, 0),
+        protein_100g: parseNumber(doc.protein_100g, 0),
+        carbs_100g: parseNumber(doc.carbs_100g, 0),
+        fats_100g: parseNumber(doc.fats_100g, 0),
+        updatedAt: doc.updatedAt ?? Date.now(),
+        _deleted: Boolean(doc._deleted),
+      },
+      this.headers,
+      headers
+    );
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const getField = createFieldGetter(row);
@@ -172,20 +195,23 @@ export const baseIngredientsSerializer: CollectionSerializer = {
 
 export const recipesSerializer: CollectionSerializer = {
   headers: ['id', 'name', 'ingredients', 'yield_factor', 'updatedAt', '_deleted'],
-  docToRow(doc: Record<string, any>): TabularRow {
-    return {
-      id: doc.id,
-      updatedAt: doc.updatedAt,
-      _deleted: doc._deleted,
-      values: [
-        escapeFormulaInjection(doc.id),
-        escapeFormulaInjection(doc.name),
-        typeof doc.ingredients === 'string' ? doc.ingredients : JSON.stringify(doc.ingredients || []),
-        parseNumber(doc.yield_factor, 1.0),
-        doc.updatedAt ?? Date.now(),
-        Boolean(doc._deleted)
-      ]
-    };
+  docToRow(doc: Record<string, any>, headers?: string[]): TabularRow {
+    return mapFieldsToHeaders(
+      doc,
+      {
+        id: escapeFormulaInjection(doc.id),
+        name: escapeFormulaInjection(doc.name),
+        ingredients:
+          typeof doc.ingredients === 'string'
+            ? doc.ingredients
+            : JSON.stringify(doc.ingredients || []),
+        yield_factor: parseNumber(doc.yield_factor, 1.0),
+        updatedAt: doc.updatedAt ?? Date.now(),
+        _deleted: Boolean(doc._deleted),
+      },
+      this.headers,
+      headers
+    );
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const getField = createFieldGetter(row);
@@ -215,20 +241,20 @@ export const recipesSerializer: CollectionSerializer = {
 
 export const portionsSerializer: CollectionSerializer = {
   headers: ['id', 'base_food_id', 'name', 'equivalent_weight_g', 'updatedAt', '_deleted'],
-  docToRow(doc: Record<string, any>): TabularRow {
-    return {
-      id: doc.id,
-      updatedAt: doc.updatedAt,
-      _deleted: doc._deleted,
-      values: [
-        escapeFormulaInjection(doc.id),
-        escapeFormulaInjection(doc.base_food_id),
-        escapeFormulaInjection(doc.name),
-        parseNumber(doc.equivalent_weight_g, 0),
-        doc.updatedAt ?? Date.now(),
-        Boolean(doc._deleted)
-      ]
-    };
+  docToRow(doc: Record<string, any>, headers?: string[]): TabularRow {
+    return mapFieldsToHeaders(
+      doc,
+      {
+        id: escapeFormulaInjection(doc.id),
+        base_food_id: escapeFormulaInjection(doc.base_food_id),
+        name: escapeFormulaInjection(doc.name),
+        equivalent_weight_g: parseNumber(doc.equivalent_weight_g, 0),
+        updatedAt: doc.updatedAt ?? Date.now(),
+        _deleted: Boolean(doc._deleted),
+      },
+      this.headers,
+      headers
+    );
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const getField = createFieldGetter(row);
@@ -264,22 +290,22 @@ export const weightLogHeaders = [
 
 export const weightLogsSerializer: CollectionSerializer = {
   headers: weightLogHeaders,
-  docToRow(doc: Record<string, any>): TabularRow {
-    return {
-      id: doc.id,
-      updatedAt: doc.updatedAt,
-      _deleted: doc._deleted,
-      values: [
-        escapeFormulaInjection(doc.id),
-        doc.date,
-        doc.timestamp,
-        parseNumber(doc.weight_kg, 0),
-        parseNumber(doc.trend_weight_kg, 0),
-        escapeFormulaInjection(sanitizeString(doc.note ?? '')),
-        doc.updatedAt ?? Date.now(),
-        Boolean(doc._deleted)
-      ]
-    };
+  docToRow(doc: Record<string, any>, headers?: string[]): TabularRow {
+    return mapFieldsToHeaders(
+      doc,
+      {
+        id: escapeFormulaInjection(doc.id),
+        date: doc.date,
+        timestamp: doc.timestamp,
+        weight_kg: parseNumber(doc.weight_kg, 0),
+        trend_weight_kg: parseNumber(doc.trend_weight_kg, 0),
+        note: escapeFormulaInjection(sanitizeString(doc.note ?? '')),
+        updatedAt: doc.updatedAt ?? Date.now(),
+        _deleted: Boolean(doc._deleted),
+      },
+      this.headers,
+      headers
+    );
   },
   rowToDoc(row: TabularRow): Record<string, any> {
     const getField = createFieldGetter(row);

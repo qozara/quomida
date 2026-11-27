@@ -203,18 +203,23 @@ describe('GoogleDriveBlobDriver', () => {
 describe('GoogleSheetsTabularDriver', () => {
   it('creates new spreadsheet with tabs if none exists', async () => {
     const mockCalls: { url: string; method?: string; body?: any }[] = [];
+    let createdTabs: string[] = ['daily_logs', '_meta', '_migrations'];
 
     const mockClient: GoogleHttpClient = {
       fetch: vi.fn(async (url: string, init?: RequestInit) => {
         mockCalls.push({ url, method: init?.method, body: init?.body });
 
         // Search Drive
-        if (url.includes('/drive/v3/files?') && init?.method === 'GET') {
+        if (url.includes('/drive/v3/files?') && (!init?.method || init.method === 'GET')) {
           return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+        if (url.includes('/drive/v3/files/sheet_created_999') && (!init?.method || init.method === 'GET')) {
+          return new Response(JSON.stringify({ properties: {}, appProperties: {} }), { status: 200 });
         }
         // Create Sheet
         if (url.includes('/v4/spreadsheets') && init?.method === 'POST' && !url.includes(':batchUpdate')) {
           const body = JSON.parse(String(init?.body));
+          createdTabs = body.sheets.map((s: any) => s.properties.title);
           return new Response(
             JSON.stringify({
               spreadsheetId: 'sheet_created_999',
@@ -223,6 +228,18 @@ describe('GoogleSheetsTabularDriver', () => {
             }),
             { status: 200 }
           );
+        }
+        if (url.includes('/v4/spreadsheets/sheet_created_999') && (!init?.method || init.method === 'GET') && !url.includes('/values')) {
+          return new Response(
+            JSON.stringify({
+              properties: { title: 'Quomida Daily Logs' },
+              sheets: createdTabs.map((title, idx) => ({ properties: { title, sheetId: idx } }))
+            }),
+            { status: 200 }
+          );
+        }
+        if (url.includes('/values:batchGet')) {
+          return new Response(JSON.stringify({ valueRanges: [] }), { status: 200 });
         }
         
         // Patch Drive metadata
@@ -257,14 +274,20 @@ describe('GoogleSheetsTabularDriver', () => {
     expect(payload.properties.title).toBe('Quomida Daily Logs');
     expect(payload.sheets[0].properties.title).toBe('daily_logs');
     
-    // Verify meta sheet is included in creation
-    expect(payload.sheets.find((s: any) => s.properties.title === '_quomida_meta')).toBeDefined();
+    // Verify canonical _meta and _migrations tabs are included in creation
+    expect(payload.sheets.find((s: any) => s.properties.title === '_meta')).toBeDefined();
+    expect(payload.sheets.find((s: any) => s.properties.title === '_migrations')).toBeDefined();
     
-    // Verify PATCH was called
-    const patchCall = mockCalls.find(c => c.method === 'PATCH');
-    expect(patchCall).toBeDefined();
-    expect(patchCall!.url).toContain('sheet_created_999');
-    expect(JSON.parse(patchCall!.body).appProperties.quomida_doc_type).toBe('daily_logs');
+    // Verify PATCH was called with legacy and canonical identity keys
+    const patchCalls = mockCalls.filter(c => c.method === 'PATCH');
+    expect(patchCalls.length).toBeGreaterThanOrEqual(1);
+    expect(patchCalls[0].url).toContain('sheet_created_999');
+    const mergedAppProps = patchCalls.reduce((acc, call) => {
+      const parsed = JSON.parse(call.body);
+      return { ...acc, ...(parsed.appProperties || {}) };
+    }, {} as Record<string, string>);
+    expect(mergedAppProps.quomida_doc_type).toBe('daily_logs');
+    expect(mergedAppProps.qozara_app).toBe('quomida');
   });
 
   it('writes rows using values:batchUpdate and reads table', async () => {
@@ -359,15 +382,15 @@ describe('GoogleSheetsTabularDriver', () => {
     await expect(driver.readTable('sheet_123', 'daily_logs')).rejects.toThrow(/quota|rate limit|429/i);
   });
 
-  it('finds existing spreadsheet by title fallback when appProperties query returns empty and patches appProperties', async () => {
+  it('finds existing spreadsheet by title fallback when it has verified legacy _quomida_meta and patches appProperties', async () => {
     const mockCalls: { url: string; method?: string; body?: any }[] = [];
 
     const mockClient: GoogleHttpClient = {
       fetch: vi.fn(async (url: string, init?: RequestInit) => {
         mockCalls.push({ url, method: init?.method, body: init?.body });
 
-        // 1. AppProperties query returns empty (e.g. file existed from before or created manually)
-        if (url.includes('/drive/v3/files?') && url.includes('appProperties')) {
+        // 1. AppProperties/Properties query returns empty (e.g. legacy sheet created before index or Drive copy)
+        if (url.includes('/drive/v3/files?') && (url.includes('appProperties') || url.includes('properties'))) {
           return new Response(JSON.stringify({ files: [] }), { status: 200 });
         }
 
@@ -379,24 +402,30 @@ describe('GoogleSheetsTabularDriver', () => {
           );
         }
 
-        // 3. Inspect existing sheet tabs
-        if (url.includes('/v4/spreadsheets/sheet_existing_title_match?fields=sheets(properties(title))')) {
+        // 2b. File metadata read during provenance check
+        if (url.includes('/drive/v3/files/sheet_existing_title_match') && init?.method !== 'PATCH') {
+          return new Response(JSON.stringify({ properties: {}, appProperties: {} }), { status: 200 });
+        }
+
+        // 3. Inspect existing sheet tabs (includes verified legacy _quomida_meta tab)
+        if (url.includes('/v4/spreadsheets/sheet_existing_title_match') && !url.includes('/values')) {
           return new Response(
             JSON.stringify({
+              properties: { title: 'Quomida Food Catalog' },
               sheets: [
-                { properties: { title: 'base_ingredients' } }
+                { properties: { title: 'base_ingredients', sheetId: 0 } },
+                { properties: { title: '_quomida_meta', sheetId: 1 } }
               ]
             }),
             { status: 200 }
           );
         }
 
-        // 4. Batch update to add missing tabs (recipes, portions, _quomida_meta)
-        if (url.includes(':batchUpdate')) {
-          return new Response(JSON.stringify({}), { status: 200 });
+        if (url.includes('/values:batchGet')) {
+          return new Response(JSON.stringify({ valueRanges: [] }), { status: 200 });
         }
 
-        // 5. PATCH Drive metadata
+        // 4. PATCH Drive metadata
         if (url.includes('/drive/v3/files/') && init?.method === 'PATCH') {
           return new Response(JSON.stringify({}), { status: 200 });
         }
@@ -413,21 +442,112 @@ describe('GoogleSheetsTabularDriver', () => {
     const docId = await driver.ensureDocument('Quomida Food Catalog', ['base_ingredients', 'recipes', 'portions']);
     expect(docId).toBe('sheet_existing_title_match');
 
-    // Verify it patched appProperties onto the existing document
+    // Verify it patched appProperties onto the verified legacy document
     const patchCall = mockCalls.find(c => c.method === 'PATCH' && c.url.includes('sheet_existing_title_match'));
     expect(patchCall).toBeDefined();
-
-    // Verify it called batchUpdate to add missing tabs ('recipes', 'portions', '_quomida_meta')
-    const batchUpdateCall = mockCalls.find(c => c.url.includes(':batchUpdate') && c.method === 'POST');
-    expect(batchUpdateCall).toBeDefined();
-    const batchBody = JSON.parse(batchUpdateCall!.body);
-    const addedTabs = batchBody.requests.map((r: any) => r.addSheet?.properties?.title);
-    expect(addedTabs).toContain('recipes');
-    expect(addedTabs).toContain('portions');
-    expect(addedTabs).toContain('_quomida_meta');
   });
 
-  it('self-heals and creates missing tab dynamically when writeTable encounters Unable to parse range', async () => {
+  it('does not mutate an unrelated title-matched spreadsheet lacking _meta or _quomida_meta', async () => {
+    const mockCalls: { url: string; method?: string; body?: any }[] = [];
+
+    const mockClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string, init?: RequestInit) => {
+        mockCalls.push({ url, method: init?.method, body: init?.body });
+
+        if (url.includes('/drive/v3/files?') && (url.includes('appProperties') || url.includes('properties'))) {
+          return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+
+        if (url.includes('/drive/v3/files?') && url.includes('name%20%3D')) {
+          return new Response(
+            JSON.stringify({ files: [{ id: 'random_user_sheet', name: 'Quomida Daily Logs' }] }),
+            { status: 200 }
+          );
+        }
+
+        if (url.includes('/drive/v3/files/') && init?.method === 'GET') {
+          return new Response(JSON.stringify({ properties: {}, appProperties: {} }), { status: 200 });
+        }
+
+        if (url.includes('/v4/spreadsheets') && init?.method === 'POST' && !url.includes(':batchUpdate')) {
+          const body = JSON.parse(String(init.body));
+          return new Response(
+            JSON.stringify({
+              spreadsheetId: 'sheet_new_managed',
+              properties: { title: body.properties.title },
+              sheets: body.sheets.map((s: any, idx: number) => ({ properties: { title: s.properties.title, sheetId: idx } }))
+            }),
+            { status: 200 }
+          );
+        }
+
+        if (url.includes('/v4/spreadsheets/random_user_sheet') && !url.includes('/values')) {
+          return new Response(
+            JSON.stringify({
+              properties: { title: 'Quomida Daily Logs' },
+              sheets: [{ properties: { title: 'MyPersonalBudget', sheetId: 0 } }]
+            }),
+            { status: 200 }
+          );
+        }
+
+        if (url.includes('/v4/spreadsheets/sheet_new_managed') && !url.includes('/values')) {
+          return new Response(
+            JSON.stringify({
+              properties: { title: 'Quomida Daily Logs' },
+              sheets: [
+                { properties: { title: 'daily_logs', sheetId: 0 } },
+                { properties: { title: '_meta', sheetId: 1 } },
+                { properties: { title: '_migrations', sheetId: 2 } }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+
+        if (url.includes('/values:batchGet')) {
+          return new Response(JSON.stringify({ valueRanges: [] }), { status: 200 });
+        }
+
+        return new Response(JSON.stringify({}), { status: 200 });
+      })
+    };
+
+    const driver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: mockClient
+    });
+
+    const resolvedId = await driver.ensureDocument('Quomida Daily Logs', ['daily_logs', 'weight_logs']);
+    expect(resolvedId).toBe('sheet_new_managed');
+
+    // Never mutates the unrelated user file that happened to share the same title
+    expect(mockCalls.filter(c => c.method === 'PATCH' && c.url.includes('random_user_sheet'))).toHaveLength(0);
+    expect(mockCalls.filter(c => c.url.includes('random_user_sheet:batchUpdate'))).toHaveLength(0);
+  });
+
+  it('does not auto-create missing tabs on writeTable by default unless autoCreateMissingTabOnWrite is explicitly true', async () => {
+    const defaultClient: GoogleHttpClient = {
+      fetch: vi.fn(async (url: string) => {
+        if (url.includes('/values:batchUpdate')) {
+          return new Response(
+            JSON.stringify({ error: { message: 'Unable to parse range: portions!A1:Z' } }),
+            { status: 400 }
+          );
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      })
+    };
+
+    const defaultDriver = new GoogleSheetsTabularDriver({
+      getAccessToken: () => 'mock-token',
+      httpClient: defaultClient
+    });
+
+    await expect(
+      defaultDriver.writeTable('doc_123', 'portions', ['id', 'name'], [{ id: 'p1', values: ['p1', '1 unidad'] }])
+    ).rejects.toThrow();
+
     const mockCalls: { url: string; method?: string; body?: any }[] = [];
     let writeAttempts = 0;
 
@@ -463,7 +583,8 @@ describe('GoogleSheetsTabularDriver', () => {
 
     const driver = new GoogleSheetsTabularDriver({
       getAccessToken: () => 'mock-token',
-      httpClient: mockClient
+      httpClient: mockClient,
+      autoCreateMissingTabOnWrite: true,
     });
 
     await driver.writeTable('doc_123', 'portions', ['id', 'name'], [{ id: 'p1', values: ['p1', '1 unidad'] }]);

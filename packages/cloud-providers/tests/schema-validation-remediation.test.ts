@@ -270,25 +270,45 @@ describe('Google ValidationService & Repair Strategy', () => {
         if (url.includes('/drive/v3/files/sheet_logs?fields=')) {
           return new Response(JSON.stringify({
             modifiedTime: '2026-09-18T20:00:00Z',
-            appProperties: { quomida_schema_version: '1' }
+            appProperties: { quomida_doc_type: 'daily_logs', quomida_schema_version: '2' }
           }), { status: 200 });
         }
 
-        if (url.includes('/v4/spreadsheets/sheet_logs') && !url.includes('/values/')) {
+        if (url.includes('/v4/spreadsheets/sheet_logs') && !url.includes('/values')) {
           return new Response(JSON.stringify({
-            sheets: [{ properties: { title: 'daily_logs', sheetId: 0 } }]
+            sheets: [
+              { properties: { title: 'daily_logs', sheetId: 0 } },
+              { properties: { title: 'weight_logs', sheetId: 1 } },
+              { properties: { title: '_meta', sheetId: 2 } },
+              { properties: { title: '_migrations', sheetId: 3 } }
+            ]
           }), { status: 200 });
         }
 
         if (url.includes('/values:batchGet')) {
-          // Missing 'calories' and 'meal_type' columns
+          const urlObj = new URL(url);
+          const requestedRanges = urlObj.searchParams.getAll('ranges');
           return new Response(JSON.stringify({
-            valueRanges: [
-              {
-                range: 'daily_logs!1:1',
-                values: [['id', 'timestamp', 'date', 'food_reference_id', 'quantity']]
+            valueRanges: requestedRanges.map((range) => {
+              if (range.includes('_meta')) {
+                return {
+                  range,
+                  values: [
+                    ['key', 'value', 'updatedAt'],
+                    ['app_id', 'quomida', '2026-09-18T20:00:00Z'],
+                    ['doc_type', 'daily_logs', '2026-09-18T20:00:00Z']
+                  ]
+                };
               }
-            ]
+              if (range.includes('_migrations')) {
+                return { range, values: [['2', '2026-09-18T20:00:00Z']] };
+              }
+              if (range.includes('weight_logs')) {
+                return { range, values: [QuomidaDailyLogsSpreadsheetSchema.tabs[1].columns.map(c => c.name)] };
+              }
+              // Missing 'calories' and 'meal_type' columns
+              return { range, values: [['id', 'timestamp', 'date', 'food_reference_id', 'quantity']] };
+            })
           }), { status: 200 });
         }
 
@@ -306,20 +326,13 @@ describe('Google ValidationService & Repair Strategy', () => {
   });
 
   it('reconciles schema version if _migrations tab contains a newer version than appProperties', async () => {
-    let appPropertiesUpdated = false;
-
     mockHttpClient = {
-      fetch: vi.fn(async (url: string, init?: RequestInit) => {
-        if (url.includes('/drive/v3/files/sheet_logs') && init?.method === 'PATCH') {
-          appPropertiesUpdated = true;
-          return new Response(JSON.stringify({}), { status: 200 });
-        }
-
+      fetch: vi.fn(async (url: string) => {
         if (url.includes('/drive/v3/files/sheet_logs')) {
           return new Response(JSON.stringify({
             modifiedTime: '2026-09-18T20:00:00Z',
             // Stale appProperties indicates version 0
-            appProperties: { quomida_schema_version: '0' }
+            appProperties: { quomida_doc_type: 'daily_logs', quomida_schema_version: '0' }
           }), { status: 200 });
         }
 
@@ -328,37 +341,37 @@ describe('Google ValidationService & Repair Strategy', () => {
             sheets: [
               { properties: { title: 'daily_logs', sheetId: 0 } },
               { properties: { title: 'weight_logs', sheetId: 2 } },
+              { properties: { title: '_meta', sheetId: 3 } },
               { properties: { title: '_migrations', sheetId: 1 } }
             ]
           }), { status: 200 });
         }
 
-        if (decodeURIComponent(url).includes('_migrations!A2:B')) {
-          // Spreadsheet _migrations tab records version 1 as applied
-          return new Response(JSON.stringify({
-            valueRanges: [
-              {
-                range: '_migrations!A2:B',
-                values: [['1', '2026-09-18T20:05:00Z']]
-              }
-            ]
-          }), { status: 200 });
-        }
-
         if (url.includes('/values:batchGet')) {
+          const urlObj = new URL(url);
+          const requestedRanges = urlObj.searchParams.getAll('ranges');
           const dailyHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns.map(c => c.name);
           const weightHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[1].columns.map(c => c.name);
           return new Response(JSON.stringify({
-            valueRanges: [
-              {
-                range: 'daily_logs!1:1',
-                values: [dailyHeaders]
-              },
-              {
-                range: 'weight_logs!1:1',
-                values: [weightHeaders]
+            valueRanges: requestedRanges.map((range) => {
+              if (range.includes('_migrations')) {
+                return { range, values: [['2', '2026-09-18T20:05:00Z']] };
               }
-            ]
+              if (range.includes('_meta')) {
+                return {
+                  range,
+                  values: [
+                    ['key', 'value', 'updatedAt'],
+                    ['app_id', 'quomida', '2026-09-18T20:05:00Z'],
+                    ['doc_type', 'daily_logs', '2026-09-18T20:05:00Z']
+                  ]
+                };
+              }
+              if (range.includes('weight_logs')) {
+                return { range, values: [weightHeaders] };
+              }
+              return { range, values: [dailyHeaders] };
+            })
           }), { status: 200 });
         }
 
@@ -369,15 +382,15 @@ describe('Google ValidationService & Repair Strategy', () => {
     const validationService = new ValidationService(() => 'test-token', mockHttpClient);
     const health = await validationService.checkHealth('sheet_logs', QuomidaDailyLogsSpreadsheetSchema);
 
-    expect(health.currentVersion).toBe(1);
+    expect(health.currentVersion).toBe(2);
     expect(health.status).toBe(ValidationStatus.READY);
-    expect(appPropertiesUpdated).toBe(true);
   });
 
   it('repairs missing columns non-destructively after creating a backup', async () => {
     let backupCreated = false;
     let appendedColumnsCount = 0;
     let newColumnNames: string[] = [];
+    let isRepaired = false;
 
     mockHttpClient = {
       fetch: vi.fn(async (url: string, init?: RequestInit) => {
@@ -392,7 +405,7 @@ describe('Google ValidationService & Repair Strategy', () => {
         if (url.includes('/drive/v3/files/sheet_logs?fields=')) {
           return new Response(JSON.stringify({
             modifiedTime: '2026-09-18T20:00:00Z',
-            appProperties: { quomida_schema_version: '1' }
+            appProperties: { quomida_doc_type: 'daily_logs', quomida_schema_version: '2' }
           }), { status: 200 });
         }
 
@@ -408,6 +421,9 @@ describe('Google ValidationService & Repair Strategy', () => {
                   for (const v of r.values) {
                     if (v.userEnteredValue?.stringValue) {
                       newColumnNames.push(v.userEnteredValue.stringValue);
+                      if (v.userEnteredValue.stringValue === 'calories') {
+                        isRepaired = true;
+                      }
                     }
                   }
                 }
@@ -417,24 +433,51 @@ describe('Google ValidationService & Repair Strategy', () => {
           }
 
           return new Response(JSON.stringify({
-            sheets: [{ properties: { title: 'daily_logs', sheetId: 0 } }]
+            sheets: [
+              { properties: { title: 'daily_logs', sheetId: 0 } },
+              { properties: { title: 'weight_logs', sheetId: 1 } },
+              { properties: { title: '_meta', sheetId: 2 } },
+              { properties: { title: '_migrations', sheetId: 3 } }
+            ]
           }), { status: 200 });
         }
 
+        if (url.includes('/values:batchUpdate')) {
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+
         if (url.includes('/values:batchGet')) {
-          // Missing 'calories'
-          const existingHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns
-            .map(c => c.name)
-            .filter(name => name !== 'calories');
+          const urlObj = new URL(url);
+          const requestedRanges = urlObj.searchParams.getAll('ranges');
+          const fullDailyHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[0].columns.map(c => c.name);
+          const missingDailyHeaders = fullDailyHeaders.filter(name => name !== 'calories');
+          const weightHeaders = QuomidaDailyLogsSpreadsheetSchema.tabs[1].columns.map(c => c.name);
 
           return new Response(JSON.stringify({
-            valueRanges: [
-              {
-                range: 'daily_logs!1:1',
-                values: [existingHeaders]
+            valueRanges: requestedRanges.map((range) => {
+              if (range.includes('_migrations')) {
+                return { range, values: [['2', '2026-09-18T20:00:00Z']] };
               }
-            ]
+              if (range.includes('_meta')) {
+                return {
+                  range,
+                  values: [
+                    ['key', 'value', 'updatedAt'],
+                    ['app_id', 'quomida', '2026-09-18T20:00:00Z'],
+                    ['doc_type', 'daily_logs', '2026-09-18T20:00:00Z']
+                  ]
+                };
+              }
+              if (range.includes('weight_logs')) {
+                return { range, values: [weightHeaders] };
+              }
+              return { range, values: [isRepaired ? fullDailyHeaders : missingDailyHeaders] };
+            })
           }), { status: 200 });
+        }
+
+        if (url.includes('/drive/v3/files/') && init?.method === 'DELETE') {
+          return new Response(JSON.stringify({}), { status: 200 });
         }
 
         if (url.includes('/drive/v3/files/sheet_logs') && init?.method === 'PATCH') {
@@ -460,8 +503,19 @@ describe('Google ValidationService & Repair Strategy', () => {
         if (url.includes('/drive/v3/files/sheet_logs')) {
           return new Response(JSON.stringify({
             modifiedTime: '2026-09-18T22:00:00Z', // newer than expected
-            appProperties: {}
+            appProperties: { quomida_doc_type: 'daily_logs' }
           }), { status: 200 });
+        }
+        if (url.includes('/v4/spreadsheets/sheet_logs') && !url.includes('/values')) {
+          return new Response(JSON.stringify({
+            sheets: [
+              { properties: { title: 'daily_logs', sheetId: 0 } },
+              { properties: { title: '_quomida_meta', sheetId: 1 } }
+            ]
+          }), { status: 200 });
+        }
+        if (url.includes('/values:batchGet')) {
+          return new Response(JSON.stringify({ valueRanges: [] }), { status: 200 });
         }
         return new Response('OK', { status: 200 });
       })
