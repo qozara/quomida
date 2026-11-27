@@ -10,28 +10,56 @@ export const SchemaRemediationModal: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
 
   // If status transitions back to idle or disconnected, reset dismissal & state
+  const isModalStatus =
+    syncStatus === 'corrupted' ||
+    syncStatus === 'upgrade_required' ||
+    syncStatus === 'unmanaged' ||
+    syncStatus === 'foreign_app';
+
   useEffect(() => {
-    if (syncStatus !== 'corrupted' && syncStatus !== 'upgrade_required') {
+    if (!isModalStatus) {
       setIsDismissed(false);
       setIsSuccess(false);
       setErrorMessage(null);
     }
-  }, [syncStatus]);
+  }, [isModalStatus]);
 
-  if (isDismissed || (syncStatus !== 'corrupted' && syncStatus !== 'upgrade_required')) {
+  if (isDismissed || !isModalStatus) {
     return null;
   }
 
   const isCorrupted = syncStatus === 'corrupted';
-  const title = isCorrupted
-    ? t.sync.remediation?.corruptedTitle || 'Spreadsheet Structure Mismatch'
-    : t.sync.remediation?.upgradeTitle || 'Spreadsheet Schema Upgrade Required';
+  const isUnmanaged = syncStatus === 'unmanaged';
+  const isForeignApp = syncStatus === 'foreign_app';
+  const isReadOnlyRejection = isUnmanaged || isForeignApp;
 
-  const description = isCorrupted
-    ? t.sync.remediation?.corruptedDesc ||
-      'Columns or tabs have been altered in your linked cloud spreadsheet. Quomida can safely repair the structure by appending missing columns without deleting your existing data.'
-    : t.sync.remediation?.upgradeDesc ||
-      'Your linked cloud spreadsheet was created with an older schema version. An automatic migration is required to continue syncing.';
+  const title = isUnmanaged
+    ? t.sync.remediation?.unmanagedTitle || 'Unrecognized Spreadsheet'
+    : isForeignApp
+      ? t.sync.remediation?.foreignAppTitle || 'Spreadsheet Belongs to Another App'
+      : isCorrupted
+        ? t.sync.remediation?.corruptedTitle || 'Spreadsheet Structure Mismatch'
+        : t.sync.remediation?.upgradeTitle || 'Spreadsheet Schema Upgrade Required';
+
+  const subtitle = isForeignApp
+    ? t.sync.remediation?.foreignAppBadge || 'Foreign App Protected'
+    : isUnmanaged
+      ? t.sync.remediation?.unmanagedBadge || 'Unmanaged File'
+      : isCorrupted
+        ? 'Structure Remediation'
+        : 'Schema Upgrade';
+
+  const description = isUnmanaged
+    ? t.sync.remediation?.unmanagedDesc ||
+      'A spreadsheet with the default name was found in Google Drive, but it lacks Quomida\'s _meta manifest tab. Quomida will not modify unmanaged files.'
+    : isForeignApp
+      ? t.sync.remediation?.foreignAppDesc ||
+        'This spreadsheet belongs to another Qozara application and cannot be modified by Quomida.'
+      : isCorrupted
+        ? t.sync.remediation?.corruptedDesc ||
+          'Columns or tabs have been altered in your linked cloud spreadsheet. Quomida can safely repair the structure by appending missing columns without deleting your existing data.'
+        : t.sync.remediation?.upgradeDesc ||
+          'Your linked cloud spreadsheet was created with an older schema version. An automatic migration is required to continue syncing.';
 
   const handleRemediate = async () => {
     setIsLoading(true);
@@ -82,7 +110,7 @@ export const SchemaRemediationModal: React.FC = () => {
               {title}
             </h2>
             <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mt-0.5">
-              {isCorrupted ? 'Structure Remediation' : 'Schema Upgrade'}
+              {subtitle}
             </p>
           </div>
         </div>
@@ -93,13 +121,15 @@ export const SchemaRemediationModal: React.FC = () => {
         </p>
 
         {/* Automated Backup Guarantee Badge */}
-        <div className="flex items-center gap-3 p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl mb-5">
-          <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-          <p className="text-xs text-slate-300 leading-snug">
-            {t.sync.remediation?.backupNote ||
-              'A backup copy of your spreadsheet will be created in your cloud drive before applying changes.'}
-          </p>
-        </div>
+        {!isReadOnlyRejection && (
+          <div className="flex items-center gap-3 p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl mb-5">
+            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+            <p className="text-xs text-slate-300 leading-snug">
+              {t.sync.remediation?.backupNote ||
+                'A backup copy of your spreadsheet will be created in your cloud drive before applying changes.'}
+            </p>
+          </div>
+        )}
 
         {/* Error Announcement */}
         {errorMessage && (
@@ -136,22 +166,24 @@ export const SchemaRemediationModal: React.FC = () => {
             {t.sync.remediation?.dismiss || 'Dismiss for now'}
           </button>
 
-          <button
-            onClick={handleRemediate}
-            disabled={isLoading || isSuccess}
-            className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-sm font-semibold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-          >
-            {isLoading && <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />}
-            <span>
-              {isLoading
-                ? isCorrupted
-                  ? t.sync.remediation?.repairing || 'Repairing spreadsheet...'
-                  : t.sync.remediation?.upgrading || 'Upgrading spreadsheet...'
-                : isCorrupted
-                  ? t.sync.remediation?.repairButton || 'Repair Spreadsheet'
-                  : t.sync.remediation?.upgradeButton || 'Upgrade Spreadsheet'}
-            </span>
-          </button>
+          {!isReadOnlyRejection && (
+            <button
+              onClick={handleRemediate}
+              disabled={isLoading || isSuccess}
+              className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-sm font-semibold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              {isLoading && <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />}
+              <span>
+                {isLoading
+                  ? isCorrupted
+                    ? t.sync.remediation?.repairing || 'Repairing spreadsheet...'
+                    : t.sync.remediation?.upgrading || 'Upgrading spreadsheet...'
+                  : isCorrupted
+                    ? t.sync.remediation?.repairButton || 'Repair Spreadsheet'
+                    : t.sync.remediation?.upgradeButton || 'Upgrade Spreadsheet'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -19,8 +19,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@qozara/cloud-sync": "^1.0.0",
-    "@qozara/cloud-sync-google": "^1.0.2",
+    "@qozara/cloud-sync": "^2.0.0",
+    "@qozara/cloud-sync-google": "^2.0.0",
     "@quomida/domain-core": "*"
   },
   "devDependencies": {

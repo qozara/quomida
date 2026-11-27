@@ -7,6 +7,7 @@ import {
   QuomidaDailyLogsSpreadsheetSchema,
   QuomidaFoodCatalogSpreadsheetSchema,
 } from './schemas.js';
+import { QUOMIDA_MIGRATIONS_BY_DOC_TYPE } from './migrations/2_canonical_meta_manifest.js';
 
 export type { GoogleSheetsTabularDriverOptions };
 
@@ -15,11 +16,13 @@ export function createQuomidaTabularDriverOptions(
 ): GoogleSheetsTabularDriverOptions {
   return {
     ...options,
+    appId: options.appId ?? 'quomida',
     defaultSchema: options.defaultSchema ?? QuomidaDailyLogsSpreadsheetSchema,
     schemasByDocType: options.schemasByDocType ?? {
       daily_logs: QuomidaDailyLogsSpreadsheetSchema,
       food_catalog: QuomidaFoodCatalogSpreadsheetSchema,
     },
+    migrationsByDocType: options.migrationsByDocType ?? QUOMIDA_MIGRATIONS_BY_DOC_TYPE,
     docTypeResolver:
       options.docTypeResolver ??
       ((title, tabs) => {
@@ -49,7 +52,7 @@ export function createQuomidaTabularDriverOptions(
     metaSheetName: options.metaSheetName ?? '_quomida_meta',
     metaBannerText: options.metaBannerText ?? 'QUOMIDA SYSTEM FILE - DO NOT DELETE',
     metaDescription: options.metaDescription ?? 'Quomida System Metadata',
-    autoCreateMissingTabOnWrite: options.autoCreateMissingTabOnWrite ?? true,
+    autoCreateMissingTabOnWrite: options.autoCreateMissingTabOnWrite ?? false,
   };
 }
 

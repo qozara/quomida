@@ -1,5 +1,8 @@
 export {
   ConflictError,
+  ForeignDocumentError,
+  SchemaIncompatibleError,
+  UnmanagedDocumentError,
   ValidationService,
   ValidationStatus,
   type SchemaStatusDTO,

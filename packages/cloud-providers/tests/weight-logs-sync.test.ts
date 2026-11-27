@@ -76,11 +76,14 @@ class InMemoryTabularDriver implements TabularStorageDriver {
 
 describe('Weight Logs Sync Schemas, Serializers & Route Mapping', () => {
   describe('QuomidaDailyLogsSpreadsheetSchema', () => {
-    it('has schema version 1 and includes weight_logs tab definition', () => {
-      expect(QuomidaDailyLogsSpreadsheetSchema.version).toBe(1);
+    it('has schema version 2 and includes weight_logs tab definition', () => {
+      expect(QuomidaDailyLogsSpreadsheetSchema.version).toBe(2);
+      expect(QuomidaDailyLogsSpreadsheetSchema.identity?.appId).toBe('quomida');
+      expect(QuomidaDailyLogsSpreadsheetSchema.identity?.docType).toBe('daily_logs');
       const tabNames = QuomidaDailyLogsSpreadsheetSchema.tabs.map(t => t.name);
       expect(tabNames).toContain('daily_logs');
       expect(tabNames).toContain('weight_logs');
+      expect(tabNames).toContain('_meta');
 
       const weightLogsTab = QuomidaDailyLogsSpreadsheetSchema.tabs.find(t => t.name === 'weight_logs');
       expect(weightLogsTab).toBeDefined();

@@ -29,6 +29,14 @@ describe('Schema Remediation UI State & i18n Guard', () => {
       adapter: upgradeAdapter as any
     });
     expect(upgradeUxState).toBe('error');
+
+    for (const protectedStatus of ['unmanaged', 'foreign_app'] as const) {
+      const protectedUx = resolveUXStatus({
+        isOnline: true,
+        adapter: { getStatus: () => protectedStatus } as any
+      });
+      expect(protectedUx).toBe('error');
+    }
   });
 
   it('maintains 100% parity between English and Spanish dictionaries for remediation keys', () => {
@@ -43,6 +51,12 @@ describe('Schema Remediation UI State & i18n Guard', () => {
       'corruptedDesc',
       'upgradeTitle',
       'upgradeDesc',
+      'unmanagedTitle',
+      'unmanagedBadge',
+      'unmanagedDesc',
+      'foreignAppTitle',
+      'foreignAppBadge',
+      'foreignAppDesc',
       'backupNote',
       'repairButton',
       'upgradeButton',
